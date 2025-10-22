@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Human approval for large diffs",
+  "description": "Avoid accidental rewrites by checking diff size before commits. If the diff exceeds 500 lines or touches more than 10 files, stop and ask for manual approval.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Analyze the current git diff. Count the total number of lines changed and the number of files modified. If the diff exceeds 500 lines OR touches more than 10 files, stop immediately and print a summary table showing: total lines changed, number of files modified, and a list of affected files. Then ask the user: \"This is a large change. Do you want to proceed with the commit?\" Wait for explicit approval before continuing. If the diff is under these thresholds, allow the commit to proceed without interruption."
+  }
+}

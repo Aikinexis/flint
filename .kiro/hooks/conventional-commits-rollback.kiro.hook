@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Conventional commits with rollback point",
+  "description": "Keep history clean and provide an instant escape hatch by ensuring conventional commit format and creating rollback tags",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      ".git/COMMIT_EDITMSG"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Ensure the commit message follows conventional commits format (e.g., feat:, fix:, docs:, etc.). Create a lightweight rollback tag 'rollback-point' on the last green commit (the commit before this one). If the new commit fails tests in CI, instruct the user to reset --hard to rollback-point. Verify that a clean commit message exists and a rollback tag has been created."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "name": "E2E smoke after key flows change",
+  "description": "Keep the core demo path green by running Playwright tests for voice-to-draft, summarize selection, and rewrite selection flows whenever key files change",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/content/**/*",
+      "src/components/**/*",
+      "src/services/ai.ts"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Run Playwright for three flows:\n1. Voice to draft with mocked speech\n2. Summarize selection and accept\n3. Rewrite selection and replace in place\n\nIf a test fails, suggest the smallest code or test change to restore green.\n\nExpected outcome: All three flows pass in headless mode."
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Changelog and clean commit",
+  "description": "Produce clean history before tagging. Generate changelog from last tag grouped by features, fixes, and docs. Suggest conventional commit messages for staged changes and prepare release note draft.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      ".git/index"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "From the last tag, generate a changelog grouped by features, fixes, and docs. Suggest conventional commit messages for staged changes. Prepare a release note draft for GitHub. Expected outcome: Changelog and notes ready to publish."
+  }
+}

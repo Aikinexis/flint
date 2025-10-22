@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Lock task intent and persist state",
+  "description": "Persist the current task, constraints, and acceptance criteria so the agent can resume after timeouts",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      ".kiro/state/task.yaml"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Create or update .kiro/state/task.yaml with:\n- task_title\n- scope_of_change (files and functions allowed to change)\n- acceptance_criteria (tests, compile, size budgets)\n- step_plan (numbered steps)\n- current_step\n- last_result_summary\nIf a timeout occurs later, reload this file and continue from current_step."
+  }
+}

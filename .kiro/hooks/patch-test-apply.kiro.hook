@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Propose patch then apply if green",
+  "description": "Prevent runaway edits and enforce compile plus tests before writing. Generate a unified diff for the task, run TypeScript build and Jest on a temp checkout with the diff applied, and only apply the diff to the working tree if both pass. If either fails, propose a smaller diff for the same task.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      ".kiro/state/task.yaml"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Generate a unified diff for the task in .kiro/state/task.yaml. Do not write files yet. Run TypeScript build and Jest on a temp checkout with the diff applied. If both pass, apply the diff to the working tree. If either fails, print the failures and propose a smaller diff for the same task."
+  }
+}

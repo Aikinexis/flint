@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Block placeholders and accidental mocks",
+  "description": "Refuse changes that introduce placeholder text or mock code outside tests.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*.ts",
+      "src/**/*.tsx"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Scan the diff for forbidden strings outside __tests__ or __mocks__ directories:\nForbidden patterns: [\"TODO\", \"FIXME\", \"PLACEHOLDER\", \"LOREM IPSUM\", \"NOT IMPLEMENTED\", \"throw new Error('Not implemented')\", \"pass # stub\", \"<placeholder>\", \"mockImplementation(\"]\n\nIf any forbidden patterns are found in files that are NOT in __tests__ or __mocks__ directories:\n1. Revert those hunks and replace with real implementation code\n2. If real code is not possible, cancel the save and print a clear explanation of what was blocked and why\n3. Suggest what the developer should do instead\n\nSuccess criteria: No forbidden placeholders in src except in __tests__ or __mocks__ directories."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "name": "Bundle and perf budgets",
+  "description": "Keep size and latency within targets.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "dist/**/*",
+      "vite.config.ts",
+      "package.json"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Analyze the Vite output. Ensure total compressed size for panel and content script is under 1 MB.\nList the top five modules by size and suggest code splitting if any exceed 150 KB.\nRun a quick interaction profile for rewrite and summarize paths. Target under 800 ms for short selections.\nExpect: Budget OK and hot spots listed if any."
+  }
+}

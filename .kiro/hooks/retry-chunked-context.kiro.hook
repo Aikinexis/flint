@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Retry with chunked context on timeout",
+  "description": "Recover gracefully from long context failures by splitting tasks into atomic substeps and processing one file/function at a time",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      ".kiro/state/task.yaml"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "If the last run timed out or returned a summary, reload .kiro/state/task.yaml. Produce a smaller plan: Split the task into atomic substeps per file, process at most one file and one function per attempt, and confirm acceptance criteria after each substep. Continue from current_step and update last_result_summary each time."
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Prevent scope drift",
+  "description": "Enforce that only files listed in the task scope are changed",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      ".git/index"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Read .kiro/state/task.yaml scope_of_change. Compare the staged files with allowed paths. If any file is out of scope, unstage it and print a warning. Ask for a new task file if the scope must expand."
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "enabled": true,
+  "name": "Capability fallback tests",
+  "description": "Prove graceful behavior when APIs are unavailable by running unit and e2e tests with Summarizer and Rewriter unavailable, confirming fallback to Prompt API or clear messaging",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/services/ai.ts",
+      "src/components/SummaryPanel.tsx",
+      "src/components/RewritePanel.tsx",
+      "tests/**/*.test.ts",
+      "tests/**/*.spec.ts"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Run unit and e2e tests with Summarizer unavailable, then with Rewriter unavailable. Confirm prompts fall back to the Prompt API or show a clear message and do not crash. Verify all fallback scenarios pass."
+  }
+}

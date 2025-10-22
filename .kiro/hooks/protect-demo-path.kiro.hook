@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "name": "Protect the demo path",
+  "description": "The core flows must never break. Runs three Playwright demo flows on file save and blocks if any fail.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/services/ai.ts",
+      "src/components/**/*",
+      "src/content/**/*"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Run the three Playwright demo flows:\n1) Voice to draft with mocked speech\n2) Summarize selection and accept\n3) Rewrite selection and replace in place\n\nIf any fail, block the save and print the failing step and suggested one-line fix.\n\nExpected outcome: Demo flows always green."
+  }
+}

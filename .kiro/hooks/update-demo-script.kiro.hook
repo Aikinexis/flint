@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Update demo script",
+  "description": "Keep a ready to record flow script under three minutes.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "manual"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Generate a two minute thirty second script that shows:\n1. Voice to draft\n2. Summarize long paragraph\n3. Rewrite with tone change and accept\nInclude exact clicks and hotkeys. Keep it under 250 words."
+  }
+}

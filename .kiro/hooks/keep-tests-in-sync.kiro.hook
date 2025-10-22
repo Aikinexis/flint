@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Keep tests in sync",
+  "description": "When TypeScript files change, ensure matching tests exist and run green.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*.ts",
+      "src/**/*.tsx"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "For each changed file, create or update Jest tests to cover new logic and edge cases. Run Jest. If failures occur, propose minimal fixes or test updates. Do not change public interfaces. Success expectation: All tests pass and new lines are covered."
+  }
+}

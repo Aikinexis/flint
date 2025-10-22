@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "MV3 and privacy compliance check",
+  "description": "Validate rules before a demo or submission",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "manifest.json",
+      "src/**/*",
+      "README.md",
+      "package.json"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Verify all items:\n- Manifest V3 only and background is a service worker\n- Permissions are storage, scripting, activeTab only\n- Strict CSP present\n- No external network calls in code paths\n- README states local AI processing and Web Speech privacy note\n- Bundle size under 1 MB for panel plus content script\nReport any violations with exact file and line. Suggest a one line fix for each."
+  }
+}

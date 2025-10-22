@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Compile and tests must pass",
+  "description": "Stop drift when the agent restarts or summarizes away context by running TypeScript build, Jest unit tests, RTL component tests, and Playwright smoke tests on every file save. If any fail, suggest minimal code edits or test updates limited to the files touched. If still failing, revert to the last green commit and reopen the task from .kiro/state/task.yaml.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*",
+      "manifest.json"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Run TypeScript build. Run Jest unit and RTL component tests. Run Playwright smoke tests. If any fail, suggest minimal code edits or test updates limited to the files touched in this save. If still failing, revert to the last green commit and reopen the task from .kiro/state/task.yaml. Success expectation: All checks green or changes reverted."
+  }
+}

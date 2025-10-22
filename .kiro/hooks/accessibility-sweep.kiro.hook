@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Accessibility sweep",
+  "description": "Catch issues early in the panel UI by running automated a11y audits on component and panel files",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/components/**/*",
+      "src/panel/**/*"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Render components in a headless DOM and run an a11y audit with axe. Ensure focus order, ARIA labels, contrast, and keyboard operability. For each issue, propose a small fix and apply it if low risk. Success expectation: No critical or serious a11y issues."
+  }
+}

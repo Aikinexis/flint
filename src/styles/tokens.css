@@ -1,0 +1,219 @@
+/* Flint monochrome + orange accent tokens */
+:root {
+  /* Geometry */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+
+  /* Elevation */
+  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.25);
+  --shadow-glow: 0 0 0 1px rgba(249, 115, 22, 0.25), 0 12px 40px rgba(249, 115, 22, 0.18);
+
+  /* Typography */
+  --font-sans: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    'Apple Color Emoji', 'Segoe UI Emoji';
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 18px;
+  --fs-2xl: 22px;
+
+  /* Colors - Dark Mode (Default) */
+  --bg: #0c0e13;
+  --surface: #111421;
+  --surface-2: #151a28;
+  --overlay: rgba(0, 0, 0, 0.35);
+  --text: #eef0f6;
+  --muted: #b7bccf;
+  --disabled: #8c92a8;
+  --accent: #f97316;
+  --accent-2: #fdba74;
+  --comp: #3b82f6;
+  --comp-2: #93c5fd;
+  --stroke: rgba(255, 255, 255, 0.08);
+  --stroke-strong: rgba(255, 255, 255, 0.14);
+
+  /* Dimensions */
+  --btn-height: 38px;
+  --toolbar-height: 44px;
+}
+
+/* Light Mode */
+.light {
+  --bg: #ffffff;
+  --surface: #f6f7fb;
+  --surface-2: #eef0f6;
+  --overlay: rgba(0, 0, 0, 0.06);
+  --text: #0d1220;
+  --muted: #4d5568;
+  --disabled: #8b94a8;
+  --accent: #ea580c;
+  --accent-2: #fb923c;
+  --comp: #2563eb;
+  --comp-2: #93c5fd;
+  --stroke: rgba(13, 18, 32, 0.08);
+  --stroke-strong: rgba(13, 18, 32, 0.14);
+}
+
+/* Optional blue accent toggle on the root element */
+.accent-comp {
+  --accent: var(--comp);
+  --accent-2: var(--comp-2);
+  --shadow-glow: 0 0 0 1px rgba(59, 130, 246, 0.25), 0 12px 40px rgba(59, 130, 246, 0.18);
+}
+
+/* Primitives */
+.flint-bg {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.flint-surface {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
+    var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.flint-card {
+  background: var(--surface-2);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+}
+
+/* Buttons */
+.flint-btn {
+  height: var(--btn-height);
+  padding: 0 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--stroke);
+  background: var(--surface-2);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: var(--fs-md);
+  font-family: var(--font-sans);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.flint-btn:hover {
+  box-shadow: var(--shadow-glow);
+}
+
+.flint-btn:active {
+  transform: translateY(1px);
+}
+
+.flint-btn.primary {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  color: #0b0d13;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.flint-btn.ghost {
+  background: transparent;
+}
+
+.flint-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Inputs */
+.flint-input {
+  height: 40px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--stroke);
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 0 16px;
+  font-size: var(--fs-md);
+  font-family: var(--font-sans);
+  outline: none;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.flint-input:focus {
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 50%, transparent), var(--shadow-glow);
+  border-color: color-mix(in oklab, var(--accent) 60%, var(--stroke));
+}
+
+.flint-input::placeholder {
+  color: var(--muted);
+}
+
+/* Textarea */
+.flint-textarea {
+  min-height: 80px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--stroke);
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 12px 16px;
+  font-size: var(--fs-md);
+  font-family: var(--font-sans);
+  outline: none;
+  resize: vertical;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.flint-textarea:focus {
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 50%, transparent), var(--shadow-glow);
+  border-color: color-mix(in oklab, var(--accent) 60%, var(--stroke));
+}
+
+.flint-textarea::placeholder {
+  color: var(--muted);
+}
+
+/* Toolbar and panel */
+.flint-toolbar {
+  height: var(--toolbar-height);
+  backdrop-filter: blur(10px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+  border-bottom: 1px solid var(--stroke);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+}
+
+.flint-badge {
+  padding: 2px 8px;
+  font-size: var(--fs-xs);
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  color: var(--muted);
+}
+
+.flint-section-title {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+/* Minibar */
+.flint-minibar {
+  position: fixed;
+  z-index: 999999;
+  display: inline-flex;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--stroke-strong);
+  background: rgba(17, 20, 33, 0.85);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-glow);
+}
+
+.light .flint-minibar {
+  background: rgba(246, 247, 251, 0.85);
+}

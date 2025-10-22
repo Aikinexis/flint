@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Use deterministic prompts for code changes",
+  "description": "Reduce randomness between retries by using a structured template for all code actions. The template includes objective, allowed files, acceptance criteria, non-goals, test plan, and output format. The filled template is saved at .kiro/state/prompt.md and reused for retries.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      ".kiro/state/prompt.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "For the current task, use this template for all code actions:\n- Objective:\n- Files allowed to change:\n- Acceptance criteria:\n- Non goals:\n- Test plan:\n- Output format: unified diff only\n\nSave the filled template at .kiro/state/prompt.md and reuse it for retries. Ensure .kiro/state/prompt.md exists and is reused for consistency across retry attempts."
+  }
+}

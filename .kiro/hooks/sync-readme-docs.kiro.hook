@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Sync README with APIs and permissions",
+  "description": "Keep documentation accurate as code evolves by updating README sections for AI APIs, permissions, and setup steps when manifest.json or src/services/ai.ts are modified",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "manifest.json",
+      "src/services/ai.ts"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Update README sections:\n1. Built in AI APIs used and capability checks\n2. Permissions and host_permissions\n3. Setup and load unpacked steps\nKeep text short and exact. Commit with message \"docs: sync with code\"."
+  }
+}
