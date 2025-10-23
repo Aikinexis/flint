@@ -41,9 +41,9 @@ Flint is a Chrome extension that brings voice capture, instant summarization, an
    - Select the `dist/` folder from your project directory
    - Flint icon appears in the extensions toolbar
 
-4. Open side panel:
+4. Open panel:
    - Click the Flint icon in toolbar
-   - Side panel opens on the right side
+   - Panel opens as popup
 
 ### Development with Watch Mode
 
@@ -93,61 +93,48 @@ flint/
 
 ## Built-in AI APIs
 
-Flint uses Chrome's local AI APIs with capability checks before each operation:
+Flint uses Chrome's local AI APIs with capability checks:
 
-**Prompt API**: General-purpose text generation
+**Prompt API**: Text generation
 ```typescript
-const available = await LanguageModel.availability();
-if (available !== 'unavailable' && navigator.userActivation.isActive) {
-  const session = await LanguageModel.create();
-  const result = await session.prompt('Your prompt here');
+const available = await ai.languageModel.availability();
+if (available !== 'no') {
+  const session = await ai.languageModel.create();
+  const result = await session.prompt('Your prompt');
 }
 ```
 
-**Summarizer API**: Text summarization with modes (bullets, paragraph, outline)
+**Summarizer API**: Text summarization
 ```typescript
-if ('Summarizer' in self) {
-  const availability = await Summarizer.availability();
-  if (availability !== 'unavailable' && navigator.userActivation.isActive) {
-    const summarizer = await Summarizer.create({
-      type: 'key-points',
-      format: 'markdown',
-      length: 'medium'
-    });
-    const summary = await summarizer.summarize(text);
-  }
+const available = await ai.summarizer.availability();
+if (available !== 'no') {
+  const summarizer = await ai.summarizer.create();
+  const summary = await summarizer.summarize(text);
 }
 ```
 
-**Rewriter API**: Text transformation with tone control
+**Rewriter API**: Text transformation
 ```typescript
-if ('Rewriter' in self) {
-  const availability = await Rewriter.availability();
-  if (availability !== 'unavailable' && navigator.userActivation.isActive) {
-    const rewriter = await Rewriter.create({ 
-      tone: 'more-formal',
-      format: 'plain-text'
-    });
-    const result = await rewriter.rewrite(text);
-  }
+const available = await ai.rewriter.availability();
+if (available !== 'no') {
+  const rewriter = await ai.rewriter.create();
+  const result = await rewriter.rewrite(text);
 }
 ```
 
-All APIs require user activation (button click) and include fallback to mock providers when unavailable.
+All APIs check availability before use and fall back to mock providers when unavailable.
 
 ## Permissions
 
-Flint requires the following permissions (defined in `manifest.json`):
-
 **permissions:**
-- `storage` - Save user settings, pinned notes, and session history locally
-- `scripting` - Inject content scripts into web pages to detect text selections
-- `activeTab` - Access the current tab to insert and replace text
+- `storage` - Save settings and history locally
+- `scripting` - Inject content scripts for text selection
+- `activeTab` - Access current tab for text insertion
 
 **host_permissions:**
-- `<all_urls>` - Required for content script injection on any website
+- `<all_urls>` - Content script injection on any site
 
-All permissions are used solely for core functionality. No data is sent to external servers.
+No data sent to external servers.
 
 ## Troubleshooting
 
