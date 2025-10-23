@@ -36,13 +36,15 @@ Flint is a Chrome extension that brings voice capture, instant summarization, an
 
 3. Load as unpacked extension:
    - Open `chrome://extensions/`
-   - Enable "Developer mode" (top right)
+   - Enable "Developer mode" (top right toggle)
    - Click "Load unpacked"
    - Select the `dist/` folder
+   - Extension appears in toolbar
 
 4. Open side panel:
-   - Click Flint icon in toolbar
+   - Click Flint icon in Chrome toolbar
    - Side panel opens on right side
+   - Grant microphone permission when prompted
 
 ### Development with Watch Mode
 
@@ -97,7 +99,7 @@ Flint uses Chrome's local AI APIs with capability checks:
 **Prompt API**: Text generation and fallback
 ```typescript
 const available = await ai.languageModel.availability();
-if (available !== 'no') {
+if (available !== 'no' && navigator.userActivation.isActive) {
   const session = await ai.languageModel.create();
   const result = await session.prompt('Your prompt');
 }
@@ -106,7 +108,7 @@ if (available !== 'no') {
 **Summarizer API**: Text summarization with options
 ```typescript
 const available = await ai.summarizer.availability();
-if (available !== 'no') {
+if (available !== 'no' && navigator.userActivation.isActive) {
   const summarizer = await ai.summarizer.create({
     type: 'key-points',
     format: 'markdown',
@@ -119,7 +121,7 @@ if (available !== 'no') {
 **Rewriter API**: Text transformation with tone control
 ```typescript
 const available = await ai.rewriter.availability();
-if (available !== 'no') {
+if (available !== 'no' && navigator.userActivation.isActive) {
   const rewriter = await ai.rewriter.create({
     tone: 'more-formal',
     format: 'plain-text'
@@ -128,7 +130,7 @@ if (available !== 'no') {
 }
 ```
 
-All APIs check availability before use. Falls back to mock providers when unavailable.
+All APIs check availability and user activation before use. Falls back to mock providers when unavailable.
 
 ## Permissions
 
@@ -137,6 +139,7 @@ All APIs check availability before use. Falls back to mock providers when unavai
 - `scripting` - Inject content scripts for text manipulation
 - `activeTab` - Access current tab for text insertion
 - `sidePanel` - Display side panel UI
+- `audioCapture` - Microphone access for voice recording
 
 **Host permissions:**
 - `<all_urls>` - Enable content script injection on all sites
@@ -146,7 +149,7 @@ All APIs check availability before use. Falls back to mock providers when unavai
 - Injected at `document_idle` on all pages
 - Handles text selection and insertion
 
-No external network calls. All AI processing is local.
+No external network calls except Web Speech API (server-based recognition).
 
 ## Troubleshooting
 

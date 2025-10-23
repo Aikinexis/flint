@@ -8,7 +8,16 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log('Flint extension installed');
 });
 
-// Message listener - placeholder for now
+// Handle extension icon click - open side panel
+chrome.action.onClicked.addListener((tab) => {
+  if (tab.id) {
+    chrome.sidePanel.open({ tabId: tab.id }).catch((error) => {
+      console.error('Failed to open side panel:', error);
+    });
+  }
+});
+
+// Message listener for panel-content communication
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   console.log('Background received message:', message);
   sendResponse({ success: true });

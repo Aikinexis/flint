@@ -3,6 +3,17 @@
 /* Tailwind directives */
 @tailwind base;
 @tailwind components;
+
+/* Custom component overrides in utilities layer */
+@layer utilities {
+  .flint-action-group {
+    display: flex !important;
+    gap: 12px !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+  }
+}
+
 @tailwind utilities;
 
 /* Global styles */
@@ -10,6 +21,16 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
 }
 
 body {
@@ -24,6 +45,8 @@ body {
 #root {
   width: 100%;
   height: 100%;
+  background: var(--bg);
+  position: relative;
 }
 
 /* Scrollbar styling for dark mode */
@@ -37,22 +60,128 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--stroke-strong);
+  background: var(--border);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
+  background: var(--text-muted);
 }
 
 /* Focus visible for accessibility */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
 /* Selection styling */
 ::selection {
-  background: color-mix(in oklab, var(--accent) 30%, transparent);
+  background: color-mix(in oklab, var(--primary) 30%, transparent);
   color: var(--text);
+}
+
+/* Panel Container - full side panel */
+.flint-panel-container {
+  display: flex;
+  flex-direction: row-reverse;
+  height: 100vh;
+  width: 100%;
+  background: var(--bg);
+}
+
+/* Sidebar Component Styles - FIXED to the right */
+.flint-sidebar {
+  position: fixed;
+  right: 0;
+  top: 0;
+  height: 100vh;
+  width: 72px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--stroke);
+  z-index: 100;
+}
+
+/* Content Area */
+.content-area {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  width: 0;
+  overflow: hidden;
+  background: var(--bg);
+  transition: width 0.3s ease;
+}
+
+.content-area.expanded {
+  width: calc(100% - 72px);
+  overflow-y: auto;
+}
+
+/* Sidebar Content Container */
+.sidebar-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+/* Sidebar Navigation */
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-nav .flint-btn {
+  justify-content: center;
+  width: 100%;
+  height: 48px;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 0;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.sidebar-nav .flint-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.sidebar-nav .flint-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 50%, transparent);
+}
+
+.sidebar-nav .flint-btn.active {
+  background: linear-gradient(135deg, oklch(0.5 0.1 255) 0%, oklch(0.4 0.12 255) 100%);
+  color: oklch(0.12 0 255);
+}
+
+.sidebar-nav .icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Collapsed State Styles */
+.flint-sidebar.collapsed .flint-btn span:not(.icon) {
+  display: none;
+}
+
+.flint-sidebar.collapsed .flint-btn {
+  justify-content: center;
+  padding: 0;
 }

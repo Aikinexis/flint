@@ -11,7 +11,8 @@
   "permissions": [
     "storage",
     "scripting",
-    "activeTab"
+    "activeTab",
+    "sidePanel"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -19,11 +20,9 @@
   "background": {
     "service_worker": "src/background/background.js"
   },
+
   "side_panel": {
     "default_path": "src/panel/index.html"
-  },
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
   },
   "action": {
     "default_title": "Open Flint",
@@ -32,5 +31,8 @@
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
   }
 }

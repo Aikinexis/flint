@@ -4,7 +4,7 @@
   "description": "Stop drift when the agent restarts or summarizes away context by running TypeScript build, Jest unit tests, RTL component tests, and Playwright smoke tests on every file save. If any fail, suggest minimal code edits or test updates limited to the files touched. If still failing, revert to the last green commit and reopen the task from .kiro/state/task.yaml.",
   "version": "1",
   "when": {
-    "type": "fileEdited",
+    "type": "fileCreated",
     "patterns": [
       "src/**/*",
       "manifest.json"

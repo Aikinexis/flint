@@ -62,7 +62,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
 
 ## Phase 3: Core Services Layer
 
-- [ ] 6. Create utility modules
+- [x] 6. Create utility modules
   - Create `src/utils/id.ts` with UUID generation function
   - Create `src/utils/throttle.ts` with throttle and debounce functions
   - Create `src/utils/dom.ts` with DOM helper functions
@@ -71,7 +71,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 8.2_
   - _Commit: "feat: add utility modules for ID generation and DOM helpers"_
 
-- [ ] 7. Implement storage service foundation
+- [x] 7. Implement storage service foundation
   - Create `src/services/storage.ts` with StorageService interface
   - Implement chrome.storage.local wrapper for settings
   - Add getSettings() and saveSettings() methods
@@ -80,7 +80,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 6.6, 10.4_
   - _Commit: "feat: implement chrome.storage wrapper for settings"_
 
-- [ ] 8. Implement IndexedDB for history and notes
+- [x] 8. Implement IndexedDB for history and notes
   - Add IndexedDB initialization in storage service
   - Create database schema for pinnedNotes and history object stores
   - Implement getPinnedNotes(), savePinnedNote(), deletePinnedNote()
@@ -90,64 +90,36 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 5.1, 5.2, 5.3, 7.1, 7.6, 7.7, 10.4_
   - _Commit: "feat: add IndexedDB storage for pinned notes and history"_
 
-- [ ] 9. Create AI service with availability checks
+- [x] 9. Create AI service with availability checks
   - Create `src/services/ai.ts` with AIService interface
   - Implement checkAvailability() for Prompt, Summarizer, Rewriter APIs
   - Add TypeScript interfaces for AIAvailability, SummaryOptions, RewriteOptions
   - Implement basic error handling structure
   - Add user activation check helper
-  - _Requirements: 2.7, 3.7, 3.8, 10.1, 10.3_
-  - _Commit: "feat: create AI service with capability detection"_
+  - Add prompt(), summarize(), and rewrite() methods
+  - Implement MockAIProvider for graceful fallback
+  - Add pinned notes merging into AI context
+  - _Requirements: 2.3, 2.4, 2.5, 2.6, 2.7, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 10.1, 10.2, 10.3_
+  - _Commit: "feat: implement complete AI service with all APIs and mock fallback"_
 
-- [ ] 10. Implement Prompt API integration
-  - Add prompt() method to AI service
-  - Check LanguageModel.availability() before use
-  - Verify navigator.userActivation.isActive
-  - Create session and call session.prompt()
-  - Add timeout handling (5 seconds)
-  - Implement error handling with user-friendly messages
+- [x] 10. Implement Prompt API integration
+  - Completed as part of task 9
   - _Requirements: 3.7, 8.5, 10.3_
-  - _Commit: "feat: integrate Chrome Prompt API with error handling"_
 
-- [ ] 11. Implement Summarizer API integration
-  - Add summarize() method to AI service
-  - Check Summarizer.availability() before use
-  - Map mode options (bullets, paragraph, outline) to API types
-  - Map reading levels to API length options
-  - Create summarizer session with options
-  - Call summarizer.summarize() with text
-  - Add timeout and error handling
+- [x] 11. Implement Summarizer API integration
+  - Completed as part of task 9
   - _Requirements: 2.3, 2.4, 2.6, 2.7, 10.1_
-  - _Commit: "feat: integrate Chrome Summarizer API with mode options"_
 
-- [ ] 12. Implement Rewriter API integration
-  - Add rewrite() method to AI service
-  - Check Rewriter.availability() before use
-  - Map preset options to tone settings
-  - Handle custom prompts via Prompt API
-  - Create rewriter session with tone options
-  - Call rewriter.rewrite() with text
-  - Implement fallback to Prompt API if Rewriter unavailable
-  - Add timeout and error handling
+- [x] 12. Implement Rewriter API integration
+  - Completed as part of task 9
   - _Requirements: 3.3, 3.4, 3.6, 3.7, 10.1_
-  - _Commit: "feat: integrate Chrome Rewriter API with preset mapping"_
 
-- [ ] 13. Create mock AI provider for fallback
-  - Add Mock Provider class in AI service
-  - Implement mock summarize with simple text extraction
-  - Implement mock rewrite with basic transformations
-  - Return example outputs that demonstrate functionality
-  - Add clear notice message about AI unavailability
-  - Use mock when all APIs return 'unavailable'
+- [x] 13. Create mock AI provider for fallback
+  - Completed as part of task 9
   - _Requirements: 2.7, 3.8, 10.1, 10.2_
-  - _Commit: "feat: add mock AI provider for graceful fallback"_
 
-- [ ] 14. Implement pinned notes merging into prompts
-  - Add mergePinnedNotes() helper in AI service
-  - Fetch pinned notes from storage
-  - Concatenate note content into prompt context
-  - Add to summarize() and rewrite() operations
-  - Format as context prefix for AI APIs
+- [x] 14. Implement pinned notes merging into prompts
+  - Completed as part of task 9
   - _Requirements: 2.5, 3.5, 5.4_
   - _Commit: "feat: merge pinned notes into AI prompt context"_
 

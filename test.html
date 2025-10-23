@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Button Gap Test</title>
+  <link rel="stylesheet" href="dist/src/panel/panel.css">
+</head>
+<body style="padding: 20px; background: #1a1a1a;">
+  <h1 style="color: white;">Button Gap Test</h1>
+  
+  <h2 style="color: white;">Test 1: Inline style gap</h2>
+  <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+    <button class="flint-btn primary">Button 1</button>
+    <button class="flint-btn">Button 2</button>
+    <button class="flint-btn ghost">Button 3</button>
+  </div>
+
+  <h2 style="color: white;">Test 2: Inline style with React syntax</h2>
+  <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+    <button class="flint-btn secondary">Button A</button>
+    <button class="flint-btn">Button B</button>
+  </div>
+
+  <h2 style="color: white;">Test 3: No gap (should touch)</h2>
+  <div style="display: flex; margin-bottom: 20px;">
+    <button class="flint-btn">No</button>
+    <button class="flint-btn">Gap</button>
+  </div>
+</body>
+</html>
