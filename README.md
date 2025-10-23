@@ -35,15 +35,15 @@ Flint is a Chrome extension that brings voice capture, instant summarization, an
    ```
 
 3. Load as unpacked extension:
-   - Navigate to `chrome://extensions/`
-   - Enable "Developer mode" (toggle in top right)
+   - Open `chrome://extensions/`
+   - Enable "Developer mode" (top right toggle)
    - Click "Load unpacked"
-   - Select the `dist/` folder from your project directory
-   - Flint icon appears in the extensions toolbar
+   - Select the `dist/` folder
+   - Extension loads with Flint icon in toolbar
 
-4. Open panel:
-   - Click the Flint icon in toolbar
-   - Panel opens as popup
+4. Open side panel:
+   - Click Flint icon in toolbar
+   - Side panel opens on right side of browser
 
 ### Development with Watch Mode
 
@@ -95,46 +95,57 @@ flint/
 
 Flint uses Chrome's local AI APIs with capability checks:
 
-**Prompt API**: Text generation
+**Prompt API**: Text generation and fallback
 ```typescript
 const available = await ai.languageModel.availability();
-if (available !== 'no') {
+if (available !== 'no' && navigator.userActivation.isActive) {
   const session = await ai.languageModel.create();
   const result = await session.prompt('Your prompt');
 }
 ```
 
-**Summarizer API**: Text summarization
+**Summarizer API**: Text summarization with options
 ```typescript
 const available = await ai.summarizer.availability();
-if (available !== 'no') {
-  const summarizer = await ai.summarizer.create();
+if (available !== 'no' && navigator.userActivation.isActive) {
+  const summarizer = await ai.summarizer.create({
+    type: 'key-points',
+    format: 'markdown',
+    length: 'medium'
+  });
   const summary = await summarizer.summarize(text);
 }
 ```
 
-**Rewriter API**: Text transformation
+**Rewriter API**: Text transformation with tone control
 ```typescript
 const available = await ai.rewriter.availability();
-if (available !== 'no') {
-  const rewriter = await ai.rewriter.create();
+if (available !== 'no' && navigator.userActivation.isActive) {
+  const rewriter = await ai.rewriter.create({
+    tone: 'more-formal',
+    format: 'plain-text'
+  });
   const result = await rewriter.rewrite(text);
 }
 ```
 
-All APIs check availability before use and fall back to mock providers when unavailable.
+All APIs check availability and require user activation (click/gesture). Falls back to mock providers when unavailable.
 
 ## Permissions
 
-**permissions:**
-- `storage` - Save settings and history locally
-- `scripting` - Inject content scripts for text selection
+**Required permissions:**
+- `storage` - Persist settings and history locally
+- `scripting` - Inject content scripts for text manipulation
 - `activeTab` - Access current tab for text insertion
 
-**host_permissions:**
-- `<all_urls>` - Content script injection on any site
+**Host permissions:**
+- `<all_urls>` - Enable content script injection on all sites
 
-No data sent to external servers.
+**Content scripts:**
+- Automatically injected at `document_idle` on all pages
+- Handles text selection and insertion
+
+No external network calls. All AI processing is local.
 
 ## Troubleshooting
 
