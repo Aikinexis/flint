@@ -32,7 +32,10 @@ export function Settings() {
       <h2 className="flint-section-header">Settings</h2>
 
       {/* Setting row - consistent layout */}
-      <div className="flex items-center justify-between py-3 border-b border-border-muted">
+      <div
+        className="flex items-center justify-between border-b border-border-muted"
+        style={{ paddingTop: '12px', paddingBottom: '12px' }}
+      >
         <div>
           <div className="text-text text-sm font-medium">Theme</div>
           <div className="text-text-muted text-xs mt-1">
@@ -59,7 +62,10 @@ export function Settings() {
       </div>
 
       {/* Additional settings can follow same pattern */}
-      <div className="flex items-center justify-between py-3">
+      <div
+        className="flex items-center justify-between"
+        style={{ paddingTop: '12px', paddingBottom: '12px' }}
+      >
         <div>
           <div className="text-text text-sm font-medium">Language</div>
           <div className="text-text-muted text-xs mt-1">

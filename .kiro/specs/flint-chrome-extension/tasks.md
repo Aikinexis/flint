@@ -123,7 +123,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 2.5, 3.5, 5.4_
   - _Commit: "feat: merge pinned notes into AI prompt context"_
 
-- [ ] 15. Create speech recognition service
+- [x] 15. Create speech recognition service
   - Create `src/services/speech.ts` with SpeechService interface
   - Check for SpeechRecognition API support
   - Implement start() method with language configuration
@@ -133,7 +133,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 1.1, 1.3, 1.4_
   - _Commit: "feat: create speech recognition service wrapper"_
 
-- [ ] 16. Add speech error handling and confidence
+- [x] 16. Add speech error handling and confidence
   - Map speech error types to user-friendly messages
   - Handle 'no-speech', 'audio-capture', 'not-allowed', 'network' errors
   - Extract confidence score from final results
@@ -145,7 +145,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
 
 ## Phase 4: Content Scripts
 
-- [ ] 17. Create selection handler module
+- [x] 17. Create selection handler module
   - Create `src/content/selection.ts` with SelectionHandler interface
   - Implement getSelectedText() using window.getSelection()
   - Implement getSelectionRange() for Range capture
@@ -155,7 +155,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 2.1, 3.1, 4.1_
   - _Commit: "feat: create text selection handler for content script"_
 
-- [ ] 18. Create caret position handler
+- [x] 18. Create caret position handler
   - Create `src/content/caret.ts` with CaretHandler interface
   - Implement getCaretPosition() for textarea and contenteditable
   - Use selectionStart/selectionEnd for textarea elements
@@ -164,7 +164,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 1.6, 4.3, 4.4_
   - _Commit: "feat: add caret position detection for text insertion"_
 
-- [ ] 19. Implement text insertion at caret
+- [x] 19. Implement text insertion at caret
   - Add insertAtCaret() method to CaretHandler
   - Handle textarea: insert at selectionStart, update caret position
   - Handle contenteditable: create text node, insert at range
@@ -173,7 +173,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 1.6, 4.3_
   - _Commit: "feat: implement text insertion at caret position"_
 
-- [ ] 20. Implement text replacement in selections
+- [x] 20. Implement text replacement in selections
   - Add replaceSelection() method to CaretHandler
   - Handle textarea: replace between selectionStart and selectionEnd
   - Handle contenteditable: delete range contents, insert new text
@@ -182,7 +182,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 4.2, 4.3, 4.4_
   - _Commit: "feat: add text replacement for selected content"_
 
-- [ ] 21. Add clipboard fallback for unsupported editors
+- [x] 21. Add clipboard fallback for unsupported editors
   - Detect when direct insertion fails (Google Docs, complex editors)
   - Use navigator.clipboard.writeText() as fallback
   - Show user notification when fallback is used
@@ -191,7 +191,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 4.5_
   - _Commit: "feat: add clipboard fallback for complex editors"_
 
-- [ ] 22. Create mini bar injector
+- [x] 22. Create mini bar injector
   - Create `src/content/injector.ts` with MiniBarInjector interface
   - Create shadow DOM for style isolation
   - Implement show() to inject mini bar near selection
@@ -201,7 +201,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 2.1, 3.1_
   - _Commit: "feat: create mini bar injector with shadow DOM"_
 
-- [ ] 23. Add mini bar positioning and auto-hide
+- [x] 23. Add mini bar positioning and auto-hide
   - Implement positioning logic to avoid covering text
   - Handle viewport boundaries (flip above/below)
   - Add auto-hide after 5 seconds of inactivity
@@ -211,7 +211,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 2.1_
   - _Commit: "feat: add mini bar positioning and auto-hide behavior"_
 
-- [ ] 24. Create main content script coordinator
+- [x] 24. Create main content script coordinator
   - Create `src/content/contentScript.ts` as entry point
   - Initialize SelectionHandler, CaretHandler, MiniBarInjector
   - Listen for selectionchange events
@@ -221,7 +221,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 2.1, 3.1, 4.2_
   - _Commit: "feat: create content script coordinator with message handling"_
 
-- [ ] 25. Add content script message handlers
+- [x] 25. Add content script message handlers
   - Implement handler for GET_SELECTION message
   - Implement handler for INSERT_TEXT message
   - Implement handler for REPLACE_TEXT message
@@ -234,7 +234,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
 
 ## Phase 5: Background Service Worker
 
-- [ ] 26. Create background service worker
+- [x] 26. Create background service worker
   - Create `src/background/background.ts` as service worker entry
   - Add chrome.runtime.onInstalled listener for setup
   - Register content scripts dynamically with chrome.scripting
@@ -243,7 +243,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 6.6_
   - _Commit: "feat: create background service worker with message routing"_
 
-- [ ] 27. Implement dynamic content script registration
+- [x] 27. Implement dynamic content script registration
   - Use chrome.scripting.registerContentScripts API
   - Register content script for all URLs
   - Set runAt to document_idle
@@ -252,7 +252,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 6.6_
   - _Commit: "feat: add dynamic content script registration"_
 
-- [ ] 28. Add message forwarding logic
+- [x] 28. Add message forwarding logic
   - Forward messages from panel to active tab's content script
   - Forward responses from content script back to panel
   - Use chrome.tabs.query to find active tab
@@ -264,7 +264,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
 
 ## Phase 6: State Management
 
-- [ ] 29. Create application state store
+- [x] 29. Create application state store
   - Create `src/state/store.ts` with AppState interface
   - Set up React Context for state management
   - Define initial state with all properties
@@ -273,7 +273,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 6.1, 6.2, 6.3_
   - _Commit: "feat: create application state store with React Context"_
 
-- [ ] 30. Define state actions
+- [x] 30. Define state actions
   - Create `src/state/actions.ts` with action creators
   - Add setActiveTab, setSettings, setCurrentText actions
   - Add addPinnedNote, updatePinnedNote, deletePinnedNote actions
@@ -283,7 +283,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 5.1, 5.2, 5.3, 7.1, 7.5_
   - _Commit: "feat: define state actions for app operations"_
 
-- [ ] 31. Create state selectors
+- [x] 31. Create state selectors
   - Create `src/state/selectors.ts` with selector functions
   - Add selectors for activeTab, settings, pinnedNotes
   - Add selectors for history, currentText, aiAvailability
@@ -292,7 +292,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 7.3_
   - _Commit: "feat: add state selectors for component access"_
 
-- [ ] 32. Integrate storage with state
+- [x] 32. Integrate storage with state
   - Load settings from chrome.storage on app init
   - Load pinned notes from IndexedDB on app init
   - Load recent history from IndexedDB on app init
@@ -305,7 +305,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
 
 ## Phase 7: React Components - Voice Recorder
 
-- [ ] 33. Create VoiceRecorder component structure
+- [x] 33. Create VoiceRecorder component structure
   - Create `src/components/VoiceRecorder.tsx` with component skeleton
   - Define VoiceRecorderProps interface
   - Set up component state (isRecording, transcript, confidence, error)
@@ -314,7 +314,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 1.1, 1.2_
   - _Commit: "feat: create VoiceRecorder component structure"_
 
-- [ ] 34. Implement recording controls
+- [x] 34. Implement recording controls
   - Add click handler for record button
   - Request microphone permission before starting
   - Call speechService.start() when recording starts
@@ -324,7 +324,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 1.1, 1.2, 1.7_
   - _Commit: "feat: add recording controls with permission handling"_
 
-- [ ] 35. Add real-time transcript streaming
+- [x] 35. Add real-time transcript streaming
   - Set up onPartialResult callback from speech service
   - Update partialTranscript state as results arrive
   - Display partial transcript in gray text
@@ -334,7 +334,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 1.3, 1.4, 1.5_
   - _Commit: "feat: implement real-time transcript streaming"_
 
-- [ ] 36. Add insert and clear functionality
+- [x] 36. Add insert and clear functionality
   - Create insert button (disabled until transcript is final)
   - Send INSERT_TEXT message to content script via background
   - Show success feedback after insertion
@@ -344,7 +344,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 1.6_
   - _Commit: "feat: add insert and clear transcript functionality"_
 
-- [ ] 37. Implement voice error handling
+- [x] 37. Implement voice error handling
   - Set up onError callback from speech service
   - Display error messages in UI (red text or banner)
   - Handle microphone permission denied error
@@ -356,7 +356,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
 
 ## Phase 8: React Components - Rewrite Panel
 
-- [ ] 38. Create RewritePanel component structure
+- [x] 38. Create RewritePanel component structure
   - Create `src/components/RewritePanel.tsx` with component skeleton
   - Define RewritePanelProps interface
   - Set up component state (inputText, selectedPreset, customPrompt, isProcessing)
@@ -365,7 +365,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 3.1, 3.2_
   - _Commit: "feat: create RewritePanel component structure"_
 
-- [ ] 39. Implement preset button selection
+- [x] 39. Implement preset button selection
   - Create grid of preset buttons (clarify, simplify, concise, expand, friendly, formal, poetic, persuasive)
   - Make preset buttons mutually exclusive
   - Highlight selected preset
@@ -374,7 +374,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 3.3_
   - _Commit: "feat: add preset button selection with mutual exclusivity"_
 
-- [ ] 40. Add custom instruction field
+- [x] 40. Add custom instruction field
   - Create textarea for custom instructions
   - Enable custom field when no preset is selected
   - Disable presets when custom field has content
@@ -383,7 +383,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 3.4_
   - _Commit: "feat: add custom instruction field for rewriting"_
 
-- [ ] 41. Implement rewrite operation
+- [x] 41. Implement rewrite operation
   - Create rewrite button (primary style)
   - Validate that text and (preset or custom prompt) are present
   - Show loading spinner during processing
@@ -394,7 +394,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 3.3, 3.4, 3.5, 3.6_
   - _Commit: "feat: implement rewrite operation with AI service"_
 
-- [ ] 42. Add rewrite error handling
+- [x] 42. Add rewrite error handling
   - Display error messages from AI service
   - Handle AI unavailable error with clear message
   - Handle user activation required error
@@ -404,7 +404,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 3.7, 3.8, 10.1, 10.3_
   - _Commit: "feat: add error handling for rewrite operations"_
 
-- [ ] 43. Integrate with CompareView
+- [x] 43. Integrate with CompareView
   - Navigate to CompareView when rewrite completes
   - Pass original and rewritten text as props
   - Handle accept callback to replace text
@@ -416,7 +416,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
 
 ## Phase 9: React Components - Summary Panel
 
-- [ ] 44. Create SummaryPanel component structure
+- [x] 44. Create SummaryPanel component structure
   - Create `src/components/SummaryPanel.tsx` with component skeleton
   - Define SummaryPanelProps interface
   - Set up component state (inputText, mode, readingLevel, summary, isProcessing)
@@ -425,7 +425,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 2.2_
   - _Commit: "feat: create SummaryPanel component structure"_
 
-- [ ] 45. Implement mode and reading level selectors
+- [x] 45. Implement mode and reading level selectors
   - Create radio buttons for mode (bullets, paragraph, outline)
   - Create dropdown for reading level (elementary, middle school, high school, college)
   - Set default values (bullets, high school)
@@ -434,7 +434,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 2.3, 2.4_
   - _Commit: "feat: add mode and reading level selectors"_
 
-- [ ] 46. Implement summarize operation
+- [x] 46. Implement summarize operation
   - Create summarize button (primary style)
   - Validate that input text is present
   - Show loading spinner during processing
@@ -445,7 +445,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 2.3, 2.4, 2.5, 2.6_
   - _Commit: "feat: implement summarize operation with AI service"_
 
-- [ ] 47. Add summary result display and copy
+- [x] 47. Add summary result display and copy
   - Create result area to display generated summary
   - Format summary based on mode (bullets, paragraph, outline)
   - Add copy to clipboard button
@@ -454,7 +454,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 2.6_
   - _Commit: "feat: add summary result display with copy functionality"_
 
-- [ ] 48. Add summary error handling
+- [x] 48. Add summary error handling
   - Display error messages from AI service
   - Handle AI unavailable error with clear message
   - Handle user activation required error

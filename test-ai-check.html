@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI API Availability Check</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+
+        .result {
+            background: #2a2a2a;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #f97316;
+        }
+
+        .available {
+            border-left-color: #10b981;
+        }
+
+        .unavailable {
+            border-left-color: #ef4444;
+        }
+
+        button {
+            background: #f97316;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px 10px 0;
+        }
+
+        button:hover {
+            background: #ea580c;
+        }
+
+        pre {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Chrome Built-in AI Availability Check</h1>
+
+    <button onclick="checkAPIs()">Check AI APIs</button>
+    <button onclick="testSummarize()">Test Summarize</button>
+
+    <div id="results"></div>
+
+    <script>
+        async function checkAPIs() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>Checking APIs...</h2>';
+
+            let html = '';
+
+            // Check if ai namespace exists
+            html += `<div class="result ${('ai' in self) ? 'available' : 'unavailable'}">
+        <strong>self.ai namespace:</strong> ${('ai' in self) ? '✓ Available' : '✗ Not found'}
+      </div>`;
+
+            // Check for window.ai (older structure)
+            html += `<div class="result ${('ai' in window) ? 'available' : 'unavailable'}">
+        <strong>window.ai namespace:</strong> ${('ai' in window) ? '✓ Available' : '✗ Not found'}
+      </div>`;
+
+            // Check for old API structure
+            const hasOldPromptAPI = 'LanguageModel' in window || 'ai' in window;
+            html += `<div class="result ${hasOldPromptAPI ? 'available' : 'unavailable'}">
+        <strong>Old API structure (window.LanguageModel):</strong> ${('LanguageModel' in window) ? '✓ Available' : '✗ Not found'}
+      </div>`;
+
+            // Check chrome.aiOriginTrial
+            const hasChromeAI = typeof chrome !== 'undefined' && 'aiOriginTrial' in chrome;
+            html += `<div class="result ${hasChromeAI ? 'available' : 'unavailable'}">
+        <strong>chrome.aiOriginTrial:</strong> ${hasChromeAI ? '✓ Available' : '✗ Not found'}
+      </div>`;
+
+            if ('ai' in self) {
+                const ai = self.ai;
+
+                // Check languageModel
+                html += `<div class="result ${('languageModel' in ai) ? 'available' : 'unavailable'}">
+          <strong>ai.languageModel:</strong> ${('languageModel' in ai) ? '✓ Available' : '✗ Not found'}
+        </div>`;
+
+                if ('languageModel' in ai) {
+                    try {
+                        const caps = await ai.languageModel.capabilities();
+                        html += `<div class="result available">
+              <strong>languageModel.capabilities():</strong><br>
+              <pre>${JSON.stringify(caps, null, 2)}</pre>
+            </div>`;
+                    } catch (e) {
+                        html += `<div class="result unavailable">
+              <strong>languageModel.capabilities() error:</strong><br>
+              <pre>${e.message}</pre>
+            </div>`;
+                    }
+                }
+
+                // Check summarizer
+                html += `<div class="result ${('summarizer' in ai) ? 'available' : 'unavailable'}">
+          <strong>ai.summarizer:</strong> ${('summarizer' in ai) ? '✓ Available' : '✗ Not found'}
+        </div>`;
+
+                if ('summarizer' in ai) {
+                    try {
+                        const caps = await ai.summarizer.capabilities();
+                        html += `<div class="result available">
+              <strong>summarizer.capabilities():</strong><br>
+              <pre>${JSON.stringify(caps, null, 2)}</pre>
+            </div>`;
+                    } catch (e) {
+                        html += `<div class="result unavailable">
+              <strong>summarizer.capabilities() error:</strong><br>
+              <pre>${e.message}</pre>
+            </div>`;
+                    }
+                }
+
+                // Check rewriter
+                html += `<div class="result ${('rewriter' in ai) ? 'available' : 'unavailable'}">
+          <strong>ai.rewriter:</strong> ${('rewriter' in ai) ? '✓ Available' : '✗ Not found'}
+        </div>`;
+
+                if ('rewriter' in ai) {
+                    try {
+                        const caps = await ai.rewriter.capabilities();
+                        html += `<div class="result available">
+              <strong>rewriter.capabilities():</strong><br>
+              <pre>${JSON.stringify(caps, null, 2)}</pre>
+            </div>`;
+                    } catch (e) {
+                        html += `<div class="result unavailable">
+              <strong>rewriter.capabilities() error:</strong><br>
+              <pre>${e.message}</pre>
+            </div>`;
+                    }
+                }
+            }
+
+            // Check user activation
+            html += `<div class="result ${navigator.userActivation?.isActive ? 'available' : 'unavailable'}">
+        <strong>User Activation:</strong> ${navigator.userActivation?.isActive ? '✓ Active' : '✗ Not active'}
+      </div>`;
+
+            results.innerHTML = html;
+        }
+
+        async function testSummarize() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>Testing Summarize...</h2>';
+
+            try {
+                if (!('ai' in self) || !('summarizer' in self.ai)) {
+                    throw new Error('Summarizer API not found');
+                }
+
+                const caps = await self.ai.summarizer.capabilities();
+                results.innerHTML += `<div class="result available">
+          <strong>Capabilities:</strong><br>
+          <pre>${JSON.stringify(caps, null, 2)}</pre>
+        </div>`;
+
+                if (caps.available !== 'readily') {
+                    throw new Error(`Summarizer not readily available: ${caps.available}`);
+                }
+
+                const summarizer = await self.ai.summarizer.create({
+                    type: 'key-points',
+                    format: 'plain-text',
+                    length: 'medium'
+                });
+
+                const text = 'A Segway is a two-wheeled, self-balancing personal transporter device invented by Dean Kamen. The name is a registered trademark of Segway Inc. It was brought to market in 2001 as the Segway HT, and then subsequently as the Segway PT.';
+
+                const summary = await summarizer.summarize(text);
+
+                results.innerHTML += `<div class="result available">
+          <strong>Summary Result:</strong><br>
+          <pre>${summary}</pre>
+        </div>`;
+
+            } catch (e) {
+                results.innerHTML += `<div class="result unavailable">
+          <strong>Error:</strong><br>
+          <pre>${e.message}\n${e.stack}</pre>
+        </div>`;
+            }
+        }
+
+        // Auto-run on load
+        checkAPIs();
+    </script>
+</body>
+
+</html>

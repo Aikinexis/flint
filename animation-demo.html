@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Button Animation Options - Flint</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: oklch(0.22 0 255);
+            color: oklch(0.96 0 255);
+            padding: 40px;
+            line-height: 1.6;
+        }
+
+        h1 {
+            margin-bottom: 32px;
+            font-size: 32px;
+        }
+
+        h2 {
+            margin: 32px 0 16px;
+            font-size: 20px;
+            color: oklch(0.76 0 255);
+        }
+
+        .demo-section {
+            background: oklch(0.28 0 255);
+            padding: 24px;
+            border-radius: 16px;
+            margin-bottom: 24px;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .btn {
+            height: 38px;
+            padding: 0 20px;
+            border-radius: 16px;
+            border: 1px solid oklch(0.3 0 255);
+            background: linear-gradient(135deg, oklch(0.5 0.1 255) 0%, oklch(0.4 0.12 255) 100%);
+            color: oklch(0.12 0 255);
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        /* 1. Shimmer */
+        .shimmer {
+            overflow: hidden;
+        }
+
+        .shimmer::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .shimmer:hover::after {
+            left: 100%;
+        }
+
+        /* 2. Border Gradient Rotation */
+        .border-rotate::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: conic-gradient(from 0deg, oklch(0.6 0.15 255), oklch(0.5 0.12 280), oklch(0.6 0.15 255));
+            border-radius: 16px;
+            opacity: 0;
+            z-index: -1;
+            animation: rotate 3s linear infinite;
+            animation-play-state: paused;
+        }
+
+        .border-rotate:hover::before {
+            opacity: 1;
+            animation-play-state: running;
+        }
+
+        @keyframes rotate {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* 3. Glow Pulse (on click) */
+        .glow-pulse:active {
+            animation: glow 0.6s ease-out;
+        }
+
+        @keyframes glow {
+            0% {
+                box-shadow: 0 0 0 0 oklch(0.5 0.15 255 / 0.7);
+            }
+
+            50% {
+                box-shadow: 0 0 20px 8px oklch(0.5 0.15 255 / 0.3);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 oklch(0.5 0.15 255 / 0);
+            }
+        }
+
+        /* 4. Scale + Glow */
+        .scale-glow:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px oklch(0.5 0.15 255 / 0.5);
+        }
+
+        /* 5. Ripple Effect */
+        .ripple {
+            overflow: hidden;
+        }
+
+        .ripple::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .ripple:active::after {
+            animation: ripple-anim 0.6s ease-out;
+        }
+
+        @keyframes ripple-anim {
+            0% {
+                transform: translate(-50%, -50%) scale(0);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(2);
+                opacity: 0;
+            }
+        }
+
+        /* 6. Border Pulse */
+        .border-pulse:hover {
+            animation: border-pulse-anim 1.5s ease-in-out infinite;
+        }
+
+        @keyframes border-pulse-anim {
+
+            0%,
+            100% {
+                border-color: oklch(0.3 0.08 255);
+            }
+
+            50% {
+                border-color: oklch(0.6 0.15 255);
+            }
+        }
+
+        /* 7. Slide Background */
+        .slide-bg {
+            background-size: 200% 100%;
+            background-image: linear-gradient(90deg, oklch(0.5 0.1 255) 50%, oklch(0.6 0.12 255) 50%);
+            transition: background-position 0.3s ease;
+        }
+
+        .slide-bg:hover {
+            background-position: 100% 0;
+        }
+
+        /* 8. Bounce */
+        .bounce:hover {
+            animation: bounce-anim 0.5s ease;
+        }
+
+        @keyframes bounce-anim {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-5px);
+            }
+        }
+
+        /* 9. Rotate Slight */
+        .rotate-slight:hover {
+            transform: rotate(2deg) scale(1.02);
+        }
+
+        /* 10. Shadow Grow */
+        .shadow-grow {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .shadow-grow:hover {
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            transform: translateY(-2px);
+        }
+
+        /* 11. Neon Glow */
+        .neon-glow:hover {
+            box-shadow:
+                0 0 10px oklch(0.5 0.15 255),
+                0 0 20px oklch(0.5 0.15 255),
+                0 0 30px oklch(0.5 0.15 255);
+        }
+
+        /* 12. Gradient Shift */
+        .gradient-shift {
+            background: linear-gradient(135deg, oklch(0.5 0.1 255), oklch(0.4 0.12 255));
+            transition: all 0.3s ease;
+        }
+
+        .gradient-shift:hover {
+            background: linear-gradient(135deg, oklch(0.6 0.12 255), oklch(0.5 0.14 280));
+        }
+
+        p {
+            color: oklch(0.76 0 255);
+            font-size: 13px;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🎨 Button Animation Options</h1>
+
+    <div class="demo-section">
+        <h2>1. Shimmer (Hover)</h2>
+        <div class="button-row">
+            <button class="btn shimmer">Shimmer Effect</button>
+        </div>
+        <p>Light sweep across button - elegant, Apple-like</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>2. Border Gradient Rotation (Hover)</h2>
+        <div class="button-row">
+            <button class="btn border-rotate">Rotating Border</button>
+        </div>
+        <p>Animated gradient border - premium, dynamic</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>3. Glow Pulse (Click)</h2>
+        <div class="button-row">
+            <button class="btn glow-pulse">Click Me</button>
+        </div>
+        <p>Pulsing glow on click - satisfying feedback</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>4. Scale + Glow (Hover)</h2>
+        <div class="button-row">
+            <button class="btn scale-glow">Scale & Glow</button>
+        </div>
+        <p>Grows slightly with glow - modern, attention-grabbing</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>5. Ripple Effect (Click)</h2>
+        <div class="button-row">
+            <button class="btn ripple">Ripple Click</button>
+        </div>
+        <p>Material Design ripple - familiar, tactile</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>6. Border Pulse (Hover)</h2>
+        <div class="button-row">
+            <button class="btn border-pulse">Pulsing Border</button>
+        </div>
+        <p>Border color pulses - subtle, rhythmic</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>7. Slide Background (Hover)</h2>
+        <div class="button-row">
+            <button class="btn slide-bg">Slide Background</button>
+        </div>
+        <p>Background slides across - smooth, directional</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>8. Bounce (Hover)</h2>
+        <div class="button-row">
+            <button class="btn bounce">Bounce</button>
+        </div>
+        <p>Playful bounce - fun, energetic</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>9. Rotate Slight (Hover)</h2>
+        <div class="button-row">
+            <button class="btn rotate-slight">Slight Rotate</button>
+        </div>
+        <p>Subtle rotation - quirky, unique</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>10. Shadow Grow (Hover)</h2>
+        <div class="button-row">
+            <button class="btn shadow-grow">Shadow Grow</button>
+        </div>
+        <p>Shadow expands, lifts up - classic, depth</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>11. Neon Glow (Hover)</h2>
+        <div class="button-row">
+            <button class="btn neon-glow">Neon Glow</button>
+        </div>
+        <p>Bright neon effect - bold, cyberpunk</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>12. Gradient Shift (Hover)</h2>
+        <div class="button-row">
+            <button class="btn gradient-shift">Gradient Shift</button>
+        </div>
+        <p>Gradient colors shift - smooth, colorful</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>✨ Current: Border Rotate (Hover) + Glow Pulse (Click)</h2>
+        <div class="button-row">
+            <button class="btn border-rotate glow-pulse">Current Style</button>
+        </div>
+        <p>Your current combination - hover to see rotation, click for pulse</p>
+    </div>
+</body>
+
+</html>

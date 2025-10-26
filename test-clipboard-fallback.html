@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clipboard Fallback Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .test-section {
+      background: white;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h2 {
+      margin-top: 0;
+      color: #333;
+    }
+    textarea, input {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+    .contenteditable {
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin: 10px 0;
+      min-height: 100px;
+      border-radius: 4px;
+      background: #fafafa;
+    }
+    button {
+      background: #f97316;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 5px;
+    }
+    button:hover {
+      background: #ea580c;
+    }
+    .result {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .clipboard {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+  </style>
+</head>
+<body>
+  <h1>Clipboard Fallback Test</h1>
+  <p>This page tests the clipboard fallback functionality for text insertion.</p>
+
+  <div class="test-section">
+    <h2>Test 1: Textarea (Direct Insertion)</h2>
+    <textarea id="textarea1" placeholder="Click here and test insertion..."></textarea>
+    <button onclick="testInsert('textarea1')">Insert Text</button>
+    <button onclick="testReplace('textarea1')">Replace Selection</button>
+    <div id="result1" class="result" style="display:none;"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 2: Input Field (Direct Insertion)</h2>
+    <input type="text" id="input1" placeholder="Click here and test insertion...">
+    <button onclick="testInsert('input1')">Insert Text</button>
+    <button onclick="testReplace('input1')">Replace Selection</button>
+    <div id="result2" class="result" style="display:none;"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 3: ContentEditable (Direct Insertion)</h2>
+    <div id="contenteditable1" class="contenteditable" contenteditable="true">
+      Click here and test insertion...
+    </div>
+    <button onclick="testInsert('contenteditable1')">Insert Text</button>
+    <button onclick="testReplace('contenteditable1')">Replace Selection</button>
+    <div id="result3" class="result" style="display:none;"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 4: Unsupported Element (Clipboard Fallback)</h2>
+    <div id="unsupported" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #fafafa;">
+      This is a non-editable div. Click here to focus it.
+    </div>
+    <button onclick="testInsertUnsupported()">Insert Text (Should Use Clipboard)</button>
+    <div id="result4" class="result" style="display:none;"></div>
+  </div>
+
+  <script type="module">
+    import { createCaretHandler } from './src/content/caret.ts';
+
+    const caretHandler = createCaretHandler();
+    window.caretHandler = caretHandler;
+
+    window.testInsert = async function(elementId) {
+      const element = document.getElementById(elementId);
+      element.focus();
+      
+      const result = await caretHandler.insertAtCaret('Inserted text! ');
+      showResult(elementId, result);
+    };
+
+    window.testReplace = async function(elementId) {
+      const element = document.getElementById(elementId);
+      element.focus();
+      
+      // Select some text first
+      if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+        element.setSelectionRange(0, 5);
+      } else if (element.isContentEditable) {
+        const range = document.createRange();
+        const selection = window.getSelection();
+        range.selectNodeContents(element);
+        range.setEnd(range.startContainer, Math.min(5, range.toString().length));
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+      
+      const result = await caretHandler.replaceSelection('REPLACED ');
+      showResult(elementId, result);
+    };
+
+    window.testInsertUnsupported = async function() {
+      const element = document.getElementById('unsupported');
+      element.focus();
+      
+      const result = await caretHandler.insertAtCaret('This should be in clipboard!');
+      showResult('unsupported', result);
+    };
+
+    function showResult(elementId, result) {
+      const resultNum = elementId.replace(/\D/g, '') || '4';
+      const resultDiv = document.getElementById(`result${resultNum}`);
+      resultDiv.style.display = 'block';
+      
+      if (result.success) {
+        if (result.usedClipboard) {
+          resultDiv.className = 'result clipboard';
+          resultDiv.textContent = '✓ Success! Text copied to clipboard. Please paste manually (Ctrl+V or Cmd+V).';
+        } else {
+          resultDiv.className = 'result success';
+          resultDiv.textContent = '✓ Success! Text inserted directly.';
+        }
+      } else {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = `✗ Failed: ${result.error || 'Unknown error'}`;
+      }
+      
+      // Hide after 5 seconds
+      setTimeout(() => {
+        resultDiv.style.display = 'none';
+      }, 5000);
+    }
+  </script>
+</body>
+</html>

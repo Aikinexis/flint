@@ -1,0 +1,116 @@
+/**
+ * Welcome/Home panel with app description
+ * Shown when logo is clicked
+ */
+export function WelcomePanel() {
+  return (
+    <div className="flint-section">
+      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <svg
+          width="64"
+          height="64"
+          viewBox="0 0 1024 1024"
+          fill="currentColor"
+          style={{ margin: '0 auto 16px' }}
+        >
+          <path
+            opacity="1.000000"
+            stroke="none"
+            d="M420.622864,818.744873 C428.345612,783.067200 435.904907,747.784851 443.722443,712.559753 C457.631531,649.886902 471.518066,587.208008 485.755219,524.609314 C496.564301,477.083374 507.992371,429.698547 518.979004,382.212555 C528.725586,340.086487 538.240540,297.906830 547.866150,255.752747 C549.113342,250.290665 551.605164,245.840851 555.936646,241.855347 C574.570923,224.709412 592.621887,206.928955 611.278320,189.807877 C630.290222,172.360550 649.703430,155.356903 669.346741,138.604477 C695.704468,116.125778 722.385864,94.050461 749.320007,72.275101 C760.455872,63.272099 771.748291,54.462837 782.961609,45.555523 C784.262451,44.522205 785.445251,43.267097 787.843994,43.777775 C787.969421,49.512825 785.894592,54.984104 784.848389,60.531807 C778.468384,94.364838 771.796265,128.143204 765.129822,161.921707 C759.107239,192.437515 752.974426,222.931610 746.873718,253.432007 C745.471802,260.440582 743.828369,267.406403 742.644470,274.450409 C742.123596,277.549713 740.653748,279.499603 738.179382,281.216705 C713.281616,298.494598 688.385559,315.775665 663.583557,333.190521 C644.100159,346.870880 624.997131,361.076294 606.090820,375.544189 C605.336365,376.121460 604.669434,376.812988 604.246643,378.084534 C644.717346,364.050842 684.856934,349.237244 725.482117,336.379272 C726.775085,337.699402 726.278198,338.825409 725.958252,339.934570 C707.872070,402.613556 690.081482,465.378021 669.911865,527.439636 C667.551086,534.703430 663.973938,539.762207 657.619324,543.917419 C624.170410,565.789185 590.702026,587.648010 558.444336,611.275391 C552.435486,615.676636 546.349304,620.015198 541.151794,625.811523 C573.529175,619.647827 605.142212,610.373413 636.958862,602.680542 C638.036438,605.240540 636.881042,606.374939 636.164062,607.654480 C628.428528,621.459106 620.692688,635.263550 612.983032,649.082581 C608.744812,656.679138 602.201172,662.171936 595.701904,667.591309 C569.363281,689.553650 542.641602,711.052612 516.951721,733.794373 C502.980286,746.162476 488.956299,758.451843 475.467285,771.358826 C470.681152,775.938354 467.703735,780.861145 466.370239,787.407043 C462.819458,804.837646 459.346771,822.279053 456.323730,839.807922 C456.024658,841.542236 455.326355,843.366333 456.471558,845.751099 C471.621338,845.751099 487.020996,845.751099 502.420654,845.751099 C502.715973,846.241638 503.011322,846.732239 503.306671,847.222778 C466.405457,885.100037 427.760773,921.263184 391.449524,959.917664 C399.997375,912.493164 410.282928,865.828796 420.622864,818.744873 z"
+          />
+          <path
+            opacity="1.000000"
+            stroke="none"
+            d="M360.556580,712.334473 C353.704987,693.505859 347.009369,675.034363 340.227905,656.594482 C338.023773,650.601074 339.874298,644.786133 340.694366,638.925415 C344.288696,613.237366 347.967499,587.561035 351.549805,561.871277 C356.257202,528.113220 360.943390,494.351990 365.552338,460.580383 C367.102570,449.221252 368.447357,437.832855 369.758606,426.443176 C370.130920,423.209167 371.924438,420.997498 374.013458,418.771912 C409.950134,380.486237 447.854858,344.147797 484.750183,306.811005 C492.245728,299.225769 499.828186,291.726440 507.368530,284.185455 C508.293152,283.260742 509.115173,282.179474 511.932678,281.951569 C473.140350,454.009125 435.222595,625.750610 394.821869,797.228088 C391.837891,797.195435 391.627777,794.569824 390.823456,792.598083 C380.068542,766.233643 370.476166,739.430115 360.556580,712.334473 z"
+          />
+        </svg>
+        <h1 style={{ fontSize: '24px', fontWeight: '600', marginBottom: '8px' }}>
+          Welcome to Flint
+        </h1>
+        <p className="text-text-muted">Local-first AI assistant for Chrome</p>
+      </div>
+
+      <div style={{ marginBottom: '32px' }}>
+        <h2 style={{ fontSize: '16px', fontWeight: '500', marginBottom: '16px' }}>
+          What is Flint?
+        </h2>
+        <p style={{ lineHeight: '1.6', marginBottom: '16px' }}>
+          Flint is a privacy-focused Chrome extension that brings AI-powered text tools directly
+          to your browser. All processing happens locally using Chrome's built-in AI APIs—no data
+          leaves your device.
+        </p>
+      </div>
+
+      <div style={{ marginBottom: '32px' }}>
+        <h2 style={{ fontSize: '16px', fontWeight: '500', marginBottom: '16px' }}>Features</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
+              </svg>
+              <strong>Voice to Text</strong>
+            </div>
+            <p className="text-text-muted" style={{ fontSize: '14px', paddingLeft: '24px' }}>
+              Record your voice and convert it to text instantly
+            </p>
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+              <strong>Rewrite Text</strong>
+            </div>
+            <p className="text-text-muted" style={{ fontSize: '14px', paddingLeft: '24px' }}>
+              Adjust tone, make text concise, or expand with custom prompts
+            </p>
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="8" y1="6" x2="21" y2="6" />
+                <line x1="8" y1="12" x2="21" y2="12" />
+                <line x1="8" y1="18" x2="21" y2="18" />
+                <line x1="3" y1="6" x2="3.01" y2="6" />
+                <line x1="3" y1="12" x2="3.01" y2="12" />
+                <line x1="3" y1="18" x2="3.01" y2="18" />
+              </svg>
+              <strong>Summarize</strong>
+            </div>
+            <p className="text-text-muted" style={{ fontSize: '14px', paddingLeft: '24px' }}>
+              Create bullet points, paragraphs, or outlines from long text
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          padding: '16px',
+          background: 'var(--surface)',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border-muted)',
+        }}
+      >
+        <h3 style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+          🔒 Privacy First
+        </h3>
+        <p className="text-text-muted" style={{ fontSize: '14px', lineHeight: '1.5' }}>
+          All AI processing happens locally on your device using Chrome's built-in Gemini Nano
+          model. Your data never leaves your browser.
+        </p>
+      </div>
+
+      <div style={{ marginTop: '32px', textAlign: 'center' }}>
+        <p className="text-text-muted" style={{ fontSize: '12px' }}>
+          Get started by selecting a tool from the sidebar
+        </p>
+      </div>
+    </div>
+  );
+}

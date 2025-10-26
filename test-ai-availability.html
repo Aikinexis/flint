@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chrome AI API Availability Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    .test-section {
+      margin: 20px 0;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-weight: 600;
+      margin-left: 10px;
+    }
+    .available { background: #d4edda; color: #155724; }
+    .unavailable { background: #f8d7da; color: #721c24; }
+    .pending { background: #fff3cd; color: #856404; }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover { background: #0056b3; }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    pre {
+      background: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    .info {
+      background: #e7f3ff;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Chrome Built-in AI API Availability Test</h1>
+  
+  <div class="info">
+    <strong>Note:</strong> This page tests if Chrome's built-in AI APIs are available on your system.
+    Click the test buttons below (user interaction is required for API access).
+  </div>
+
+  <div class="test-section">
+    <h2>System Information</h2>
+    <div id="system-info">Checking...</div>
+  </div>
+
+  <div class="test-section">
+    <h2>1. Prompt API (LanguageModel)</h2>
+    <div id="prompt-status">Checking availability...</div>
+    <button id="test-prompt" disabled>Test Prompt API</button>
+    <pre id="prompt-result"></pre>
+  </div>
+
+  <div class="test-section">
+    <h2>2. Summarizer API</h2>
+    <div id="summarizer-status">Checking availability...</div>
+    <button id="test-summarizer" disabled>Test Summarizer API</button>
+    <pre id="summarizer-result"></pre>
+  </div>
+
+  <div class="test-section">
+    <h2>3. Rewriter API</h2>
+    <div id="rewriter-status">Checking availability...</div>
+    <button id="test-rewriter" disabled>Test Rewriter API</button>
+    <pre id="rewriter-result"></pre>
+  </div>
+
+  <div class="test-section">
+    <h2>Troubleshooting Steps</h2>
+    <div id="troubleshooting"></div>
+  </div>
+
+  <script>
+    // System info
+    const systemInfo = document.getElementById('system-info');
+    systemInfo.innerHTML = `
+      <strong>Chrome Version:</strong> ${navigator.userAgent.match(/Chrome\/(\d+)/)?.[1] || 'Unknown'}<br>
+      <strong>Platform:</strong> ${navigator.platform}<br>
+      <strong>Language:</strong> ${navigator.language}
+    `;
+
+    // Check Prompt API
+    async function checkPromptAPI() {
+      const statusEl = document.getElementById('prompt-status');
+      const testBtn = document.getElementById('test-prompt');
+      const resultEl = document.getElementById('prompt-result');
+
+      try {
+        if (!('LanguageModel' in window)) {
+          statusEl.innerHTML = '<span class="status unavailable">Not Available</span> - LanguageModel not found in window';
+          return;
+        }
+
+        const availability = await window.LanguageModel.availability();
+        statusEl.innerHTML = `<span class="status ${availability === 'readily' ? 'available' : availability === 'after-download' ? 'pending' : 'unavailable'}">${availability}</span>`;
+        
+        if (availability !== 'unavailable') {
+          testBtn.disabled = false;
+          testBtn.onclick = async () => {
+            try {
+              resultEl.textContent = 'Creating session...';
+              const session = await window.LanguageModel.create();
+              resultEl.textContent = 'Session created! Sending prompt...';
+              const result = await session.prompt('Say "Hello from Chrome AI!"');
+              resultEl.textContent = `Success!\n\nResponse: ${result}`;
+            } catch (err) {
+              resultEl.textContent = `Error: ${err.message}`;
+            }
+          };
+        }
+      } catch (err) {
+        statusEl.innerHTML = `<span class="status unavailable">Error</span> - ${err.message}`;
+      }
+    }
+
+    // Check Summarizer API
+    async function checkSummarizerAPI() {
+      const statusEl = document.getElementById('summarizer-status');
+      const testBtn = document.getElementById('test-summarizer');
+      const resultEl = document.getElementById('summarizer-result');
+
+      try {
+        if (!('Summarizer' in window)) {
+          statusEl.innerHTML = '<span class="status unavailable">Not Available</span> - Summarizer not found in window';
+          return;
+        }
+
+        const availability = await window.Summarizer.availability();
+        statusEl.innerHTML = `<span class="status ${availability === 'readily' ? 'available' : availability === 'after-download' ? 'pending' : 'unavailable'}">${availability}</span>`;
+        
+        if (availability !== 'unavailable') {
+          testBtn.disabled = false;
+          testBtn.onclick = async () => {
+            try {
+              resultEl.textContent = 'Creating summarizer...';
+              const summarizer = await window.Summarizer.create({
+                type: 'key-points',
+                format: 'plain-text',
+                length: 'short'
+              });
+              const testText = 'Artificial intelligence is transforming how we interact with technology. Machine learning models can now understand natural language, generate creative content, and assist with complex tasks. These capabilities are becoming increasingly accessible to developers and end users alike.';
+              resultEl.textContent = 'Summarizing text...';
+              const summary = await summarizer.summarize(testText);
+              resultEl.textContent = `Success!\n\nOriginal: ${testText}\n\nSummary: ${summary}`;
+            } catch (err) {
+              resultEl.textContent = `Error: ${err.message}`;
+            }
+          };
+        }
+      } catch (err) {
+        statusEl.innerHTML = `<span class="status unavailable">Error</span> - ${err.message}`;
+      }
+    }
+
+    // Check Rewriter API
+    async function checkRewriterAPI() {
+      const statusEl = document.getElementById('rewriter-status');
+      const testBtn = document.getElementById('test-rewriter');
+      const resultEl = document.getElementById('rewriter-result');
+
+      try {
+        if (!('Rewriter' in window)) {
+          statusEl.innerHTML = '<span class="status unavailable">Not Available</span> - Rewriter not found in window';
+          return;
+        }
+
+        const availability = await window.Rewriter.availability();
+        statusEl.innerHTML = `<span class="status ${availability === 'readily' ? 'available' : availability === 'after-download' ? 'pending' : 'unavailable'}">${availability}</span>`;
+        
+        if (availability !== 'unavailable') {
+          testBtn.disabled = false;
+          testBtn.onclick = async () => {
+            try {
+              resultEl.textContent = 'Creating rewriter...';
+              const rewriter = await window.Rewriter.create({
+                tone: 'more-formal',
+                format: 'plain-text'
+              });
+              const testText = 'Hey, this is pretty cool stuff!';
+              resultEl.textContent = 'Rewriting text...';
+              const rewritten = await rewriter.rewrite(testText);
+              resultEl.textContent = `Success!\n\nOriginal: ${testText}\n\nRewritten: ${rewritten}`;
+            } catch (err) {
+              resultEl.textContent = `Error: ${err.message}`;
+            }
+          };
+        }
+      } catch (err) {
+        statusEl.innerHTML = `<span class="status unavailable">Error</span> - ${err.message}`;
+      }
+    }
+
+    // Troubleshooting
+    function showTroubleshooting() {
+      const troubleshootingEl = document.getElementById('troubleshooting');
+      const chromeVersion = parseInt(navigator.userAgent.match(/Chrome\/(\d+)/)?.[1] || '0');
+      
+      let steps = '<ol>';
+      
+      if (chromeVersion < 127) {
+        steps += '<li><strong>Update Chrome:</strong> You need Chrome 127 or later. Current version: ' + chromeVersion + '</li>';
+      }
+      
+      steps += `
+        <li><strong>Enable flags:</strong> Go to <code>chrome://flags</code> and enable:
+          <ul>
+            <li><code>#optimization-guide-on-device-model</code></li>
+            <li><code>#prompt-api-for-gemini-nano</code></li>
+            <li><code>#summarization-api-for-gemini-nano</code></li>
+            <li><code>#rewriter-api-for-gemini-nano</code></li>
+          </ul>
+        </li>
+        <li><strong>Check components:</strong> Go to <code>chrome://components</code> and look for "Optimization Guide On Device Model". Click "Check for update" if present.</li>
+        <li><strong>Restart Chrome:</strong> After enabling flags and updating components, restart Chrome completely.</li>
+        <li><strong>Regional availability:</strong> These APIs may not be available in all regions yet. Check your Chrome settings.</li>
+        <li><strong>Dev/Canary channel:</strong> Consider using Chrome Dev or Canary for early access to features.</li>
+      `;
+      
+      steps += '</ol>';
+      troubleshootingEl.innerHTML = steps;
+    }
+
+    // Run checks
+    checkPromptAPI();
+    checkSummarizerAPI();
+    checkRewriterAPI();
+    showTroubleshooting();
+  </script>
+</body>
+</html>
