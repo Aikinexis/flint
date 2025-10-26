@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { PinnedNote } from '../services/storage';
 import { AIService } from '../services/ai';
 
@@ -55,6 +55,20 @@ export function RewritePanel({
   // Undo/Redo state
   const [history, setHistory] = useState<string[]>([initialText]);
   const [historyIndex, setHistoryIndex] = useState(0);
+
+  // Load selected text from storage when component mounts
+  useEffect(() => {
+    chrome.storage.local.get('flint.selectedText').then((result) => {
+      if (result['flint.selectedText']) {
+        const text = result['flint.selectedText'];
+        setInputText(text);
+        setHistory([text]);
+        setHistoryIndex(0);
+        // Clear the stored text after loading
+        chrome.storage.local.remove('flint.selectedText');
+      }
+    });
+  }, []);
 
   /**
    * Preset configurations

@@ -10,7 +10,7 @@ export interface CompareViewProps {
   originalText: string;
 
   /**
-   * Rewritten text from AI
+   * Rewritten text from AI operation
    */
   rewrittenText: string;
 
@@ -27,7 +27,8 @@ export interface CompareViewProps {
 
 /**
  * CompareView component for side-by-side comparison of original and rewritten text
- * Displays original text on left and rewritten text on right with accept/reject actions
+ * Displays two columns with original text on left and rewritten text on right
+ * Provides accept, reject, and copy actions
  */
 export function CompareView({
   originalText,
@@ -35,24 +36,25 @@ export function CompareView({
   onAccept,
   onReject,
 }: CompareViewProps) {
-  const [copySuccess, setCopySuccess] = useState(false);
+  const [showCopySuccess, setShowCopySuccess] = useState(false);
 
   /**
    * Handles copy to clipboard button click
+   * Copies rewritten text to clipboard and shows success feedback for 2 seconds
    */
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(rewrittenText);
-      setCopySuccess(true);
-      
-      // Reset success state after 2 seconds
+      setShowCopySuccess(true);
+
+      // Hide checkmark after 2 seconds
       setTimeout(() => {
-        setCopySuccess(false);
+        setShowCopySuccess(false);
       }, 2000);
-      
-      console.log('[CompareView] Text copied to clipboard');
-    } catch (error) {
-      console.error('[CompareView] Failed to copy text:', error);
+
+      console.log('[CompareView] Rewritten text copied to clipboard');
+    } catch (err) {
+      console.error('[CompareView] Failed to copy to clipboard:', err);
     }
   };
 
@@ -60,11 +62,11 @@ export function CompareView({
     <div className="flint-section flex flex-col h-full">
       <h2 className="flint-section-header">Compare versions</h2>
 
-      {/* Two-column layout for comparison */}
-      <div 
-        style={{ 
-          display: 'grid', 
-          gridTemplateColumns: '1fr 1fr', 
+      {/* Two-column layout for side-by-side comparison */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
           gap: '16px',
           flex: 1,
           minHeight: 0,
@@ -73,21 +75,25 @@ export function CompareView({
       >
         {/* Original text column */}
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <label 
-            className="text-text-muted text-sm" 
-            style={{ marginBottom: '8px', fontWeight: 600 }}
+          <label
+            style={{
+              fontSize: 'var(--fs-sm)',
+              color: 'var(--text-muted)',
+              marginBottom: '8px',
+              fontWeight: 500,
+            }}
           >
             Original
           </label>
-          <div 
+          <div
             className="flint-card"
             style={{
               flex: 1,
               padding: '16px',
-              overflow: 'auto',
+              overflowY: 'auto',
               fontSize: 'var(--fs-md)',
-              lineHeight: '1.6',
               color: 'var(--text)',
+              lineHeight: '1.6',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
             }}
@@ -100,24 +106,27 @@ export function CompareView({
 
         {/* Rewritten text column */}
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <label 
-            className="text-text-muted text-sm" 
-            style={{ marginBottom: '8px', fontWeight: 600 }}
+          <label
+            style={{
+              fontSize: 'var(--fs-sm)',
+              color: 'var(--text-muted)',
+              marginBottom: '8px',
+              fontWeight: 500,
+            }}
           >
             Rewritten
           </label>
-          <div 
+          <div
             className="flint-card"
             style={{
               flex: 1,
               padding: '16px',
-              overflow: 'auto',
+              overflowY: 'auto',
               fontSize: 'var(--fs-md)',
-              lineHeight: '1.6',
               color: 'var(--text)',
+              lineHeight: '1.6',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
-              background: 'linear-gradient(180deg, rgba(249, 115, 22, 0.05), rgba(249, 115, 22, 0)), var(--surface)',
             }}
             role="region"
             aria-label="Rewritten text"
@@ -127,15 +136,17 @@ export function CompareView({
         </div>
       </div>
 
-      {/* Accept Button */}
-      <div style={{ marginBottom: '16px' }}>
+      {/* Action buttons */}
+      <div className="flint-button-group">
         <button
           className="flint-btn primary"
           onClick={onAccept}
           aria-label="Accept rewritten text and replace original"
-          style={{ 
-            width: '100%',
-            background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
+          style={{
+            flex: 1,
+            background: 'linear-gradient(135deg, oklch(0.54 0.11 152) 0%, oklch(0.44 0.13 152) 100%)',
+            borderColor: 'oklch(0.34 0.09 152)',
+            color: 'var(--text)',
           }}
         >
           <svg
@@ -153,18 +164,14 @@ export function CompareView({
           </svg>
           Accept
         </button>
-      </div>
 
-      {/* Copy and Reject Buttons */}
-      <div className="flint-button-group">
         <button
-          className="flint-btn secondary"
+          className="flint-btn ghost"
           onClick={handleCopy}
-          aria-label="Copy rewritten text to clipboard"
-          disabled={copySuccess}
-          style={{ flex: 1 }}
+          disabled={showCopySuccess}
+          aria-label={showCopySuccess ? 'Copied to clipboard' : 'Copy rewritten text to clipboard'}
         >
-          {copySuccess ? (
+          {showCopySuccess ? (
             <>
               <svg
                 width="16"
@@ -176,10 +183,13 @@ export function CompareView({
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden="true"
+                style={{
+                  color: '#10b981',
+                }}
               >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Copied!
+              <span style={{ color: '#10b981' }}>Copied!</span>
             </>
           ) : (
             <>
@@ -201,7 +211,7 @@ export function CompareView({
             </>
           )}
         </button>
-        
+
         <button
           className="flint-btn ghost"
           onClick={onReject}

@@ -219,6 +219,7 @@ export class AIService {
         format: 'plain-text',
         length: lengthMap[options.readingLevel] || 'medium',
         sharedContext,
+        outputLanguage: 'en', // Required for optimal output quality and safety
       });
 
       const result = await Promise.race([
@@ -286,6 +287,7 @@ export class AIService {
           format: 'plain-text',
           length: 'as-is',
           sharedContext,
+          outputLanguage: 'en', // Required for optimal output quality and safety
         });
 
         const result = await Promise.race([

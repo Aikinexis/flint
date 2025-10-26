@@ -10,9 +10,12 @@
   --border: oklch(0.4 0 255);
   --border-muted: oklch(0.3 0 255);
 
-  /* brand colors */
-  --primary: oklch(60% 0.12 255/ 0.9);
-  --secondary: oklch(46% 0.14 255);
+  /* accent hue - default blue (255) */
+  --accent-hue: 255;
+
+  /* brand colors - dynamically generated from hue */
+  --primary: oklch(60% 0.12 var(--accent-hue) / 0.9);
+  --secondary: oklch(46% 0.14 var(--accent-hue));
 
   /* status colors with 90 percent alpha */
   --danger: oklch(0.5 0.16 30 / 90%);
@@ -55,6 +58,10 @@
   --border-muted: oklch(0.9 0 255);
   --surface: var(--bg);
   --surface-2: color-mix(in oklab, var(--bg) 92%, black 8%);
+
+  /* Brighter accent colors for light mode (20% increase in lightness) */
+  --primary: oklch(80% 0.12 var(--accent-hue) / 0.9);
+  --secondary: oklch(66% 0.14 var(--accent-hue));
 }
 
 /* primitives */
@@ -126,8 +133,8 @@
 }
 
 .flint-btn.primary {
-  background: linear-gradient(135deg, oklch(0.6 0.1 255) 0%, oklch(0.5 0.12 255) 100%);
-  border-color: oklch(0.3 0.08 255);
+  background: linear-gradient(135deg, oklch(0.6 0.1 var(--accent-hue)) 0%, oklch(0.5 0.12 var(--accent-hue)) 100%);
+  border-color: oklch(0.3 0.08 var(--accent-hue));
   color: oklch(0.12 0 255);
   font-weight: 600;
   transition: all 0.3s ease;
@@ -138,21 +145,53 @@
 }
 
 .flint-btn.primary:active {
-  background: linear-gradient(135deg, oklch(0.6 0.12 255), oklch(0.5 0.14 280));
+  background: linear-gradient(135deg, oklch(0.6 0.12 var(--accent-hue)), oklch(0.5 0.14 var(--accent-hue)));
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Light mode: brighter primary button colors */
+.light .flint-btn.primary {
+  background: linear-gradient(135deg, oklch(0.8 0.1 var(--accent-hue)) 0%, oklch(0.7 0.12 var(--accent-hue)) 100%);
+  border-color: oklch(0.5 0.08 var(--accent-hue));
+  color: oklch(0.12 0 255);
+}
+
+.light .flint-btn.primary:active {
+  background: linear-gradient(135deg, oklch(0.8 0.12 var(--accent-hue)), oklch(0.7 0.14 var(--accent-hue)));
+  border-color: oklch(0.5 0.08 var(--accent-hue));
 }
 
 @keyframes border-pulse-primary {
 
   0%,
   100% {
-    border-color: oklch(0.3 0.08 255);
+    border-color: oklch(0.3 0.08 var(--accent-hue));
   }
 
   50% {
-    border-color: oklch(0.6 0.15 255);
+    border-color: oklch(0.6 0.15 var(--accent-hue));
   }
+}
+
+@keyframes border-pulse-primary-light {
+
+  0%,
+  100% {
+    border-color: oklch(0.5 0.08 var(--accent-hue));
+  }
+
+  50% {
+    border-color: oklch(0.8 0.15 var(--accent-hue));
+  }
+}
+
+.light .flint-btn.primary:hover {
+  animation: border-pulse-primary-light 1.5s ease-in-out infinite;
+}
+
+.light .flint-btn.primary:active {
+  border-color: oklch(0.5 0.08 var(--accent-hue));
 }
 
 .flint-btn.secondary {

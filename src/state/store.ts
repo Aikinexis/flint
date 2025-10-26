@@ -86,6 +86,7 @@ const DEFAULT_SETTINGS: Settings = {
   language: 'en-US',
   theme: 'dark',
   localOnlyMode: false,
+  accentHue: 255, // Default blue hue
   shortcuts: {
     openPanel: 'Ctrl+Shift+F',
     record: 'Ctrl+Shift+R',

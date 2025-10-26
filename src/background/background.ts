@@ -20,7 +20,9 @@ type MessageType =
   | 'OPEN_SUMMARY_TAB'
   | 'OPEN_REWRITE_TAB'
   | 'OPEN_SETTINGS_TAB'
-  | 'OPEN_HISTORY_TAB';
+  | 'OPEN_HISTORY_TAB'
+  // Settings messages
+  | 'UPDATE_SHORTCUTS';
 
 /**
  * Message structure for background communication
@@ -292,6 +294,18 @@ async function handlePanelMessage(
   type: MessageType,
   payload?: unknown
 ): Promise<MessageResponse> {
+  // Handle UPDATE_SHORTCUTS message separately (doesn't need active tab)
+  if (type === 'UPDATE_SHORTCUTS') {
+    console.log('[Flint Background] Shortcuts updated:', payload);
+    // Note: Chrome doesn't allow programmatic update of keyboard shortcuts
+    // Users must update them via chrome://extensions/shortcuts
+    // We just acknowledge the message here
+    return {
+      success: true,
+      data: { message: 'Shortcuts saved. Note: Chrome shortcuts are managed in chrome://extensions/shortcuts' }
+    };
+  }
+
   try {
     // Get the active tab in the current window
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -428,4 +442,77 @@ chrome.runtime.onStartup.addListener(() => {
  */
 self.addEventListener('beforeunload', () => {
   // Service worker suspending - cleanup if needed
+});
+
+/**
+ * Handle keyboard shortcuts from chrome.commands API
+ * Triggers appropriate actions when user presses registered shortcuts
+ */
+chrome.commands.onCommand.addListener(async (command) => {
+  console.log('[Flint Background] Keyboard command triggered:', command);
+
+  try {
+    // Get the active tab
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const activeTab = tabs[0];
+
+    if (!activeTab?.id) {
+      console.error('[Flint Background] No active tab for command:', command);
+      return;
+    }
+
+    switch (command) {
+      case 'open-panel':
+        // Open the side panel
+        await chrome.sidePanel.open({ tabId: activeTab.id });
+        break;
+
+      case 'record':
+        // Open side panel to Voice tab
+        await chrome.sidePanel.open({ tabId: activeTab.id });
+        // Send message to panel to switch to Voice tab
+        setTimeout(() => {
+          chrome.runtime.sendMessage({
+            type: 'OPEN_VOICE_TAB',
+            source: 'background',
+          }).catch((err) => {
+            console.error('[Flint Background] Failed to open Voice tab:', err);
+          });
+        }, 100);
+        break;
+
+      case 'summarize':
+        // Get selected text and open Summary tab
+        await chrome.sidePanel.open({ tabId: activeTab.id });
+        // Send message to panel to switch to Summary tab with selected text
+        setTimeout(() => {
+          chrome.runtime.sendMessage({
+            type: 'OPEN_SUMMARY_TAB',
+            source: 'background',
+          }).catch((err) => {
+            console.error('[Flint Background] Failed to open Summary tab:', err);
+          });
+        }, 100);
+        break;
+
+      case 'rewrite':
+        // Get selected text and open Rewrite tab
+        await chrome.sidePanel.open({ tabId: activeTab.id });
+        // Send message to panel to switch to Rewrite tab with selected text
+        setTimeout(() => {
+          chrome.runtime.sendMessage({
+            type: 'OPEN_REWRITE_TAB',
+            source: 'background',
+          }).catch((err) => {
+            console.error('[Flint Background] Failed to open Rewrite tab:', err);
+          });
+        }, 100);
+        break;
+
+      default:
+        console.warn('[Flint Background] Unknown command:', command);
+    }
+  } catch (error) {
+    console.error('[Flint Background] Error handling command:', command, error);
+  }
 });

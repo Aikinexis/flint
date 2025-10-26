@@ -156,9 +156,14 @@ body {
 }
 
 .sidebar-logo-btn.active {
-  background: linear-gradient(135deg, oklch(0.5 0.1 255) 0%, oklch(0.4 0.12 255) 100%);
+  background: linear-gradient(135deg, oklch(0.5 0.1 var(--accent-hue)) 0%, oklch(0.4 0.12 var(--accent-hue)) 100%);
   color: oklch(0.12 0 255);
   border-color: transparent;
+}
+
+.light .sidebar-logo-btn.active {
+  background: linear-gradient(135deg, oklch(0.7 0.1 var(--accent-hue)) 0%, oklch(0.6 0.12 var(--accent-hue)) 100%);
+  color: oklch(0.12 0 255);
 }
 
 .sidebar-logo-btn svg,
@@ -200,7 +205,12 @@ body {
 }
 
 .sidebar-nav .flint-btn.active {
-  background: linear-gradient(135deg, oklch(0.5 0.1 255) 0%, oklch(0.4 0.12 255) 100%);
+  background: linear-gradient(135deg, oklch(0.5 0.1 var(--accent-hue)) 0%, oklch(0.4 0.12 var(--accent-hue)) 100%);
+  color: oklch(0.12 0 255);
+}
+
+.light .sidebar-nav .flint-btn.active {
+  background: linear-gradient(135deg, oklch(0.7 0.1 var(--accent-hue)) 0%, oklch(0.6 0.12 var(--accent-hue)) 100%);
   color: oklch(0.12 0 255);
 }
 
@@ -263,4 +273,69 @@ body {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+}
+
+/* Range Slider Styling */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Webkit (Chrome, Safari, Edge) */
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+input[type='range']::-webkit-slider-thumb:active {
+  transform: scale(0.95);
+}
+
+/* Firefox */
+input[type='range']::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+input[type='range']::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+input[type='range']::-moz-range-thumb:active {
+  transform: scale(0.95);
+}
+
+/* Focus state */
+input[type='range']:focus-visible {
+  outline: none;
+}
+
+input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--primary);
+}
+
+input[type='range']:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--primary);
 }

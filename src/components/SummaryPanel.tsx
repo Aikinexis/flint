@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { PinnedNote } from '../services/storage';
 import { AIService } from '../services/ai';
 
@@ -50,6 +50,17 @@ export function SummaryPanel({
   const [error, setError] = useState<string | null>(null);
   const [isMockProvider, setIsMockProvider] = useState(false);
   const [showCopySuccess, setShowCopySuccess] = useState(false);
+
+  // Load selected text from storage when component mounts
+  useEffect(() => {
+    chrome.storage.local.get('flint.selectedText').then((result) => {
+      if (result['flint.selectedText']) {
+        setInputText(result['flint.selectedText']);
+        // Clear the stored text after loading
+        chrome.storage.local.remove('flint.selectedText');
+      }
+    });
+  }, []);
 
   /**
    * Handles mode selection change

@@ -466,7 +466,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
 
 ## Phase 10: React Components - Compare View and Mini Bar
 
-- [ ] 49. Create CompareView component
+- [x] 49. Create CompareView component
   - Create `src/components/CompareView.tsx` with component skeleton
   - Define CompareViewProps interface
   - Create two-column layout (50/50 split)
@@ -476,7 +476,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 4.1_
   - _Commit: "feat: create CompareView component with side-by-side layout"_
 
-- [ ] 50. Add accept and reject actions
+- [x] 50. Add accept and reject actions
   - Create accept button (green, primary style)
   - Create reject button (gray, ghost style)
   - Add copy to clipboard button
@@ -486,7 +486,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 4.2, 4.6_
   - _Commit: "feat: add accept and reject actions to CompareView"_
 
-- [ ] 51. Implement text replacement from CompareView
+- [x] 51. Implement text replacement from CompareView
   - Send REPLACE_TEXT message to content script
   - Pass rewritten text and selection range
   - Handle success response from content script
@@ -496,7 +496,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 4.2, 4.5_
   - _Commit: "feat: implement text replacement from CompareView"_
 
-- [ ] 52. Create MiniBar component
+- [x] 52. Create MiniBar component
   - Create `src/components/MiniBar.tsx` with component skeleton
   - Define MiniBarProps interface
   - Create horizontal layout with 4 icon buttons
@@ -508,7 +508,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 2.1, 3.1_
   - _Commit: "feat: create MiniBar component with action buttons"_
 
-- [ ] 53. Implement MiniBar button actions
+- [x] 53. Implement MiniBar button actions
   - Add click handler for record button (open panel to Voice tab)
   - Add click handler for summarize button (open panel to Summary tab with selected text)
   - Add click handler for rewrite button (open panel to Rewrite tab with selected text)
@@ -520,7 +520,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
 
 ## Phase 11: React Components - Settings and History
 
-- [ ] 54. Create Settings component structure
+- [x] 54. Create Settings component structure
   - Create `src/components/Settings.tsx` with component skeleton
   - Define SettingsProps interface
   - Set up component state from app settings
@@ -529,7 +529,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
   - _Commit: "feat: create Settings component structure"_
 
-- [ ] 55. Implement theme toggles
+- [x] 55. Implement theme toggles
   - Add toggle switch for light mode
   - Toggle .light class on document.documentElement
   - Add toggle switch for complementary accent (blue)
@@ -539,7 +539,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 6.3_
   - _Commit: "feat: add theme toggles for light mode and accent color"_
 
-- [ ] 56. Add language and local-only mode settings
+- [x] 56. Add language and local-only mode settings
   - Create dropdown for speech recognition language
   - Populate with available language options
   - Add toggle switch for local-only mode
@@ -549,7 +549,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 6.1, 6.2_
   - _Commit: "feat: add language selector and local-only mode toggle"_
 
-- [ ] 57. Implement keyboard shortcuts configuration
+- [x] 57. Implement keyboard shortcuts configuration
   - Create editable fields for keyboard shortcuts
   - Add shortcuts for: open panel, record, summarize, rewrite
   - Validate shortcuts for conflicts
@@ -559,7 +559,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 6.4_
   - _Commit: "feat: add keyboard shortcuts configuration"_
 
-- [ ] 58. Add privacy notice and pinned notes editor
+- [x] 58. Add privacy notice and pinned notes editor
   - Display privacy notice about Web Speech API
   - Make notice always visible (callout box style)
   - Create pinned notes list with add/edit/delete buttons
@@ -570,7 +570,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 5.1, 5.2, 5.3, 5.5, 6.5_
   - _Commit: "feat: add privacy notice and pinned notes editor"_
 
-- [ ] 59. Create History component
+- [x] 59. Create History component
   - Create `src/components/History.tsx` (can be part of Settings or separate tab)
   - Display list of history items sorted by timestamp (newest first)
   - Show operation type, timestamp, and preview of text
@@ -579,7 +579,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 7.2, 7.3_
   - _Commit: "feat: create History component with search"_
 
-- [ ] 60. Implement history item details and clear
+- [x] 60. Implement history item details and clear
   - Add click handler to show full history item details in modal
   - Display original text, result text, and metadata
   - Add copy buttons for original and result

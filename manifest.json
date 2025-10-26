@@ -20,7 +20,6 @@
   "background": {
     "service_worker": "src/background/background.js"
   },
-
   "side_panel": {
     "default_path": "src/panel/index.html"
   },
@@ -30,6 +29,36 @@
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
+    }
+  },
+  "commands": {
+    "open-panel": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+F",
+        "mac": "Command+Shift+F"
+      },
+      "description": "Open Flint side panel"
+    },
+    "record": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+R",
+        "mac": "Command+Shift+R"
+      },
+      "description": "Start voice recording"
+    },
+    "summarize": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "Summarize selected text"
+    },
+    "rewrite": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+W",
+        "mac": "Command+Shift+W"
+      },
+      "description": "Rewrite selected text"
     }
   },
   "content_security_policy": {

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flint - Text Replacement Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+    .test-section {
+      background: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .test-section h2 {
+      color: #666;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 14px;
+      resize: vertical;
+    }
+    .editable {
+      width: 100%;
+      min-height: 100px;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      background: white;
+    }
+    .instructions {
+      background: #e3f2fd;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      color: #1565c0;
+    }
+    .instructions ol {
+      margin: 10px 0 0 20px;
+      padding: 0;
+    }
+    .instructions li {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔥 Flint - Text Replacement Test</h1>
+  
+  <div class="instructions">
+    <strong>Test Instructions:</strong>
+    <ol>
+      <li>Select some text in any of the fields below</li>
+      <li>Click the "Rewrite" button in the mini bar that appears</li>
+      <li>Choose a rewrite style (e.g., "Formal")</li>
+      <li>Click "Rewrite" in the side panel</li>
+      <li>In the compare view, click "Accept" to replace the original text</li>
+      <li>Verify the text is replaced in the field below</li>
+    </ol>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 1: Standard Textarea</h2>
+    <textarea id="textarea1">This is a casual message that needs to be more professional. I think we should probably meet up sometime next week to discuss the project details.</textarea>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 2: Another Textarea</h2>
+    <textarea id="textarea2">Hey there! Just wanted to let you know that the thing we talked about is ready. Let me know when you want to check it out!</textarea>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 3: ContentEditable Div</h2>
+    <div class="editable" contenteditable="true">
+      This is an editable div element. You can select text here and use Flint to rewrite it. The formatting should be preserved where possible.
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 4: Rich ContentEditable</h2>
+    <div class="editable" contenteditable="true">
+      <p>This paragraph has <strong>bold text</strong> and <em>italic text</em>.</p>
+      <p>Select any part of this text and rewrite it to test formatting preservation.</p>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 5: Long Text for Summarization</h2>
+    <textarea id="textarea3">
+Artificial intelligence has become one of the most transformative technologies of the 21st century. From healthcare to finance, from transportation to entertainment, AI is reshaping how we live and work. Machine learning algorithms can now diagnose diseases, predict market trends, drive cars, and even create art. However, with these advances come important questions about ethics, privacy, and the future of human employment. As AI systems become more sophisticated, we must carefully consider how to develop and deploy them responsibly, ensuring they benefit humanity while minimizing potential risks and unintended consequences.
+    </textarea>
+  </div>
+
+  <script>
+    // Add some visual feedback when text is selected
+    document.addEventListener('selectionchange', () => {
+      const selection = window.getSelection();
+      const text = selection?.toString().trim();
+      if (text && text.length > 3) {
+        console.log('Selected text:', text);
+      }
+    });
+  </script>
+</body>
+</html>
