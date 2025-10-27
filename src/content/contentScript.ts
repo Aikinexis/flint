@@ -20,7 +20,8 @@ type MessageType =
   | 'INSERT_TEXT'
   | 'REPLACE_TEXT'
   | 'SHOW_MINI_BAR'
-  | 'HIDE_MINI_BAR';
+  | 'HIDE_MINI_BAR'
+  | 'SHOW_MINIBAR_FROM_STORAGE';
 
 /**
  * Message structure for content script communication
@@ -48,6 +49,9 @@ class ContentScriptCoordinator {
   private caretHandler: CaretHandler;
   private miniBarInjector: MiniBarInjector;
   private readonly SELECTION_THRESHOLD = 3; // Minimum characters to show mini bar
+  private selectionDebounceTimer: number | null = null;
+  private lastSelectionText = '';
+  private isPanelOpen = false;
 
   constructor() {
     // Initialize handlers
@@ -58,29 +62,109 @@ class ContentScriptCoordinator {
     // Set up event listeners
     this.setupSelectionListener();
     this.setupMessageListener();
+    this.setupPanelStateListener();
+
+    // Check if we're on Google Docs
+    if (this.isGoogleDocs()) {
+      console.log('[Flint] Google Docs detected - mini bar may not work due to custom editor');
+    }
 
     console.log('[Flint] Content script initialized');
   }
 
   /**
+   * Check if current page is Google Docs
+   */
+  private isGoogleDocs(): boolean {
+    return window.location.hostname === 'docs.google.com' && 
+           window.location.pathname.startsWith('/document/');
+  }
+
+  /**
+   * Set up listener for panel open/close state
+   * Checks periodically if panel is open by pinging it
+   */
+  private setupPanelStateListener(): void {
+    // Check panel state every 500ms
+    setInterval(() => {
+      chrome.runtime.sendMessage(
+        { type: 'PING_PANEL', source: 'content-script' },
+        (response) => {
+          const wasOpen = this.isPanelOpen;
+          this.isPanelOpen = !chrome.runtime.lastError && response?.success === true;
+          
+          // If panel was just opened, clear any existing selection
+          if (!wasOpen && this.isPanelOpen) {
+            const selection = window.getSelection();
+            if (selection) {
+              selection.removeAllRanges();
+            }
+            this.miniBarInjector.hide();
+            this.lastSelectionText = '';
+          }
+          
+          // If panel was just closed, hide mini bar
+          if (wasOpen && !this.isPanelOpen) {
+            this.miniBarInjector.hide();
+          }
+        }
+      );
+    }, 500);
+  }
+
+  /**
    * Set up listener for text selection changes
-   * Shows mini bar when text is selected
+   * Shows minibar when text is selected (with debouncing for stability)
    */
   private setupSelectionListener(): void {
     this.selectionHandler.onSelectionChange((text: string) => {
-      // Hide mini bar if selection is too short or empty
+      // Clear any pending timer
+      if (this.selectionDebounceTimer !== null) {
+        clearTimeout(this.selectionDebounceTimer);
+        this.selectionDebounceTimer = null;
+      }
+
+      // Hide mini bar immediately if selection is too short or empty
       if (!text || text.length < this.SELECTION_THRESHOLD) {
         this.miniBarInjector.hide();
+        this.lastSelectionText = '';
         return;
       }
 
-      // Get selection position for mini bar placement
-      const position = this.getSelectionPosition();
-      
-      if (position) {
-        // Show mini bar near selection
-        this.showMiniBar(position);
+      // Skip mini bar on Google Docs (doesn't work reliably)
+      if (this.isGoogleDocs()) {
+        console.log('[Flint] Skipping mini bar on Google Docs - use keyboard shortcuts or copy/paste instead');
+        return;
       }
+
+      // Debounce showing the mini bar to avoid flashing during fast selections
+      this.selectionDebounceTimer = window.setTimeout(() => {
+        // Double-check selection is still valid
+        const currentText = this.selectionHandler.getSelectedText();
+        if (!currentText || currentText.length < this.SELECTION_THRESHOLD) {
+          return;
+        }
+
+        // Only show mini bar if panel is open
+        if (!this.isPanelOpen) {
+          return;
+        }
+
+        // Only update if selection has changed
+        if (currentText === this.lastSelectionText && this.miniBarInjector.isVisible()) {
+          return;
+        }
+
+        this.lastSelectionText = currentText;
+
+        // Get selection position for mini bar placement
+        const position = this.getSelectionPosition();
+        
+        if (position) {
+          // Show mini bar near selection
+          this.showMiniBar(position);
+        }
+      }, 200); // Wait 200ms for selection to stabilize
     });
   }
 
@@ -94,7 +178,7 @@ class ContentScriptCoordinator {
         _sender: chrome.runtime.MessageSender,
         sendResponse: (response: MessageResponse) => void
       ) => {
-        // Handle message asynchronously
+        // Handle messages asynchronously
         this.handleMessage(message)
           .then(sendResponse)
           .catch((error) => {
@@ -325,6 +409,17 @@ class ContentScriptCoordinator {
    */
   private getSelectionPosition(): Position | null {
     try {
+      // Check if selection is in a textarea or input field
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLTextAreaElement || activeElement instanceof HTMLInputElement) {
+        // For form fields, position mini bar at the top-center of the field
+        const rect = activeElement.getBoundingClientRect();
+        const x = rect.left + rect.width / 2 + window.scrollX;
+        const y = rect.top + window.scrollY;
+        return { x, y };
+      }
+
+      // For regular text selections
       const selection = window.getSelection();
 
       if (!selection || selection.rangeCount === 0) {
@@ -333,6 +428,11 @@ class ContentScriptCoordinator {
 
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
+
+      // Check if rect is valid (not collapsed to 0,0)
+      if (rect.width === 0 && rect.height === 0) {
+        return null;
+      }
 
       // Calculate position at the center-top of the selection
       const x = rect.left + rect.width / 2 + window.scrollX;
@@ -352,25 +452,21 @@ class ContentScriptCoordinator {
   private showMiniBar(position: Position): void {
     this.miniBarInjector.show(position, {
       onRecord: () => {
-        console.log('[Flint] Record button clicked');
         this.sendMessageToPanel('OPEN_GENERATE_TAB');
       },
       onSummarize: () => {
-        console.log('[Flint] Summarize button clicked');
         const text = this.selectionHandler.getSelectedText();
         if (text) {
           this.sendMessageToPanel('OPEN_SUMMARY_TAB', { text });
         }
       },
       onRewrite: () => {
-        console.log('[Flint] Rewrite button clicked');
         const text = this.selectionHandler.getSelectedText();
         if (text) {
           this.sendMessageToPanel('OPEN_REWRITE_TAB', { text });
         }
       },
       onClose: () => {
-        console.log('[Flint] Close button clicked');
         this.miniBarInjector.hide();
       }
     });

@@ -38,12 +38,20 @@ function PanelContent() {
 
   // Load last selected tab from storage on mount
   useEffect(() => {
+    let mounted = true;
+
     chrome.storage.local.get({ 'flint.lastTab': 'home' }).then((result) => {
+      if (!mounted) return;
+      
       const tab = result['flint.lastTab'] as Tab;
       actions.setActiveTab(tab);
       // Mark initial tab as visited
       setVisitedTabs(prev => new Set(prev).add(tab));
     });
+
+    return () => {
+      mounted = false;
+    };
   }, [actions]);
 
   // Apply theme classes when settings change
@@ -76,6 +84,11 @@ function PanelContent() {
       }
 
       switch (message.type) {
+        case 'PING_PANEL':
+          // Simple ping to check if panel is open
+          sendResponse({ success: true, data: { message: 'Panel is open' } });
+          return true;
+
         case 'OPEN_GENERATE_TAB':
           actions.setActiveTab('generate');
           setVisitedTabs(prev => new Set(prev).add('generate'));
@@ -105,10 +118,12 @@ function PanelContent() {
           actions.setActiveTab('rewrite');
           setVisitedTabs(prev => new Set(prev).add('rewrite'));
           setCompareMode(false);
-          // Store the selected text for the rewrite panel to use
+          // Clear any previous rewrite state and set new selected text
           if (message.payload?.text) {
             setOriginalText(message.payload.text);
+            setRewrittenText(''); // Clear previous rewrite
             actions.setCurrentText(message.payload.text);
+            actions.setCurrentResult(''); // Clear previous result
             chrome.storage.local.set({ 
               'flint.lastTab': 'rewrite',
               'flint.selectedText': message.payload.text 
@@ -291,7 +306,10 @@ function PanelContent() {
           
           {visitedTabs.has('summary') && (
             <div style={{ display: state.activeTab === 'summary' ? 'block' : 'none', height: '100%' }}>
-              <SummaryPanel pinnedNotes={state.pinnedNotes} />
+              <SummaryPanel 
+                initialText={state.currentText}
+                pinnedNotes={state.pinnedNotes} 
+              />
             </div>
           )}
           

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { PinnedNote } from '../services/storage';
 import { StorageService } from '../services/storage';
 import { AIService } from '../services/ai';
@@ -47,6 +47,9 @@ export function SummaryPanel({
   // Get app state and actions for updating history
   const { state, actions } = useAppState();
   
+  // Ref to track last processed initialText
+  const lastInitialTextRef = useRef<string>(initialText);
+  
   // Component state
   const [mode, setMode] = useState<SummaryMode>('bullets');
   const [readingLevel, setReadingLevel] = useState<ReadingLevel>('moderate');
@@ -67,34 +70,27 @@ export function SummaryPanel({
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
 
-  // Load selected text from storage when component mounts (only once)
+  // Update versions when initialText changes (e.g., from minibar selection)
+  // Only update if initialText is different from the last one we processed
   useEffect(() => {
-    let mounted = true;
-    
-    chrome.storage.local.get('flint.selectedText').then((result) => {
-      if (!mounted) return;
-      
-      if (result['flint.selectedText']) {
-        const text = result['flint.selectedText'];
-        // Replace with version containing selected text
-        setVersions([{
-          id: `original-${Date.now()}`,
-          text,
-          label: 'Original',
-          isOriginal: true,
-          isLiked: false,
-          timestamp: Date.now(),
-        }]);
-        setCurrentVersionIndex(0);
-        // Clear the stored text after loading
-        chrome.storage.local.remove('flint.selectedText');
-      }
-    });
-    
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    if (initialText && initialText !== lastInitialTextRef.current) {
+      lastInitialTextRef.current = initialText;
+      // Strip timestamp marker if present (format: text\0timestamp)
+      const cleanText = initialText.includes('\0') 
+        ? initialText.substring(0, initialText.lastIndexOf('\0'))
+        : initialText;
+      // Replace with version containing new text
+      setVersions([{
+        id: `original-${Date.now()}`,
+        text: cleanText,
+        label: 'Original',
+        isOriginal: true,
+        isLiked: false,
+        timestamp: Date.now(),
+      }]);
+      setCurrentVersionIndex(0);
+    }
+  }, [initialText]);
 
   // Listen for history clear events
   useEffect(() => {
@@ -336,6 +332,8 @@ export function SummaryPanel({
    * Resets all state to initial values
    */
   const handleClear = () => {
+    // Reset the ref so the same text can be loaded again from minibar
+    lastInitialTextRef.current = '';
     setVersions([{
       id: `original-${Date.now()}`,
       text: '',

@@ -43,8 +43,17 @@ class SelectionHandlerImpl implements SelectionHandler {
   private selectionChangeCallback: ((text: string) => void) | null = null;
 
   constructor() {
-    // Set up selection change listener
-    document.addEventListener('selectionchange', this.handleSelectionChange.bind(this));
+    try {
+      // Listen for selection changes
+      document.addEventListener('selectionchange', this.handleSelectionChange.bind(this));
+      
+      // Store selection on mouseup
+      document.addEventListener('mouseup', this.handleMouseUp.bind(this));
+      
+      console.log('[Flint Selection] Handler initialized on:', window.location.href);
+    } catch (error) {
+      console.error('[Flint Selection] Failed to initialize:', error);
+    }
   }
 
   /**
@@ -52,10 +61,33 @@ class SelectionHandlerImpl implements SelectionHandler {
    */
   private handleSelectionChange(): void {
     if (this.selectionChangeCallback) {
-      const text = this.getSelectedText();
-      this.selectionChangeCallback(text || '');
+      try {
+        const text = this.getSelectedText();
+        this.selectionChangeCallback(text || '');
+      } catch (error) {
+        // Silently ignore errors in selection handling
+        // This can happen in iframes or restricted contexts
+      }
     }
   }
+
+  /**
+   * Store selection in chrome.storage when user finishes selecting
+   */
+  private handleMouseUp(): void {
+    try {
+      const text = this.getSelectedText();
+      if (text && text.length >= 3) {
+        chrome.storage.local.set({ 'flint.lastSelection': text }).catch(() => {
+          // Ignore errors
+        });
+      }
+    } catch (error) {
+      // Silently ignore errors
+    }
+  }
+
+
 
   /**
    * Get currently selected text using window.getSelection()

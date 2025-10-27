@@ -36,7 +36,7 @@ type DialogMode = 'add' | 'edit' | 'delete' | null;
 
 /**
  * Settings component for configuration and preferences
- * Provides theme toggles, language selection, keyboard shortcuts, and pinned notes management
+ * Provides theme toggles, language selection, and pinned notes management
  */
 export function Settings({
   settings: propSettings,
@@ -51,14 +51,33 @@ export function Settings({
   // Local state for settings
   const [localSettings, setLocalSettings] = useState<SettingsType | null>(null);
   const [pinnedNotes, setPinnedNotes] = useState<PinnedNote[]>([]);
-  // State for shortcut validation errors
-  const [shortcutErrors, setShortcutErrors] = useState<Record<string, string>>({});
   
   // Dialog state for pinned notes
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
   const [selectedNote, setSelectedNote] = useState<PinnedNote | null>(null);
   const [noteTitle, setNoteTitle] = useState('');
   const [noteContent, setNoteContent] = useState('');
+
+  // Collapsible section state - only Data Management open by default
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    dataManagement: true,
+    appearance: false,
+    voiceRecognition: false,
+    shortcuts: false,
+    generatePanel: false,
+    privacy: false,
+    pinnedNotes: false,
+  });
+
+  /**
+   * Toggles a section's expanded state
+   */
+  const toggleSection = (section: string) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
 
   // Generate panel settings state
   const [generateSettings, setGenerateSettings] = useState<GenerateSettings | null>(null);
@@ -85,12 +104,6 @@ export function Settings({
             theme: 'dark',
             localOnlyMode: false,
             accentHue: 255, // Default blue hue
-            shortcuts: {
-              openPanel: 'Ctrl+Shift+F',
-              record: 'Ctrl+Shift+R',
-              summarize: 'Ctrl+Shift+S',
-              rewrite: 'Ctrl+Shift+W',
-            },
           };
           setLocalSettings(defaultSettings);
         }
@@ -171,76 +184,6 @@ export function Settings({
   /**
    * Validates a keyboard shortcut format and checks for conflicts
    * @param key - The shortcut key being validated
-   * @param value - The shortcut value to validate
-   * @returns Error message if invalid, empty string if valid
-   */
-  const validateShortcut = (
-    key: keyof SettingsType['shortcuts'],
-    value: string
-  ): string => {
-    if (!settings) return '';
-    // Empty check
-    if (!value.trim()) {
-      return 'Shortcut cannot be empty';
-    }
-
-    // Basic format validation (must contain at least one modifier)
-    const hasCtrl = value.includes('Ctrl') || value.includes('Command') || value.includes('MacCtrl');
-    const hasAlt = value.includes('Alt');
-    const hasShift = value.includes('Shift');
-    
-    if (!hasCtrl && !hasAlt && !hasShift) {
-      return 'Shortcut must include at least one modifier key (Ctrl, Alt, or Shift)';
-    }
-
-    // Check for conflicts with other shortcuts
-    const shortcuts = settings.shortcuts;
-    for (const [otherKey, otherValue] of Object.entries(shortcuts)) {
-      if (otherKey !== key && otherValue.toLowerCase() === value.toLowerCase()) {
-        const keyNames: Record<string, string> = {
-          openPanel: 'Open Panel',
-          record: 'Record',
-          summarize: 'Summarize',
-          rewrite: 'Rewrite',
-        };
-        return `Conflicts with ${keyNames[otherKey] || otherKey} shortcut`;
-      }
-    }
-
-    return '';
-  };
-
-  /**
-   * Updates a keyboard shortcut with validation
-   */
-  const updateShortcut = (
-    key: keyof SettingsType['shortcuts'],
-    value: string
-  ) => {
-    // Validate the shortcut
-    const error = validateShortcut(key, value);
-    
-    // Update error state
-    setShortcutErrors((prev) => ({
-      ...prev,
-      [key]: error,
-    }));
-
-    // Only save if valid
-    if (!error) {
-      const newShortcuts = { ...settings.shortcuts, [key]: value };
-      updateSetting('shortcuts', newShortcuts);
-      
-      // Notify background to update command shortcuts
-      chrome.runtime.sendMessage({
-        type: 'UPDATE_SHORTCUTS',
-        payload: newShortcuts,
-      }).catch((err) => {
-        console.error('[Settings] Failed to update shortcuts in background:', err);
-      });
-    }
-  };
-
   /**
    * Clamps a value between min and max (word counts)
    */
@@ -671,18 +614,56 @@ export function Settings({
 
       {/* Theme Section */}
       <section style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-muted)' }}>
-        <h3
+        <button
+          onClick={() => toggleSection('appearance')}
           style={{
-            fontSize: 'var(--fs-sm)',
-            fontWeight: 600,
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            marginBottom: expandedSections.appearance ? '16px' : '0',
+            cursor: 'pointer',
             color: 'var(--text)',
-            marginBottom: '16px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
           }}
+          aria-expanded={expandedSections.appearance}
+          aria-controls="appearance-content"
         >
-          Appearance
-        </h3>
+          <h3
+            style={{
+              fontSize: 'var(--fs-sm)',
+              fontWeight: 600,
+              color: 'var(--text)',
+              margin: 0,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
+            Appearance
+          </h3>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            style={{
+              transform: expandedSections.appearance ? 'rotate(90deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+            }}
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+
+        {expandedSections.appearance && (
+          <div id="appearance-content">
 
         {/* Light mode toggle */}
         <div
@@ -859,392 +840,63 @@ export function Settings({
             />
           </div>
         </div>
-      </section>
-
-      {/* Language Section */}
-      <section style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-muted)' }}>
-        <h3
-          style={{
-            fontSize: 'var(--fs-sm)',
-            fontWeight: 600,
-            color: 'var(--text)',
-            marginBottom: '16px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-          }}
-        >
-          Voice Recognition
-        </h3>
-
-        {/* Language selector */}
-        <div style={{ marginBottom: '16px' }}>
-          <label
-            htmlFor="language-select"
-            style={{
-              display: 'block',
-              fontSize: 'var(--fs-sm)',
-              color: 'var(--text-muted)',
-              marginBottom: '8px',
-              fontWeight: 500,
-            }}
-          >
-            Language
-          </label>
-          <select
-            id="language-select"
-            className="flint-input"
-            value={settings.language}
-            onChange={(e) => updateSetting('language', e.target.value)}
-            aria-label="Select speech recognition language"
-            style={{
-              width: '100%',
-              height: '48px',
-              padding: '12px 40px 12px 16px',
-              cursor: 'pointer',
-              appearance: 'none',
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'right 16px center',
-              backgroundSize: '12px',
-            }}
-          >
-            <option value="en-US">English (US)</option>
-            <option value="en-GB">English (UK)</option>
-            <option value="es-ES">Spanish (Spain)</option>
-            <option value="es-MX">Spanish (Mexico)</option>
-            <option value="fr-FR">French</option>
-            <option value="de-DE">German</option>
-            <option value="it-IT">Italian</option>
-            <option value="pt-BR">Portuguese (Brazil)</option>
-            <option value="ja-JP">Japanese</option>
-            <option value="ko-KR">Korean</option>
-            <option value="zh-CN">Chinese (Simplified)</option>
-            <option value="zh-TW">Chinese (Traditional)</option>
-          </select>
-        </div>
-
-        {/* Local-only mode toggle */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{ flex: 1 }}>
-            <label
-              htmlFor="local-only-toggle"
-              style={{
-                display: 'block',
-                fontSize: 'var(--fs-sm)',
-                color: 'var(--text)',
-                fontWeight: 500,
-                marginBottom: '4px',
-              }}
-            >
-              Local-only mode
-            </label>
-            <p
-              style={{
-                fontSize: 'var(--fs-xs)',
-                color: 'var(--text-muted)',
-                margin: 0,
-              }}
-            >
-              Disable network-dependent features
-            </p>
           </div>
-          <label
-            className="flint-toggle"
-            style={{
-              position: 'relative',
-              display: 'inline-block',
-              width: '48px',
-              height: '28px',
-              flexShrink: 0,
-              marginLeft: '16px',
-            }}
-          >
-            <input
-              id="local-only-toggle"
-              type="checkbox"
-              checked={settings.localOnlyMode}
-              onChange={(e) => updateSetting('localOnlyMode', e.target.checked)}
-              aria-label="Toggle local-only mode"
-              style={{
-                opacity: 0,
-                width: 0,
-                height: 0,
-              }}
-            />
-            <span
-              style={{
-                position: 'absolute',
-                cursor: 'pointer',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: settings.localOnlyMode
-                  ? 'var(--primary)'
-                  : 'var(--surface-2)',
-                transition: '0.2s',
-                borderRadius: '28px',
-                border: '1px solid var(--border)',
-              }}
-            >
-              <span
-                style={{
-                  position: 'absolute',
-                  content: '""',
-                  height: '20px',
-                  width: '20px',
-                  left: settings.localOnlyMode ? '24px' : '4px',
-                  bottom: '3px',
-                  background: 'white',
-                  transition: '0.2s',
-                  borderRadius: '50%',
-                }}
-              />
-            </span>
-          </label>
-        </div>
-      </section>
-
-      {/* Keyboard Shortcuts Section */}
-      <section style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-muted)' }}>
-        <h3
-          style={{
-            fontSize: 'var(--fs-sm)',
-            fontWeight: 600,
-            color: 'var(--text)',
-            marginBottom: '8px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-          }}
-        >
-          Keyboard Shortcuts
-        </h3>
-        <p
-          style={{
-            fontSize: 'var(--fs-xs)',
-            color: 'var(--text-muted)',
-            marginBottom: '16px',
-            lineHeight: '1.5',
-          }}
-        >
-          Use modifiers like Ctrl, Alt, Shift with a key (e.g., Ctrl+Shift+F). On Mac, use Command instead of Ctrl.
-          These shortcuts are saved as preferences, but Chrome manages the actual key bindings in{' '}
-          <a
-            href="chrome://extensions/shortcuts"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              color: 'var(--primary)',
-              textDecoration: 'underline',
-            }}
-          >
-            chrome://extensions/shortcuts
-          </a>
-          .
-        </p>
-
-        {/* Open Panel shortcut */}
-        <div style={{ marginBottom: '12px' }}>
-          <label
-            htmlFor="shortcut-open-panel"
-            style={{
-              display: 'block',
-              fontSize: 'var(--fs-sm)',
-              color: 'var(--text-muted)',
-              marginBottom: '8px',
-              fontWeight: 500,
-            }}
-          >
-            Open Panel
-          </label>
-          <input
-            id="shortcut-open-panel"
-            type="text"
-            className="flint-input"
-            value={settings.shortcuts.openPanel}
-            onChange={(e) => updateShortcut('openPanel', e.target.value)}
-            onBlur={(e) => updateShortcut('openPanel', e.target.value)}
-            placeholder="Ctrl+Shift+F"
-            aria-label="Open panel keyboard shortcut"
-            aria-invalid={!!shortcutErrors.openPanel}
-            aria-describedby={shortcutErrors.openPanel ? 'error-open-panel' : undefined}
-            style={{
-              width: '100%',
-              borderColor: shortcutErrors.openPanel ? '#ef4444' : undefined,
-            }}
-          />
-          {shortcutErrors.openPanel && (
-            <p
-              id="error-open-panel"
-              style={{
-                fontSize: 'var(--fs-xs)',
-                color: '#ef4444',
-                marginTop: '4px',
-                marginBottom: 0,
-              }}
-            >
-              {shortcutErrors.openPanel}
-            </p>
-          )}
-        </div>
-
-        {/* Record shortcut */}
-        <div style={{ marginBottom: '12px' }}>
-          <label
-            htmlFor="shortcut-record"
-            style={{
-              display: 'block',
-              fontSize: 'var(--fs-sm)',
-              color: 'var(--text-muted)',
-              marginBottom: '8px',
-              fontWeight: 500,
-            }}
-          >
-            Record
-          </label>
-          <input
-            id="shortcut-record"
-            type="text"
-            className="flint-input"
-            value={settings.shortcuts.record}
-            onChange={(e) => updateShortcut('record', e.target.value)}
-            onBlur={(e) => updateShortcut('record', e.target.value)}
-            placeholder="Ctrl+Shift+R"
-            aria-label="Record keyboard shortcut"
-            aria-invalid={!!shortcutErrors.record}
-            aria-describedby={shortcutErrors.record ? 'error-record' : undefined}
-            style={{
-              width: '100%',
-              borderColor: shortcutErrors.record ? '#ef4444' : undefined,
-            }}
-          />
-          {shortcutErrors.record && (
-            <p
-              id="error-record"
-              style={{
-                fontSize: 'var(--fs-xs)',
-                color: '#ef4444',
-                marginTop: '4px',
-                marginBottom: 0,
-              }}
-            >
-              {shortcutErrors.record}
-            </p>
-          )}
-        </div>
-
-        {/* Summarize shortcut */}
-        <div style={{ marginBottom: '12px' }}>
-          <label
-            htmlFor="shortcut-summarize"
-            style={{
-              display: 'block',
-              fontSize: 'var(--fs-sm)',
-              color: 'var(--text-muted)',
-              marginBottom: '8px',
-              fontWeight: 500,
-            }}
-          >
-            Summarize
-          </label>
-          <input
-            id="shortcut-summarize"
-            type="text"
-            className="flint-input"
-            value={settings.shortcuts.summarize}
-            onChange={(e) => updateShortcut('summarize', e.target.value)}
-            onBlur={(e) => updateShortcut('summarize', e.target.value)}
-            placeholder="Ctrl+Shift+S"
-            aria-label="Summarize keyboard shortcut"
-            aria-invalid={!!shortcutErrors.summarize}
-            aria-describedby={shortcutErrors.summarize ? 'error-summarize' : undefined}
-            style={{
-              width: '100%',
-              borderColor: shortcutErrors.summarize ? '#ef4444' : undefined,
-            }}
-          />
-          {shortcutErrors.summarize && (
-            <p
-              id="error-summarize"
-              style={{
-                fontSize: 'var(--fs-xs)',
-                color: '#ef4444',
-                marginTop: '4px',
-                marginBottom: 0,
-              }}
-            >
-              {shortcutErrors.summarize}
-            </p>
-          )}
-        </div>
-
-        {/* Rewrite shortcut */}
-        <div style={{ marginBottom: '12px' }}>
-          <label
-            htmlFor="shortcut-rewrite"
-            style={{
-              display: 'block',
-              fontSize: 'var(--fs-sm)',
-              color: 'var(--text-muted)',
-              marginBottom: '8px',
-              fontWeight: 500,
-            }}
-          >
-            Rewrite
-          </label>
-          <input
-            id="shortcut-rewrite"
-            type="text"
-            className="flint-input"
-            value={settings.shortcuts.rewrite}
-            onChange={(e) => updateShortcut('rewrite', e.target.value)}
-            onBlur={(e) => updateShortcut('rewrite', e.target.value)}
-            placeholder="Ctrl+Shift+W"
-            aria-label="Rewrite keyboard shortcut"
-            aria-invalid={!!shortcutErrors.rewrite}
-            aria-describedby={shortcutErrors.rewrite ? 'error-rewrite' : undefined}
-            style={{
-              width: '100%',
-              borderColor: shortcutErrors.rewrite ? '#ef4444' : undefined,
-            }}
-          />
-          {shortcutErrors.rewrite && (
-            <p
-              id="error-rewrite"
-              style={{
-                fontSize: 'var(--fs-xs)',
-                color: '#ef4444',
-                marginTop: '4px',
-                marginBottom: 0,
-              }}
-            >
-              {shortcutErrors.rewrite}
-            </p>
-          )}
-        </div>
+        )}
       </section>
 
       {/* Generate Panel Settings Section */}
       {generateSettings && (
         <section style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-muted)' }}>
-          <h3
+          <button
+            onClick={() => toggleSection('generatePanel')}
             style={{
-              fontSize: 'var(--fs-sm)',
-              fontWeight: 600,
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              marginBottom: expandedSections.generatePanel ? '16px' : '0',
+              cursor: 'pointer',
               color: 'var(--text)',
-              marginBottom: '16px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
             }}
+            aria-expanded={expandedSections.generatePanel}
+            aria-controls="generate-panel-content"
           >
-            Generate Panel
-          </h3>
+            <h3
+              style={{
+                fontSize: 'var(--fs-sm)',
+                fontWeight: 600,
+                color: 'var(--text)',
+                margin: 0,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}
+            >
+              Generate Panel
+            </h3>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              style={{
+                transform: expandedSections.generatePanel ? 'rotate(90deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease',
+              }}
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+
+          {expandedSections.generatePanel && (
+            <div id="generate-panel-content">
 
           {/* Short length inputs */}
           <div style={{ marginBottom: '16px' }}>
@@ -1504,8 +1156,200 @@ export function Settings({
               </span>
             </label>
           </div>
+            </div>
+          )}
         </section>
       )}
+
+      {/* Language Section */}
+      <section style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-muted)' }}>
+        <button
+          onClick={() => toggleSection('voiceRecognition')}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            marginBottom: expandedSections.voiceRecognition ? '16px' : '0',
+            cursor: 'pointer',
+            color: 'var(--text)',
+          }}
+          aria-expanded={expandedSections.voiceRecognition}
+          aria-controls="voice-recognition-content"
+        >
+          <h3
+            style={{
+              fontSize: 'var(--fs-sm)',
+              fontWeight: 600,
+              color: 'var(--text)',
+              margin: 0,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
+            Voice Recognition
+          </h3>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            style={{
+              transform: expandedSections.voiceRecognition ? 'rotate(90deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+            }}
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+
+        {expandedSections.voiceRecognition && (
+          <div id="voice-recognition-content">
+
+        {/* Language selector */}
+        <div style={{ marginBottom: '16px' }}>
+          <label
+            htmlFor="language-select"
+            style={{
+              display: 'block',
+              fontSize: 'var(--fs-sm)',
+              color: 'var(--text-muted)',
+              marginBottom: '8px',
+              fontWeight: 500,
+            }}
+          >
+            Language
+          </label>
+          <select
+            id="language-select"
+            className="flint-input"
+            value={settings.language}
+            onChange={(e) => updateSetting('language', e.target.value)}
+            aria-label="Select speech recognition language"
+            style={{
+              width: '100%',
+              height: '48px',
+              padding: '12px 40px 12px 16px',
+              cursor: 'pointer',
+              appearance: 'none',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 16px center',
+              backgroundSize: '12px',
+            }}
+          >
+            <option value="en-US">English (US)</option>
+            <option value="en-GB">English (UK)</option>
+            <option value="es-ES">Spanish (Spain)</option>
+            <option value="es-MX">Spanish (Mexico)</option>
+            <option value="fr-FR">French</option>
+            <option value="de-DE">German</option>
+            <option value="it-IT">Italian</option>
+            <option value="pt-BR">Portuguese (Brazil)</option>
+            <option value="ja-JP">Japanese</option>
+            <option value="ko-KR">Korean</option>
+            <option value="zh-CN">Chinese (Simplified)</option>
+            <option value="zh-TW">Chinese (Traditional)</option>
+          </select>
+        </div>
+
+        {/* Local-only mode toggle */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <label
+              htmlFor="local-only-toggle"
+              style={{
+                display: 'block',
+                fontSize: 'var(--fs-sm)',
+                color: 'var(--text)',
+                fontWeight: 500,
+                marginBottom: '4px',
+              }}
+            >
+              Local-only mode
+            </label>
+            <p
+              style={{
+                fontSize: 'var(--fs-xs)',
+                color: 'var(--text-muted)',
+                margin: 0,
+              }}
+            >
+              Disable network-dependent features
+            </p>
+          </div>
+          <label
+            className="flint-toggle"
+            style={{
+              position: 'relative',
+              display: 'inline-block',
+              width: '48px',
+              height: '28px',
+              flexShrink: 0,
+              marginLeft: '16px',
+            }}
+          >
+            <input
+              id="local-only-toggle"
+              type="checkbox"
+              checked={settings.localOnlyMode}
+              onChange={(e) => updateSetting('localOnlyMode', e.target.checked)}
+              aria-label="Toggle local-only mode"
+              style={{
+                opacity: 0,
+                width: 0,
+                height: 0,
+              }}
+            />
+            <span
+              style={{
+                position: 'absolute',
+                cursor: 'pointer',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: settings.localOnlyMode
+                  ? 'var(--primary)'
+                  : 'var(--surface-2)',
+                transition: '0.2s',
+                borderRadius: '28px',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <span
+                style={{
+                  position: 'absolute',
+                  content: '""',
+                  height: '20px',
+                  width: '20px',
+                  left: settings.localOnlyMode ? '24px' : '4px',
+                  bottom: '3px',
+                  background: 'white',
+                  transition: '0.2s',
+                  borderRadius: '50%',
+                }}
+              />
+            </span>
+          </label>
+        </div>
+          </div>
+        )}
+      </section>
 
       {/* Privacy Notice Section */}
       <section
@@ -1519,7 +1363,23 @@ export function Settings({
           padding: '16px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+        <button
+          onClick={() => toggleSection('privacy')}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            color: 'var(--text)',
+            textAlign: 'left',
+          }}
+          aria-expanded={expandedSections.privacy}
+          aria-controls="privacy-content"
+        >
           <svg
             width="20"
             height="20"
@@ -1537,31 +1397,54 @@ export function Settings({
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
           <div style={{ flex: 1 }}>
-            <h3
-              style={{
-                fontSize: 'var(--fs-sm)',
-                fontWeight: 600,
-                color: '#fbbf24',
-                marginBottom: '8px',
-              }}
-            >
-              Privacy Notice
-            </h3>
-            <p
-              style={{
-                fontSize: 'var(--fs-sm)',
-                color: 'var(--text-muted)',
-                margin: 0,
-                lineHeight: '1.5',
-              }}
-            >
-              Speech recognition uses the Web Speech API, which may send audio to
-              a network-based service for transcription. All AI text processing
-              (summarization and rewriting) happens locally on your device using
-              Chrome&apos;s built-in AI.
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3
+                style={{
+                  fontSize: 'var(--fs-sm)',
+                  fontWeight: 600,
+                  color: '#fbbf24',
+                  margin: 0,
+                }}
+              >
+                Privacy Notice
+              </h3>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#fbbf24"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                style={{
+                  transform: expandedSections.privacy ? 'rotate(90deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease',
+                  marginLeft: '8px',
+                }}
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </div>
+            {expandedSections.privacy && (
+              <p
+                id="privacy-content"
+                style={{
+                  fontSize: 'var(--fs-sm)',
+                  color: 'var(--text-muted)',
+                  margin: '8px 0 0 0',
+                  lineHeight: '1.5',
+                }}
+              >
+                Speech recognition uses the Web Speech API, which may send audio to
+                a network-based service for transcription. All AI text processing
+                (summarization and rewriting) happens locally on your device using
+                Chrome&apos;s built-in AI.
+              </p>
+            )}
           </div>
-        </div>
+        </button>
       </section>
 
       {/* Pinned Notes Section */}
@@ -1761,12 +1644,12 @@ export function Settings({
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
+            background: 'rgba(0, 0, 0, 0.85)',
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'stretch',
             justifyContent: 'center',
             zIndex: 1000,
-            padding: '16px',
+            padding: '0',
           }}
           onClick={handleCloseDialog}
           role="dialog"
@@ -1774,92 +1657,200 @@ export function Settings({
           aria-labelledby="dialog-title"
         >
           <div
-            className="flint-card"
             style={{
-              maxWidth: '500px',
               width: '100%',
-              maxHeight: '80vh',
-              overflow: 'auto',
+              maxWidth: '600px',
+              height: '100vh',
+              background: 'var(--bg)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3
-              id="dialog-title"
+            {/* Header */}
+            <div
               style={{
-                fontSize: 'var(--fs-lg)',
-                fontWeight: 600,
-                color: 'var(--text)',
-                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '20px 24px',
+                borderBottom: '1px solid var(--stroke)',
+                flexShrink: 0,
               }}
             >
-              {dialogMode === 'add' ? 'Add Pinned Note' : 'Edit Pinned Note'}
-            </h3>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label
-                htmlFor="note-title"
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    background: 'var(--surface)',
+                    color: 'var(--primary)',
+                  }}
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                  </svg>
+                </div>
+                <h3
+                  id="dialog-title"
+                  style={{
+                    fontSize: 'var(--fs-lg)',
+                    fontWeight: 600,
+                    color: 'var(--text)',
+                    margin: 0,
+                  }}
+                >
+                  {dialogMode === 'add' ? 'Add Pinned Note' : 'Edit Pinned Note'}
+                </h3>
+              </div>
+              <button
+                onClick={handleCloseDialog}
+                aria-label="Close dialog"
                 style={{
-                  display: 'block',
-                  fontSize: 'var(--fs-sm)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '8px',
+                  background: 'transparent',
+                  border: 'none',
                   color: 'var(--text-muted)',
-                  marginBottom: '8px',
-                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--surface)';
+                  e.currentTarget.style.color = 'var(--text)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-muted)';
                 }}
               >
-                Title
-              </label>
-              <input
-                id="note-title"
-                type="text"
-                className="flint-input"
-                value={noteTitle}
-                onChange={(e) => setNoteTitle(e.target.value)}
-                placeholder="Enter note title"
-                autoFocus
-                style={{ width: '100%' }}
-              />
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
             </div>
 
-            <div style={{ marginBottom: '24px' }}>
-              <label
-                htmlFor="note-content"
-                style={{
-                  display: 'block',
-                  fontSize: 'var(--fs-sm)',
-                  color: 'var(--text-muted)',
-                  marginBottom: '8px',
-                  fontWeight: 500,
-                }}
-              >
-                Content
-              </label>
-              <textarea
-                id="note-content"
-                className="flint-input"
-                value={noteContent}
-                onChange={(e) => setNoteContent(e.target.value)}
-                placeholder="Enter note content (e.g., audience, tone, style guidelines)"
-                rows={6}
-                style={{
-                  width: '100%',
-                  resize: 'vertical',
-                  minHeight: '120px',
-                  padding: '12px 16px',
-                }}
-              />
+            {/* Content */}
+            <div
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                padding: '24px',
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{ marginBottom: '16px' }}>
+                <label
+                  htmlFor="note-title"
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--fs-sm)',
+                    color: 'var(--text-muted)',
+                    marginBottom: '8px',
+                    fontWeight: 500,
+                  }}
+                >
+                  Title
+                </label>
+                <input
+                  id="note-title"
+                  type="text"
+                  className="flint-input"
+                  value={noteTitle}
+                  onChange={(e) => setNoteTitle(e.target.value)}
+                  placeholder="Enter note title"
+                  autoFocus
+                  style={{ width: '100%', background: 'transparent', border: 'none' }}
+                />
+              </div>
+
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <label
+                  htmlFor="note-content"
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--fs-sm)',
+                    color: 'var(--text-muted)',
+                    marginBottom: '8px',
+                    fontWeight: 500,
+                  }}
+                >
+                  Content
+                </label>
+                <textarea
+                  id="note-content"
+                  className="flint-input"
+                  value={noteContent}
+                  onChange={(e) => setNoteContent(e.target.value)}
+                  placeholder="Enter note content (e.g., audience, tone, style guidelines)"
+                  style={{
+                    width: '100%',
+                    flex: 1,
+                    resize: 'none',
+                    padding: '12px 16px',
+                    background: 'transparent',
+                    border: 'none',
+                    overflowY: 'auto',
+                  }}
+                />
+              </div>
+
               <p
                 style={{
                   fontSize: 'var(--fs-xs)',
                   color: 'var(--text-muted)',
-                  marginTop: '8px',
+                  marginTop: '16px',
                   marginBottom: 0,
+                  textAlign: 'center',
                 }}
               >
                 This note will be merged into AI prompts for summarization and rewriting.
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            {/* Footer */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '8px',
+                justifyContent: 'flex-end',
+                padding: '16px 24px',
+                borderTop: '1px solid var(--stroke)',
+                flexShrink: 0,
+              }}
+            >
               <button
                 className="flint-btn ghost"
                 onClick={handleCloseDialog}
@@ -1894,12 +1885,12 @@ export function Settings({
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
+            background: 'rgba(0, 0, 0, 0.85)',
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'stretch',
             justifyContent: 'center',
             zIndex: 1000,
-            padding: '16px',
+            padding: '0',
           }}
           onClick={handleCloseDialog}
           role="dialog"
@@ -1907,56 +1898,142 @@ export function Settings({
           aria-labelledby="delete-dialog-title"
         >
           <div
-            className="flint-card"
             style={{
-              maxWidth: '400px',
               width: '100%',
+              maxWidth: '500px',
+              height: '100vh',
+              background: 'var(--bg)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '16px' }}>
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#ef4444"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                style={{ flexShrink: 0, marginTop: '2px' }}
-              >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="15" y1="9" x2="9" y2="15" />
-                <line x1="9" y1="9" x2="15" y2="15" />
-              </svg>
-              <div style={{ flex: 1 }}>
+            {/* Header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '20px 24px',
+                borderBottom: '1px solid var(--stroke)',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    color: '#ef4444',
+                  }}
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="15" y1="9" x2="9" y2="15" />
+                    <line x1="9" y1="9" x2="15" y2="15" />
+                  </svg>
+                </div>
                 <h3
                   id="delete-dialog-title"
                   style={{
                     fontSize: 'var(--fs-lg)',
                     fontWeight: 600,
                     color: 'var(--text)',
-                    marginBottom: '8px',
+                    margin: 0,
                   }}
                 >
                   Delete Pinned Note?
                 </h3>
-                <p
-                  style={{
-                    fontSize: 'var(--fs-sm)',
-                    color: 'var(--text-muted)',
-                    margin: 0,
-                    lineHeight: '1.5',
-                  }}
-                >
-                  Are you sure you want to delete &quot;{selectedNote.title}&quot;? This action cannot be undone.
-                </p>
               </div>
+              <button
+                onClick={handleCloseDialog}
+                aria-label="Close dialog"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '8px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--surface)';
+                  e.currentTarget.style.color = 'var(--text)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-muted)';
+                }}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            {/* Content */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '24px',
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 'var(--fs-base)',
+                  color: 'var(--text-muted)',
+                  margin: 0,
+                  lineHeight: '1.6',
+                }}
+              >
+                Are you sure you want to delete <strong style={{ color: 'var(--text)' }}>&quot;{selectedNote.title}&quot;</strong>? This action cannot be undone.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '8px',
+                justifyContent: 'flex-end',
+                padding: '16px 24px',
+                borderTop: '1px solid var(--stroke)',
+                flexShrink: 0,
+              }}
+            >
               <button
                 className="flint-btn ghost"
                 onClick={handleCloseDialog}

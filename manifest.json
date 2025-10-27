@@ -20,9 +20,6 @@
   "background": {
     "service_worker": "background.js"
   },
-  "side_panel": {
-    "default_path": "index.html"
-  },
   "action": {
     "default_title": "Open Flint",
     "default_icon": {
@@ -31,36 +28,10 @@
       "128": "icons/icon128.png"
     }
   },
-  "commands": {
-    "open-panel": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+F",
-        "mac": "Command+Shift+F"
-      },
-      "description": "Open Flint side panel"
-    },
-    "record": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+R",
-        "mac": "Command+Shift+R"
-      },
-      "description": "Open generate panel"
-    },
-    "summarize": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+S",
-        "mac": "Command+Shift+S"
-      },
-      "description": "Summarize selected text"
-    },
-    "rewrite": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+W",
-        "mac": "Command+Shift+W"
-      },
-      "description": "Rewrite selected text"
-    }
+  "side_panel": {
+    "default_path": "index.html"
   },
+
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   }

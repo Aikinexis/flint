@@ -60,12 +60,6 @@ export interface Settings {
   theme: 'light' | 'dark' | 'system';
   localOnlyMode: boolean;
   accentHue: number; // Hue value (0-360) for OKLCH color system
-  shortcuts: {
-    openPanel: string;
-    record: string;
-    summarize: string;
-    rewrite: string;
-  };
 }
 
 /**
@@ -76,12 +70,6 @@ const DEFAULT_SETTINGS: Settings = {
   theme: 'dark',
   localOnlyMode: false,
   accentHue: 255, // Default blue hue
-  shortcuts: {
-    openPanel: 'Ctrl+Shift+F',
-    record: 'Ctrl+Shift+R',
-    summarize: 'Ctrl+Shift+S',
-    rewrite: 'Ctrl+Shift+W',
-  },
 };
 
 /**

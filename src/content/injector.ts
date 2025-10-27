@@ -55,361 +55,302 @@ export interface MiniBarInjector {
 }
 
 /**
- * Implementation of MiniBarInjector with Shadow DOM for style isolation
+ * Implementation of MiniBarInjector using Shadow DOM
+ * Renders minibar in isolated shadow root for stable, flicker-free UI
  */
 class MiniBarInjectorImpl implements MiniBarInjector {
-  private container: HTMLDivElement | null = null;
+  private host: HTMLDivElement | null = null;
   private shadowRoot: ShadowRoot | null = null;
-  private autoHideTimeout: number | null = null;
-  private readonly AUTO_HIDE_DELAY = 5000; // 5 seconds
-  private currentPosition: Position | null = null;
+  private bar: HTMLDivElement | null = null;
   private scrollHandler: (() => void) | null = null;
+  private resizeHandler: (() => void) | null = null;
+  private callbacks: MiniBarCallbacks | null = null;
+
+  constructor() {
+    // Create shadow host on initialization
+    this.createShadowHost();
+  }
+
+  /**
+   * Create shadow host and minibar structure
+   * Uses Shadow DOM for style isolation
+   */
+  private createShadowHost(): void {
+    if (this.host) return;
+
+    // Create shadow host
+    this.host = document.createElement('div');
+    this.host.id = 'flint-host';
+    Object.assign(this.host.style, {
+      position: 'fixed',
+      inset: '0',
+      zIndex: '2147483647',
+      pointerEvents: 'none'
+    });
+
+    // Attach shadow root
+    this.shadowRoot = this.host.attachShadow({ mode: 'open' });
+
+    // Create minibar element
+    this.bar = document.createElement('div');
+    this.bar.className = 'flint-bar';
+    this.bar.style.cssText = `
+      position: fixed;
+      display: none;
+      pointer-events: auto;
+      background: rgba(50, 50, 50, 0.95);
+      color: #F4F6FA;
+      border: none;
+      border-radius: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      padding: 8px 10px;
+      gap: 8px;
+      align-items: center;
+      opacity: 0;
+      transform: translate3d(0, 0, 0) scale(0.9);
+      transition: opacity 0.2s ease, transform 0.2s ease, left 0.15s ease, top 0.15s ease;
+      will-change: transform, opacity, left, top;
+    `;
+
+    // Add buttons
+    this.bar.innerHTML = `
+      <button data-action="record" aria-label="Record voice" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
+        </svg>
+      </button>
+      <button data-action="summarize" aria-label="Summarize" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="8" y1="6" x2="21" y2="6"/>
+          <line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="21" y2="18"/>
+          <line x1="3" y1="6" x2="3.01" y2="6"/>
+          <line x1="3" y1="12" x2="3.01" y2="12"/>
+          <line x1="3" y1="18" x2="3.01" y2="18"/>
+        </svg>
+      </button>
+      <button data-action="rewrite" aria-label="Rewrite" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>
+      <button data-action="close" aria-label="Close" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    `;
+
+    // Add styles
+    const style = document.createElement('style');
+    style.textContent = `
+      .flint-bar {
+        display: flex;
+      }
+      .flint-bar button {
+        /* Aggressive reset */
+        all: unset;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        
+        /* Size and spacing */
+        box-sizing: border-box;
+        width: 22px;
+        height: 22px;
+        padding: 0 !important;
+        margin: 0 !important;
+        
+        /* Remove all borders and backgrounds */
+        border: none !important;
+        border-width: 0 !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+        box-shadow: none !important;
+        outline: none !important;
+        
+        /* Color and shape */
+        color: inherit;
+        border-radius: 6px;
+        
+        /* Layout */
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.12s ease;
+      }
+      .flint-bar button:hover {
+        background: rgba(255, 255, 255, 0.1) !important;
+      }
+      .flint-bar button:active {
+        transform: translateY(1px);
+      }
+      .flint-bar button:focus {
+        outline: none !important;
+        box-shadow: none !important;
+      }
+      .flint-bar button svg {
+        display: block;
+        pointer-events: none;
+      }
+    `;
+
+    this.shadowRoot.append(style, this.bar);
+
+    // Set up button event listeners with pointerdown capture
+    this.bar.addEventListener(
+      'pointerdown',
+      (e) => {
+        const btn = (e.target as HTMLElement).closest('button');
+        if (!btn) return;
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        const action = btn.getAttribute('data-action');
+        if (!action) return;
+
+        if (action === 'close') {
+          this.hide();
+          return;
+        }
+
+        // Execute callback
+        if (this.callbacks) {
+          switch (action) {
+            case 'record':
+              this.callbacks.onRecord();
+              break;
+            case 'summarize':
+              this.callbacks.onSummarize();
+              break;
+            case 'rewrite':
+              this.callbacks.onRewrite();
+              break;
+          }
+        }
+      },
+      { capture: true }
+    );
+
+    // Append to document
+    if (document.documentElement) {
+      document.documentElement.appendChild(this.host);
+    } else {
+      document.addEventListener('DOMContentLoaded', () => {
+        if (this.host && document.documentElement) {
+          document.documentElement.appendChild(this.host);
+        }
+      });
+    }
+
+    console.log('[Flint] Shadow host created');
+  }
 
   /**
    * Show the mini bar near the text selection
    */
   show(position: Position, callbacks: MiniBarCallbacks): void {
-    // Remove existing mini bar if present
-    this.hide();
+    if (!this.bar) return;
 
-    // Store position for repositioning on scroll
-    this.currentPosition = position;
+    // Store callbacks
+    this.callbacks = callbacks;
 
-    // Create container element
-    this.container = document.createElement('div');
-    this.container.id = 'flint-minibar-container';
-    
-    // Attach shadow DOM for style isolation
-    this.shadowRoot = this.container.attachShadow({ mode: 'open' });
+    // Calculate position with offset above selection
+    const minibarWidth = 180;
+    const minibarHeight = 40;
+    const offset = 8;
 
-    // Add styles to shadow DOM
-    this.injectStyles();
+    // Convert to viewport coordinates (subtract scroll since we use fixed positioning)
+    let left = position.x - window.scrollX - minibarWidth / 2;
+    let top = position.y - window.scrollY - minibarHeight - offset;
 
-    // Create mini bar HTML structure
-    this.createMiniBarStructure(callbacks);
+    // Keep within viewport bounds
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
 
-    // Position the mini bar
-    this.positionMiniBar(position);
+    if (left < 10) left = 10;
+    if (left + minibarWidth > viewportWidth - 10) {
+      left = viewportWidth - minibarWidth - 10;
+    }
 
-    // Append to document body
-    document.body.appendChild(this.container);
+    if (top < 10) {
+      // Flip below if not enough space above
+      top = position.y - window.scrollY + offset;
+    }
 
-    // Set up auto-hide behavior
-    this.setupAutoHide();
+    if (top + minibarHeight > viewportHeight - 10) {
+      top = viewportHeight - minibarHeight - 10;
+    }
 
-    // Set up scroll repositioning
+    // Position and show minibar
+    this.bar.style.left = `${Math.round(left)}px`;
+    this.bar.style.top = `${Math.round(top)}px`;
+    this.bar.style.display = 'flex';
+
+    // Delay before showing to avoid jumpiness during selection
+    setTimeout(() => {
+      if (!this.bar || !this.callbacks) return;
+      
+      // Trigger animation
+      requestAnimationFrame(() => {
+        if (this.bar) {
+          this.bar.style.opacity = '1';
+          this.bar.style.transform = 'translate3d(0, 0, 0) scale(1)';
+        }
+      });
+    }, 100);
+
+    // Set up scroll and resize repositioning
     this.setupScrollRepositioning();
+    this.setupResizeRepositioning();
   }
 
   /**
-   * Hide and remove the mini bar
+   * Hide the mini bar
    */
   hide(): void {
-    // Clear auto-hide timeout
-    if (this.autoHideTimeout !== null) {
-      window.clearTimeout(this.autoHideTimeout);
-      this.autoHideTimeout = null;
+    if (this.bar) {
+      // Fade out animation
+      this.bar.style.opacity = '0';
+      this.bar.style.transform = 'translate3d(0, 0, 0) scale(0.9)';
+      
+      // Hide after animation completes
+      setTimeout(() => {
+        if (this.bar) {
+          this.bar.style.display = 'none';
+        }
+      }, 200);
     }
 
-    // Remove scroll event listener
+    // Remove event listeners
     this.removeScrollListener();
+    this.removeResizeListener();
 
-    // Remove container from DOM
-    if (this.container && this.container.parentNode) {
-      this.container.parentNode.removeChild(this.container);
-    }
-
-    // Clear references
-    this.container = null;
-    this.shadowRoot = null;
-    this.currentPosition = null;
+    // Clear callbacks
+    this.callbacks = null;
   }
 
   /**
    * Check if mini bar is currently visible
    */
   isVisible(): boolean {
-    return this.container !== null && document.body.contains(this.container);
+    return this.callbacks !== null;
   }
 
   /**
-   * Inject CSS styles into shadow DOM
-   */
-  private injectStyles(): void {
-    if (!this.shadowRoot) return;
-
-    const style = document.createElement('style');
-    style.textContent = `
-      /* Import design tokens - using inline styles for shadow DOM */
-      :host {
-        /* Colors */
-        --bg: oklch(0.22 0 255);
-        --surface-2: color-mix(in oklab, oklch(0.22 0 255) 85%, white 15%);
-        --text: oklch(0.96 0 255);
-        --text-muted: oklch(0.76 0 255);
-        --border: oklch(0.4 0 255);
-        --border-muted: oklch(0.3 0 255);
-        --primary: oklch(0.5 0.1 255);
-        
-        /* Layout */
-        --radius-lg: 24px;
-        --radius-md: 16px;
-        --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.25);
-        --shadow-focus: 0 0 0 2px color-mix(in oklab, var(--primary) 50%, transparent);
-        --btn-height: 38px;
-        
-        /* Typography */
-        --font-sans: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-        --fs-md: 14px;
-      }
-
-      .minibar {
-        position: fixed;
-        z-index: 999999;
-        display: inline-flex;
-        gap: 8px;
-        padding: 8px;
-        border: 1px solid var(--border);
-        background: color-mix(in oklab, var(--bg) 85%, white 15%);
-        backdrop-filter: blur(8px);
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-soft);
-        font-family: var(--font-sans);
-      }
-
-      .minibar-btn {
-        width: var(--btn-height);
-        height: var(--btn-height);
-        padding: 0;
-        border-radius: var(--radius-md);
-        border: 1px solid var(--border-muted);
-        background: var(--surface-2);
-        color: var(--text);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        font-size: 18px;
-        transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
-      }
-
-      .minibar-btn:hover {
-        background: color-mix(in oklab, var(--surface-2) 70%, white 30%);
-        box-shadow: 0 0 0 1px var(--border);
-      }
-
-      .minibar-btn:focus-visible {
-        outline: none;
-        box-shadow: var(--shadow-focus);
-      }
-
-      .minibar-btn:active {
-        transform: translateY(1px);
-      }
-
-      .minibar-btn[aria-label]::after {
-        content: attr(aria-label);
-        position: absolute;
-        bottom: calc(100% + 8px);
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 4px 8px;
-        background: var(--bg);
-        color: var(--text);
-        font-size: 12px;
-        border-radius: 6px;
-        white-space: nowrap;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.2s ease;
-      }
-
-      .minibar-btn:hover::after {
-        opacity: 1;
-      }
-    `;
-
-    this.shadowRoot.appendChild(style);
-  }
-
-  /**
-   * Create the mini bar HTML structure with 4 icon buttons
-   */
-  private createMiniBarStructure(callbacks: MiniBarCallbacks): void {
-    if (!this.shadowRoot) return;
-
-    // Create mini bar container
-    const minibar = document.createElement('div');
-    minibar.className = 'minibar';
-    minibar.setAttribute('role', 'toolbar');
-    minibar.setAttribute('aria-label', 'Flint text tools');
-
-    // SVG icon definitions matching sidebar icons
-    const icons = {
-      mic: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>',
-      list: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
-      edit: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
-      close: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
-    };
-
-    // Create buttons with SVG icons
-    const buttons = [
-      {
-        id: 'record',
-        icon: icons.mic,
-        label: 'Record voice',
-        callback: callbacks.onRecord
-      },
-      {
-        id: 'summarize',
-        icon: icons.list,
-        label: 'Summarize',
-        callback: callbacks.onSummarize
-      },
-      {
-        id: 'rewrite',
-        icon: icons.edit,
-        label: 'Rewrite',
-        callback: callbacks.onRewrite
-      },
-      {
-        id: 'close',
-        icon: icons.close,
-        label: 'Close',
-        callback: callbacks.onClose
-      }
-    ];
-
-    // Create and append buttons
-    buttons.forEach(({ id, icon, label, callback }) => {
-      const button = document.createElement('button');
-      button.className = 'minibar-btn';
-      button.setAttribute('data-action', id);
-      button.setAttribute('aria-label', label);
-      button.innerHTML = icon;
-      button.type = 'button';
-
-      // Add click handler
-      button.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        callback();
-      });
-
-      minibar.appendChild(button);
-    });
-
-    this.shadowRoot.appendChild(minibar);
-  }
-
-  /**
-   * Position the mini bar near the selection
-   * Calculates position above or below selection to avoid covering text
-   */
-  private positionMiniBar(position: Position): void {
-    if (!this.container) return;
-
-    // Get viewport dimensions
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const scrollX = window.scrollX || window.pageXOffset;
-    const scrollY = window.scrollY || window.pageYOffset;
-
-    // Estimate mini bar dimensions (will be adjusted after render)
-    const minibarWidth = 200; // Approximate width with 4 buttons
-    const minibarHeight = 54; // Height with padding
-    const offset = 10; // Offset from selection
-
-    // Calculate initial position (above selection)
-    let x = position.x - minibarWidth / 2;
-    let y = position.y - minibarHeight - offset;
-
-    // Adjust horizontal position to stay within viewport
-    if (x < scrollX + 10) {
-      x = scrollX + 10;
-    } else if (x + minibarWidth > scrollX + viewportWidth - 10) {
-      x = scrollX + viewportWidth - minibarWidth - 10;
-    }
-
-    // Check if mini bar would be above viewport, flip below if needed
-    if (y < scrollY + 10) {
-      y = position.y + offset;
-    }
-
-    // Ensure mini bar doesn't go below viewport
-    if (y + minibarHeight > scrollY + viewportHeight - 10) {
-      y = scrollY + viewportHeight - minibarHeight - 10;
-    }
-
-    // Apply position
-    this.container.style.position = 'absolute';
-    this.container.style.left = `${x}px`;
-    this.container.style.top = `${y}px`;
-    this.container.style.zIndex = '999999';
-  }
-
-  /**
-   * Set up auto-hide behavior
-   * Mini bar hides after 5 seconds of inactivity
-   * Stays visible while hovering
-   */
-  private setupAutoHide(): void {
-    if (!this.container) return;
-
-    // Start auto-hide timer
-    this.startAutoHideTimer();
-
-    // Keep visible while hovering
-    this.container.addEventListener('mouseenter', () => {
-      this.cancelAutoHideTimer();
-    });
-
-    this.container.addEventListener('mouseleave', () => {
-      this.startAutoHideTimer();
-    });
-  }
-
-  /**
-   * Start the auto-hide timer
-   */
-  private startAutoHideTimer(): void {
-    this.cancelAutoHideTimer();
-    this.autoHideTimeout = window.setTimeout(() => {
-      this.hide();
-    }, this.AUTO_HIDE_DELAY);
-  }
-
-  /**
-   * Cancel the auto-hide timer
-   */
-  private cancelAutoHideTimer(): void {
-    if (this.autoHideTimeout !== null) {
-      window.clearTimeout(this.autoHideTimeout);
-      this.autoHideTimeout = null;
-    }
-  }
-
-  /**
-   * Set up scroll event listener to reposition mini bar
-   * Uses throttling to avoid excessive repositioning
+   * Set up scroll event listener to hide mini bar on scroll
+   * With fixed positioning, minibar stays in place but selection moves, so hide it
    */
   private setupScrollRepositioning(): void {
-    if (!this.container || !this.currentPosition) return;
-
-    // Create throttled scroll handler
-    let scrollTimeout: number | null = null;
+    // Hide mini bar immediately on scroll
     this.scrollHandler = () => {
-      // Throttle scroll events to every 100ms
-      if (scrollTimeout !== null) return;
-
-      scrollTimeout = window.setTimeout(() => {
-        scrollTimeout = null;
-        
-        // Reposition mini bar if still visible
-        if (this.isVisible() && this.currentPosition) {
-          this.positionMiniBar(this.currentPosition);
-        }
-      }, 100);
+      this.hide();
     };
 
     // Add scroll listener to window and document
@@ -425,6 +366,68 @@ class MiniBarInjectorImpl implements MiniBarInjector {
       window.removeEventListener('scroll', this.scrollHandler);
       document.removeEventListener('scroll', this.scrollHandler);
       this.scrollHandler = null;
+    }
+  }
+
+  /**
+   * Set up resize event listener to reposition mini bar when viewport changes
+   * This handles side panel resizing and window resizing
+   */
+  private setupResizeRepositioning(): void {
+    this.resizeHandler = () => {
+      // Reposition mini bar based on current selection
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) {
+        this.hide();
+        return;
+      }
+
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+
+      // Calculate new position
+      const minibarWidth = 180;
+      const minibarHeight = 40;
+      const offset = 8;
+
+      let left = rect.left + rect.width / 2 - minibarWidth / 2;
+      let top = rect.top - minibarHeight - offset;
+
+      // Keep within viewport bounds
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      if (left < 10) left = 10;
+      if (left + minibarWidth > viewportWidth - 10) {
+        left = viewportWidth - minibarWidth - 10;
+      }
+
+      if (top < 10) {
+        top = rect.top + offset;
+      }
+
+      if (top + minibarHeight > viewportHeight - 10) {
+        top = viewportHeight - minibarHeight - 10;
+      }
+
+      // Update position smoothly
+      if (this.bar) {
+        this.bar.style.left = `${Math.round(left)}px`;
+        this.bar.style.top = `${Math.round(top)}px`;
+      }
+    };
+
+    // Add resize listener
+    window.addEventListener('resize', this.resizeHandler, { passive: true });
+  }
+
+  /**
+   * Remove resize event listener
+   */
+  private removeResizeListener(): void {
+    if (this.resizeHandler) {
+      window.removeEventListener('resize', this.resizeHandler);
+      this.resizeHandler = null;
     }
   }
 }

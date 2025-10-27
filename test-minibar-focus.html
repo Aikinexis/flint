@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flint MiniBar Focus Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    
+    .test-section {
+      background: #f5f5f5;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+    }
+    
+    .editable {
+      border: 2px solid #ddd;
+      padding: 12px;
+      border-radius: 6px;
+      min-height: 100px;
+      background: white;
+    }
+    
+    .instructions {
+      background: #e3f2fd;
+      padding: 15px;
+      border-left: 4px solid #2196f3;
+      margin: 20px 0;
+    }
+    
+    .instructions h3 {
+      margin-top: 0;
+      color: #1976d2;
+    }
+    
+    .instructions ol {
+      margin: 10px 0;
+      padding-left: 20px;
+    }
+    
+    .instructions li {
+      margin: 8px 0;
+    }
+    
+    code {
+      background: #f5f5f5;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎯 MiniBar Focus Management Test</h1>
+  
+  <div class="instructions">
+    <h3>Testing the blur/focus fix:</h3>
+    <ol>
+      <li>Open the Flint side panel (click the extension icon)</li>
+      <li>Select some text below (at least 3 characters)</li>
+      <li>The minibar should appear near your selection</li>
+      <li>Click anywhere in the side panel → minibar should hide smoothly (no flashing)</li>
+      <li>Click back into this page → minibar should reappear automatically</li>
+      <li>Try clicking minibar buttons → they should be responsive (no frozen state)</li>
+    </ol>
+    <p><strong>Expected behavior:</strong> Smooth hide/show transitions with no flickering or unresponsive buttons.</p>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Area 1: Textarea</h2>
+    <textarea placeholder="Select some text here to test the minibar...">
+The blur/focus pattern solves the minibar lifecycle issue by detecting when Chrome's focus leaves the webpage (panel opens) and when it returns (panel closes).
+
+This approach works reliably across all Chrome versions and matches what production extensions like Grammarly use.
+
+No non-existent API calls, no flickering, smooth restore when the user clicks back into the page.
+    </textarea>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Area 2: ContentEditable</h2>
+    <div class="editable" contenteditable="true">
+      <p>This is a contenteditable div. Select text here to test minibar positioning and focus handling.</p>
+      <p>When you click into the side panel, the minibar should hide gracefully. When you click back here, it should reappear automatically.</p>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Area 3: Regular Text</h2>
+    <p>
+      Select any text in this paragraph to test the minibar on non-editable content.
+      The focus handlers should work the same way: hide on blur (panel opens), 
+      restore on focus (panel closes or user clicks back into page).
+    </p>
+    <p>
+      Try selecting text, opening the panel, then clicking back here. 
+      The minibar should reappear smoothly without any flashing or frozen buttons.
+    </p>
+  </div>
+
+  <div class="instructions">
+    <h3>What was fixed:</h3>
+    <ul>
+      <li><strong>Before:</strong> Minibar would flash or have unresponsive buttons when panel opened/closed</li>
+      <li><strong>After:</strong> Minibar hides on <code>window.blur</code> (panel opens) and restores on <code>window.focus</code> (panel closes)</li>
+      <li><strong>Bonus:</strong> Auto-hide after 30 seconds of inactivity</li>
+      <li><strong>Result:</strong> Smooth UX matching production Chrome extensions</li>
+    </ul>
+  </div>
+</body>
+</html>

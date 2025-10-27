@@ -41,7 +41,7 @@ export {
   selectTheme,
   selectLanguage,
   selectLocalOnlyMode,
-  selectShortcuts,
+
   selectPinnedNotes,
   selectHistory,
   selectAIAvailability,

@@ -22,6 +22,7 @@ export default defineConfig({
           writeFileSync('dist/index.html', html);
         }
         
+        
         // Copy icons folder to dist
         const iconsDir = 'icons';
         const distIconsDir = 'dist/icons';

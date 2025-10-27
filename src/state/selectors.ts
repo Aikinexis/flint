@@ -121,7 +121,7 @@ export const selectLocalOnlyMode = (state: AppState) => state.settings.localOnly
  * @param state - Application state
  * @returns Keyboard shortcuts configuration
  */
-export const selectShortcuts = (state: AppState) => state.settings.shortcuts;
+
 
 /**
  * Selects all pinned notes

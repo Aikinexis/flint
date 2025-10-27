@@ -51,6 +51,7 @@ export function RewritePanel({
   const promptInputRef = useRef<HTMLInputElement>(null);
   const speechRecognitionRef = useRef<any>(null);
   const presetMenuRef = useRef<HTMLDivElement>(null);
+  const lastInitialTextRef = useRef<string>(initialText);
 
   // Preset options
   const presets = [
@@ -77,34 +78,27 @@ export function RewritePanel({
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
 
-  // Load selected text from storage when component mounts (only once)
+  // Update versions when initialText changes (e.g., from minibar selection)
+  // Only update if initialText is different from the last one we processed
   useEffect(() => {
-    let mounted = true;
-    
-    chrome.storage.local.get('flint.selectedText').then((result) => {
-      if (!mounted) return;
-      
-      if (result['flint.selectedText']) {
-        const text = result['flint.selectedText'];
-        // Replace with version containing selected text
-        setVersions([{
-          id: `original-${Date.now()}`,
-          text,
-          label: 'Original',
-          isOriginal: true,
-          isLiked: false,
-          timestamp: Date.now(),
-        }]);
-        setCurrentVersionIndex(0);
-        // Clear the stored text after loading
-        chrome.storage.local.remove('flint.selectedText');
-      }
-    });
-    
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    if (initialText && initialText !== lastInitialTextRef.current) {
+      lastInitialTextRef.current = initialText;
+      // Strip timestamp marker if present (format: text\0timestamp)
+      const cleanText = initialText.includes('\0') 
+        ? initialText.substring(0, initialText.lastIndexOf('\0'))
+        : initialText;
+      // Replace with version containing new text
+      setVersions([{
+        id: `original-${Date.now()}`,
+        text: cleanText,
+        label: 'Original',
+        isOriginal: true,
+        isLiked: false,
+        timestamp: Date.now(),
+      }]);
+      setCurrentVersionIndex(0);
+    }
+  }, [initialText]);
 
   // Listen for history clear events
   useEffect(() => {
@@ -485,6 +479,8 @@ export function RewritePanel({
    * Handles clear all - resets to empty original version
    */
   const handleClearAll = () => {
+    // Reset the ref so the same text can be loaded again from minibar
+    lastInitialTextRef.current = '';
     setVersions([{
       id: `original-${Date.now()}`,
       text: '',

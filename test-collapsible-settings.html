@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Collapsible Settings Demo - Flint</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #e5e5e5;
+      padding: 40px 20px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #1a1a1a;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 24px;
+      color: #fff;
+    }
+
+    .section {
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid #333;
+    }
+
+    .section:last-child {
+      border-bottom: none;
+    }
+
+    .section-header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      color: #e5e5e5;
+      margin-bottom: 0;
+      transition: opacity 0.2s;
+    }
+
+    .section-header:hover {
+      opacity: 0.8;
+    }
+
+    .section-header.expanded {
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 0;
+    }
+
+    .chevron {
+      width: 16px;
+      height: 16px;
+      transition: transform 0.2s ease;
+    }
+
+    .chevron.expanded {
+      transform: rotate(90deg);
+    }
+
+    .section-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .section-content.expanded {
+      max-height: 1000px;
+    }
+
+    .setting-item {
+      margin-bottom: 16px;
+    }
+
+    .setting-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .setting-description {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
+    .toggle {
+      position: relative;
+      display: inline-block;
+      width: 48px;
+      height: 28px;
+      background: #333;
+      border-radius: 28px;
+      border: 1px solid #444;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle.active {
+      background: #4a90e2;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      height: 20px;
+      width: 20px;
+      left: 4px;
+      bottom: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: left 0.2s;
+    }
+
+    .toggle.active .toggle-slider {
+      left: 24px;
+    }
+
+    .input {
+      width: 100%;
+      padding: 12px 16px;
+      background: #0a0a0a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #e5e5e5;
+      font-size: 14px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      background: rgba(74, 144, 226, 0.2);
+      color: #4a90e2;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Settings <span class="badge">NEW: Collapsible</span></h1>
+
+    <!-- Data Management Section -->
+    <div class="section">
+      <button class="section-header expanded" onclick="toggleSection(this)">
+        <h3 class="section-title">Data Management</h3>
+        <svg class="chevron expanded" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+      <div class="section-content expanded">
+        <div class="setting-item">
+          <label class="setting-label">History management</label>
+          <p class="setting-description">Export or delete all saved operations</p>
+          <button class="input" style="width: auto; padding: 8px 16px; cursor: pointer;">Clear History</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Appearance Section -->
+    <div class="section">
+      <button class="section-header" onclick="toggleSection(this)">
+        <h3 class="section-title">Appearance</h3>
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+      <div class="section-content">
+        <div class="setting-item">
+          <label class="setting-label">Light mode</label>
+          <p class="setting-description">Switch between dark and light themes</p>
+          <div class="toggle" onclick="this.classList.toggle('active')">
+            <span class="toggle-slider"></span>
+          </div>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">Accent color</label>
+          <p class="setting-description">Adjust the hue to customize your accent color</p>
+          <input type="range" min="0" max="360" value="255" class="input" style="height: 8px;">
+        </div>
+      </div>
+    </div>
+
+    <!-- Voice Recognition Section -->
+    <div class="section">
+      <button class="section-header" onclick="toggleSection(this)">
+        <h3 class="section-title">Voice Recognition</h3>
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+      <div class="section-content">
+        <div class="setting-item">
+          <label class="setting-label">Language</label>
+          <select class="input">
+            <option>English (US)</option>
+            <option>English (UK)</option>
+            <option>Spanish (Spain)</option>
+            <option>French</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">Local-only mode</label>
+          <p class="setting-description">Disable network-dependent features</p>
+          <div class="toggle" onclick="this.classList.toggle('active')">
+            <span class="toggle-slider"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Section -->
+    <div class="section">
+      <button class="section-header" onclick="toggleSection(this)">
+        <h3 class="section-title">Keyboard Shortcuts</h3>
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+      <div class="section-content">
+        <div class="setting-item">
+          <label class="setting-label">Open Panel</label>
+          <input type="text" class="input" value="Ctrl+Shift+F" placeholder="Ctrl+Shift+F">
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">Record</label>
+          <input type="text" class="input" value="Ctrl+Shift+R" placeholder="Ctrl+Shift+R">
+        </div>
+      </div>
+    </div>
+
+    <!-- Pinned Notes Section -->
+    <div class="section">
+      <button class="section-header" onclick="toggleSection(this)">
+        <h3 class="section-title">Pinned Notes</h3>
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+      <div class="section-content">
+        <div class="setting-item">
+          <p class="setting-description">No pinned notes yet. Add notes to provide context for AI operations.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleSection(button) {
+      const content = button.nextElementSibling;
+      const chevron = button.querySelector('.chevron');
+      
+      const isExpanded = content.classList.contains('expanded');
+      
+      if (isExpanded) {
+        content.classList.remove('expanded');
+        chevron.classList.remove('expanded');
+        button.classList.remove('expanded');
+      } else {
+        content.classList.add('expanded');
+        chevron.classList.add('expanded');
+        button.classList.add('expanded');
+      }
+    }
+  </script>
+</body>
+</html>

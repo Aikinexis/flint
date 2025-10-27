@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flint Mini Bar Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #333;
+    }
+    .test-section {
+      margin: 30px 0;
+      padding: 20px;
+      background: #f5f5f5;
+      border-radius: 8px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .editable {
+      border: 1px solid #ccc;
+      padding: 10px;
+      min-height: 100px;
+      background: white;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Flint Mini Bar Test Page</h1>
+  
+  <div class="test-section">
+    <h2>Test 1: Regular Text Selection</h2>
+    <p>Select this text to see if the mini bar appears. This is a longer paragraph with enough text to make a meaningful selection. Try selecting different parts of this text to test the mini bar positioning and behavior.</p>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 2: Textarea</h2>
+    <textarea placeholder="Type or paste text here, then select it...">This is editable text in a textarea. Select some of this text to test if the mini bar works in form fields.</textarea>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 3: ContentEditable</h2>
+    <div class="editable" contenteditable="true">
+      This is a contenteditable div. You can edit this text and select it. This simulates rich text editors like Google Docs (though Google Docs uses a more complex implementation).
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 4: Multiple Paragraphs</h2>
+    <p>First paragraph with some text to select.</p>
+    <p>Second paragraph with more text. Try selecting across multiple paragraphs to test how the mini bar positions itself.</p>
+    <p>Third paragraph to give you even more options for testing selections.</p>
+  </div>
+
+  <div class="test-section">
+    <h2>Instructions</h2>
+    <ol>
+      <li>Make sure the Flint extension is loaded and the side panel is open</li>
+      <li>Select text in any of the sections above</li>
+      <li>The mini bar should appear above your selection after 200ms</li>
+      <li>Try resizing the browser window - the mini bar should reposition</li>
+      <li>Try scrolling - the mini bar should hide</li>
+      <li>Close the side panel - the mini bar should not appear on new selections</li>
+    </ol>
+  </div>
+</body>
+</html>

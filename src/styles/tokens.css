@@ -336,12 +336,84 @@
   position: fixed;
   z-index: 999999;
   display: inline-flex;
-  gap: 8px;
-  padding: 8px;
+  gap: 6px;
+  padding: 6px;
   border: 1px solid var(--border);
   background: color-mix(in oklab, var(--bg) 85%, white 15%);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
+}
+
+.flint-minibar .flint-icon-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, border 0.12s ease;
+}
+
+.flint-minibar .flint-icon-btn:hover {
+  background: var(--surface-2);
+  border: 1px solid var(--border-muted);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.flint-minibar .flint-icon-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+}
+
+.flint-minibar .flint-icon-btn.primary {
+  background: transparent;
+  border: none;
+  color: var(--text);
+}
+
+.flint-minibar .flint-icon-btn.primary:hover {
+  background: linear-gradient(135deg, oklch(0.6 0.1 var(--accent-hue)) 0%, oklch(0.5 0.12 var(--accent-hue)) 100%);
+  border: 1px solid oklch(0.3 0.08 var(--accent-hue));
+  color: oklch(0.12 0 255);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.flint-minibar .flint-icon-btn.primary:active {
+  background: linear-gradient(135deg, oklch(0.6 0.12 var(--accent-hue)), oklch(0.5 0.14 var(--accent-hue)));
+  border: 1px solid oklch(0.3 0.08 var(--accent-hue));
+  color: oklch(0.12 0 255);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.light .flint-minibar .flint-icon-btn.primary:hover {
+  background: linear-gradient(135deg, oklch(0.8 0.1 var(--accent-hue)) 0%, oklch(0.7 0.12 var(--accent-hue)) 100%);
+  border: 1px solid oklch(0.5 0.08 var(--accent-hue));
+  color: oklch(0.12 0 255);
+}
+
+.light .flint-minibar .flint-icon-btn.primary:active {
+  background: linear-gradient(135deg, oklch(0.8 0.12 var(--accent-hue)), oklch(0.7 0.14 var(--accent-hue)));
+  border: 1px solid oklch(0.5 0.08 var(--accent-hue));
+  color: oklch(0.12 0 255);
+}
+
+.flint-minibar .flint-icon-btn.ghost {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+}
+
+.flint-minibar .flint-icon-btn.ghost:hover {
+  background: var(--surface-2);
+  border: 1px solid var(--border-muted);
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.flint-minibar .flint-icon-btn.ghost:active {
+  background: color-mix(in oklab, var(--surface-2) 70%, white 30%);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 
@@ -376,8 +448,8 @@
   color: var(--text);
 }
 
-/* icon buttons - for minibar and toolbars */
-.flint-icon-btn {
+/* icon buttons - for toolbars (non-minibar) */
+.flint-toolbar .flint-icon-btn {
   width: var(--btn-height);
   height: var(--btn-height);
   padding: 0;
@@ -392,16 +464,16 @@
   transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
 }
 
-.flint-icon-btn:focus-visible {
+.flint-toolbar .flint-icon-btn:focus-visible {
   outline: none;
   box-shadow: var(--shadow-focus);
 }
 
-.flint-icon-btn:active {
+.flint-toolbar .flint-icon-btn:active {
   transform: translateY(1px);
 }
 
-.flint-icon-btn.primary {
+.flint-toolbar .flint-icon-btn.primary {
   background: var(--primary);
   border-color: color-mix(in oklab, var(--primary) 70%, black 30%);
   color: oklch(0.12 0 255);

@@ -15,7 +15,9 @@ type MessageType =
   | 'REPLACE_TEXT'
   | 'SHOW_MINI_BAR'
   | 'HIDE_MINI_BAR'
+  | 'PING_PANEL'
   // Panel messages
+  | 'PANEL_OPENED'
   | 'OPEN_GENERATE_TAB'
   | 'OPEN_SUMMARY_TAB'
   | 'OPEN_REWRITE_TAB'
@@ -60,6 +62,10 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
 
   try {
+    // Set side panel to open when extension icon is clicked
+    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+    console.log('[Flint Background] Side panel behavior configured');
+
     // Unregister existing content scripts on update
     if (details.reason === 'update') {
       console.log('[Flint Background] Cleaning up old content scripts...');
@@ -69,7 +75,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     // Register content scripts dynamically
     console.log('[Flint Background] Registering content scripts...');
     await registerContentScripts();
-    
+
     console.log('[Flint Background] Setup completed successfully');
   } catch (error) {
     console.error('[Flint Background] Setup failed:', error);
@@ -77,6 +83,9 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     // User will see error message when trying to use features
   }
 });
+
+// Note: chrome.sidePanel.onPanelOpened doesn't exist in the API
+// The panel will send a message when it mounts instead
 
 /**
  * Register content scripts dynamically using chrome.scripting API
@@ -103,7 +112,7 @@ async function registerContentScripts(): Promise<void> {
         js: ['content.js'],
         matches: ['<all_urls>'],
         runAt: 'document_idle',
-        allFrames: false
+        allFrames: false // Keep false - Google Docs selection works in main frame
       }
     ]);
 
@@ -136,7 +145,7 @@ async function unregisterContentScripts(): Promise<void> {
     const registered = await chrome.scripting.getRegisteredContentScripts({
       ids: [CONTENT_SCRIPT_ID]
     });
-    
+
     // Only unregister if scripts exist
     if (registered.length > 0) {
       await chrome.scripting.unregisterContentScripts({
@@ -154,21 +163,9 @@ async function unregisterContentScripts(): Promise<void> {
   }
 }
 
-/**
- * Handle extension icon click - open side panel
- */
-chrome.action.onClicked.addListener(async (tab) => {
-  if (!tab.id) {
-    console.error('[Flint Background] No tab ID available');
-    return;
-  }
-
-  try {
-    await chrome.sidePanel.open({ tabId: tab.id });
-  } catch (error) {
-    console.error('[Flint Background] Failed to open side panel:', error);
-  }
-});
+// Note: We use chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+// instead of chrome.action.onClicked to avoid user gesture issues.
+// The panel opens automatically when the user clicks the extension icon.
 
 /**
  * Message listener for routing messages between panel and content scripts
@@ -236,12 +233,13 @@ async function handleContentScriptMessage(
   payload?: unknown
 ): Promise<MessageResponse> {
   switch (type) {
+    case 'PING_PANEL':
     case 'OPEN_GENERATE_TAB':
     case 'OPEN_SUMMARY_TAB':
     case 'OPEN_REWRITE_TAB':
     case 'OPEN_SETTINGS_TAB':
     case 'OPEN_HISTORY_TAB':
-      // Forward these messages to the panel
+      // Forward message to panel - will only work if panel is open
       return forwardMessageToPanel(type, payload);
 
     default:
@@ -277,16 +275,16 @@ async function forwardMessageToPanel(
       data: { message: 'Message forwarded to panel' }
     };
   } catch (error) {
-    console.error('[Flint Background] Failed to forward message to panel:', error);
-
-    // Panel may not be open or listening
+    // Panel not open - this is expected, just return error silently
     if (error instanceof Error && error.message.includes('Receiving end does not exist')) {
       return {
         success: false,
-        error: 'Panel is not open. Please open the Flint side panel first.'
+        error: 'Panel is not open'
       };
     }
 
+    // Log unexpected errors
+    console.error('[Flint Background] Failed to forward message to panel:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to communicate with panel'
@@ -303,6 +301,35 @@ async function handlePanelMessage(
   type: MessageType,
   payload?: unknown
 ): Promise<MessageResponse> {
+  // Handle PANEL_OPENED message - forward to content script with saved position
+  if (type === 'PANEL_OPENED') {
+    console.log('[Flint Background] ✅ Received PANEL_OPENED from panel');
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      console.log('[Flint Background] Active tab:', tabs[0]?.id);
+
+      if (tabs[0]?.id) {
+        // Get saved selection position
+        const { 'flint.lastSelectionPoint': lastSelectionPoint } =
+          await chrome.storage.local.get('flint.lastSelectionPoint');
+
+        await chrome.tabs.sendMessage(tabs[0].id, {
+          type: 'PANEL_OPENED',
+          source: 'panel',
+          payload: { position: lastSelectionPoint }
+        });
+        console.log('[Flint Background] ✅ Sent PANEL_OPENED to content script');
+        return {
+          success: true,
+          data: { message: 'Panel opened notification sent' }
+        };
+      }
+    } catch (error) {
+      console.error('[Flint Background] ❌ Failed to send PANEL_OPENED:', error);
+    }
+    return { success: true };
+  }
+
   // Handle UPDATE_SHORTCUTS message separately (doesn't need active tab)
   if (type === 'UPDATE_SHORTCUTS') {
     console.log('[Flint Background] Shortcuts updated:', payload);
@@ -453,75 +480,4 @@ self.addEventListener('beforeunload', () => {
   // Service worker suspending - cleanup if needed
 });
 
-/**
- * Handle keyboard shortcuts from chrome.commands API
- * Triggers appropriate actions when user presses registered shortcuts
- */
-chrome.commands.onCommand.addListener(async (command) => {
-  console.log('[Flint Background] Keyboard command triggered:', command);
 
-  try {
-    // Get the active tab
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    const activeTab = tabs[0];
-
-    if (!activeTab?.id) {
-      console.error('[Flint Background] No active tab for command:', command);
-      return;
-    }
-
-    switch (command) {
-      case 'open-panel':
-        // Open the side panel
-        await chrome.sidePanel.open({ tabId: activeTab.id });
-        break;
-
-      case 'record':
-        // Open side panel to Generate tab
-        await chrome.sidePanel.open({ tabId: activeTab.id });
-        // Send message to panel to switch to Generate tab
-        setTimeout(() => {
-          chrome.runtime.sendMessage({
-            type: 'OPEN_GENERATE_TAB',
-            source: 'background',
-          }).catch((err) => {
-            console.error('[Flint Background] Failed to open Generate tab:', err);
-          });
-        }, 100);
-        break;
-
-      case 'summarize':
-        // Get selected text and open Summary tab
-        await chrome.sidePanel.open({ tabId: activeTab.id });
-        // Send message to panel to switch to Summary tab with selected text
-        setTimeout(() => {
-          chrome.runtime.sendMessage({
-            type: 'OPEN_SUMMARY_TAB',
-            source: 'background',
-          }).catch((err) => {
-            console.error('[Flint Background] Failed to open Summary tab:', err);
-          });
-        }, 100);
-        break;
-
-      case 'rewrite':
-        // Get selected text and open Rewrite tab
-        await chrome.sidePanel.open({ tabId: activeTab.id });
-        // Send message to panel to switch to Rewrite tab with selected text
-        setTimeout(() => {
-          chrome.runtime.sendMessage({
-            type: 'OPEN_REWRITE_TAB',
-            source: 'background',
-          }).catch((err) => {
-            console.error('[Flint Background] Failed to open Rewrite tab:', err);
-          });
-        }, 100);
-        break;
-
-      default:
-        console.warn('[Flint Background] Unknown command:', command);
-    }
-  } catch (error) {
-    console.error('[Flint Background] Error handling command:', command, error);
-  }
-});
