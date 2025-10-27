@@ -17,6 +17,7 @@ export interface AIAvailability {
   promptAPI: AIAvailabilityStatus;
   summarizerAPI: AIAvailabilityStatus;
   rewriterAPI: AIAvailabilityStatus;
+  writerAPI: AIAvailabilityStatus;
 }
 
 /**
@@ -24,7 +25,7 @@ export interface AIAvailability {
  */
 export interface SummaryOptions {
   mode: 'bullets' | 'paragraph' | 'brief';
-  readingLevel: 'elementary' | 'middle-school' | 'high-school' | 'college';
+  readingLevel: 'simple' | 'moderate' | 'detailed' | 'complex';
   pinnedNotes?: string[];
 }
 
@@ -36,6 +37,16 @@ export interface RewriteOptions {
   customPrompt?: string;
   tone?: 'more-formal' | 'more-casual' | 'as-is';
   pinnedNotes?: string[];
+}
+
+/**
+ * Generate options
+ */
+export interface GenerateOptions {
+  pinnedNotes?: string[];
+  length?: 'short' | 'medium' | 'long';
+  lengthHint?: number;
+  context?: string;
 }
 
 /**
@@ -61,23 +72,41 @@ export class AIService {
       promptAPI: 'unavailable',
       summarizerAPI: 'unavailable',
       rewriterAPI: 'unavailable',
+      writerAPI: 'unavailable',
     };
 
-    // Check Prompt API (window.ai.canCreateTextSession)
+    // Check Prompt API (window.ai.canCreateTextSession per May 2025 spec)
+    // Note: Prompt API may not be available in extension contexts (side panels, popups)
+    // even when enabled in chrome://flags. This is a known limitation.
     try {
-      if ('ai' in window && typeof (window as any).ai.canCreateTextSession === 'function') {
+      // Try window.ai first (standard location)
+      if ('ai' in window && typeof (window as any).ai?.canCreateTextSession === 'function') {
         const status = await (window as any).ai.canCreateTextSession();
+        console.log('[AI] Prompt API (window.ai) status:', status);
         // status is "readily", "after-download", or "no"
         availability.promptAPI = status === 'readily' ? 'available' : status === 'after-download' ? 'after-download' : 'unavailable';
       }
+      // Try self.ai as fallback (may be available in extension context)
+      else if ('ai' in self && typeof (self as any).ai?.canCreateTextSession === 'function') {
+        const status = await (self as any).ai.canCreateTextSession();
+        console.log('[AI] Prompt API (self.ai) status:', status);
+        availability.promptAPI = status === 'readily' ? 'available' : status === 'after-download' ? 'after-download' : 'unavailable';
+      }
+      else {
+        console.log('[AI] Prompt API not available in extension context (this is expected)');
+        // Prompt API is not available in extension contexts, but Summarizer and Rewriter should work
+        availability.promptAPI = 'unavailable';
+      }
     } catch (error) {
       console.warn('[AI] Prompt API check failed:', error);
+      availability.promptAPI = 'unavailable';
     }
 
     // Check Summarizer API
     try {
       if ('Summarizer' in self) {
-        const status = await (self as any).Summarizer.availability();
+        // Specify outputLanguage in availability check to avoid warnings
+        const status = await (self as any).Summarizer.availability({ outputLanguage: 'en' });
         // status is "available", "downloadable", or "unavailable"
         availability.summarizerAPI = status === 'available' ? 'available' : status === 'downloadable' ? 'after-download' : 'unavailable';
       }
@@ -88,12 +117,25 @@ export class AIService {
     // Check Rewriter API
     try {
       if ('Rewriter' in self) {
-        const status = await (self as any).Rewriter.availability();
+        // Specify outputLanguage in availability check to avoid warnings
+        const status = await (self as any).Rewriter.availability({ outputLanguage: 'en' });
         // status is "available", "downloadable", or "unavailable"
         availability.rewriterAPI = status === 'available' ? 'available' : status === 'downloadable' ? 'after-download' : 'unavailable';
       }
     } catch (error) {
       console.warn('[AI] Rewriter API check failed:', error);
+    }
+
+    // Check Writer API
+    try {
+      if ('Writer' in self) {
+        // Specify outputLanguage in availability check to avoid warnings
+        const status = await (self as any).Writer.availability({ outputLanguage: 'en' });
+        // status is "available", "downloadable", or "unavailable"
+        availability.writerAPI = status === 'available' ? 'available' : status === 'downloadable' ? 'after-download' : 'unavailable';
+      }
+    } catch (error) {
+      console.warn('[AI] Writer API check failed:', error);
     }
 
     this.availabilityCache = availability;
@@ -201,7 +243,7 @@ export class AIService {
         brief: 'headline',
       };
 
-      // Map reading level to length
+      // Map reading level to length with word count guidance
       const lengthMap: Record<string, string> = {
         elementary: 'short',
         'middle-school': 'short',
@@ -209,10 +251,22 @@ export class AIService {
         college: 'long',
       };
 
-      // Merge pinned notes into shared context
-      const sharedContext = options.pinnedNotes?.length
-        ? `Audience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`
-        : '';
+      // Add word count targets to shared context based on reading level
+      const wordCountGuidance: Record<string, string> = {
+        elementary: 'Keep summary very brief, around 50-75 words.',
+        'middle-school': 'Keep summary concise, around 75-100 words.',
+        'high-school': 'Provide a moderate summary, around 100-150 words.',
+        college: 'Provide a detailed summary, around 150-250 words.',
+      };
+
+      // Merge pinned notes and word count guidance into shared context
+      let sharedContext = '';
+      if (options.pinnedNotes?.length) {
+        sharedContext = `Audience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`;
+      }
+      if (wordCountGuidance[options.readingLevel]) {
+        sharedContext += (sharedContext ? '\n\n' : '') + wordCountGuidance[options.readingLevel];
+      }
 
       const summarizer = await (self as any).Summarizer.create({
         type: typeMap[options.mode] || 'key-points',
@@ -257,37 +311,20 @@ export class AIService {
       ? `Audience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`
       : '';
 
-    // Handle custom prompt via Prompt API
-    if (options.customPrompt) {
-      const prompt = sharedContext 
-        ? `${sharedContext}\n\n${options.customPrompt}\n\nText to rewrite:\n${text}`
-        : `${options.customPrompt}\n\nText to rewrite:\n${text}`;
-      return this.prompt(prompt);
-    }
-
-    // Map presets to tone
-    const presetToneMap: Record<string, string> = {
-      clarify: 'as-is',
-      simplify: 'more-casual',
-      concise: 'as-is',
-      expand: 'as-is',
-      friendly: 'more-casual',
-      formal: 'more-formal',
-      poetic: 'as-is',
-      persuasive: 'as-is',
-    };
-
-    const tone = options.tone || (options.preset ? presetToneMap[options.preset] : 'as-is');
-
-    // Try Rewriter API first
+    // Try Rewriter API first (preferred for extension contexts)
     if (availability.rewriterAPI === 'available') {
       try {
+        // For custom prompts, use sharedContext to pass the instructions
+        const context = options.customPrompt
+          ? (sharedContext ? `${sharedContext}\n\n${options.customPrompt}` : options.customPrompt)
+          : sharedContext;
+
         const rewriter = await (self as any).Rewriter.create({
-          tone,
+          tone: options.tone || 'as-is',
           format: 'plain-text',
           length: 'as-is',
-          sharedContext,
-          outputLanguage: 'en', // Required for optimal output quality and safety
+          sharedContext: context,
+          outputLanguage: 'en',
         });
 
         const result = await Promise.race([
@@ -300,27 +337,103 @@ export class AIService {
         return result;
       } catch (error) {
         console.warn('[AI] Rewriter API failed, falling back to Prompt API:', error);
+        // Fall through to Prompt API fallback
       }
     }
 
-    // Fallback to Prompt API with preset instructions
-    const presetInstructions: Record<string, string> = {
-      clarify: 'Rewrite the following text to make it clearer and easier to understand.',
-      simplify: 'Rewrite the following text using simpler words and shorter sentences.',
-      concise: 'Rewrite the following text to be more concise without losing meaning.',
-      expand: 'Rewrite the following text with more detail and explanation.',
-      friendly: 'Rewrite the following text in a friendly, approachable tone.',
-      formal: 'Rewrite the following text in a formal, professional tone.',
-      poetic: 'Rewrite the following text with poetic, expressive language.',
-      persuasive: 'Rewrite the following text to be more persuasive and compelling.',
-    };
+    // Fallback to Prompt API if Rewriter unavailable or failed
+    if (availability.promptAPI === 'available' && options.customPrompt) {
+      const prompt = sharedContext 
+        ? `${sharedContext}\n\n${options.customPrompt}\n\nText to rewrite:\n${text}`
+        : `${options.customPrompt}\n\nText to rewrite:\n${text}`;
+      return this.prompt(prompt);
+    }
 
-    const instruction = options.preset ? presetInstructions[options.preset] : 'Rewrite this text:';
-    const prompt = sharedContext
-      ? `${sharedContext}\n\n${instruction}\n\nText to rewrite:\n${text}`
-      : `${instruction}\n\nText to rewrite:\n${text}`;
+    // If we get here, no API is available
+    throw new Error('Please provide rewrite instructions');
+  }
+
+  /**
+   * Generates text using the Writer API or Prompt API fallback
+   * @param prompt - The generation prompt
+   * @param options - Generation options
+   * @returns Promise resolving to generated text
+   */
+  static async generate(prompt: string, options: GenerateOptions = {}): Promise<string> {
+    this.ensureUserActivation();
+
+    const availability = await this.checkAvailability();
+
+    // Use mock provider if all APIs unavailable
+    if (availability.writerAPI === 'unavailable' && availability.promptAPI === 'unavailable') {
+      return MockAIProvider.generate(prompt, options);
+    }
+
+    // Build prompt with context if provided
+    // Context contains the ending of previous output for continuation
+    let fullPrompt = prompt;
+    if (options.context) {
+      // Format context to encourage continuation rather than repetition
+      fullPrompt = `Context from previous output:\n${options.context}\n\nContinue or extend based on this context. New request: ${prompt}`;
+    }
+
+    // Add word count target if specified
+    if (options.lengthHint) {
+      fullPrompt += `\n\nIMPORTANT: Generate approximately ${options.lengthHint} words.`;
+    } else if (options.length === 'long') {
+      fullPrompt += `\n\nIMPORTANT: Generate a comprehensive, detailed response with no length restrictions.`;
+    }
+
+    // Merge pinned notes into context
+    const sharedContext = options.pinnedNotes?.length
+      ? `Audience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`
+      : '';
+
+    // Try Writer API first
+    if (availability.writerAPI === 'available') {
+      try {
+        const writer = await (self as any).Writer.create({
+          tone: 'neutral',
+          format: 'plain-text',
+          length: options.length || 'medium',
+          sharedContext,
+          outputLanguage: 'en',
+        });
+
+        const result = await Promise.race([
+          writer.write(fullPrompt),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Operation timed out')), 30000)
+          ),
+        ]);
+
+        return result;
+      } catch (error) {
+        console.warn('[AI] Writer API failed, falling back to Prompt API:', error);
+      }
+    }
+
+    // Fallback to Prompt API
+    const promptWithContext = sharedContext
+      ? `${sharedContext}\n\n${fullPrompt}`
+      : fullPrompt;
     
-    return this.prompt(prompt);
+    return this.prompt(promptWithContext);
+  }
+
+  /**
+   * Generates a context summary of output text for use in follow-up requests
+   * @param text - The generated output text to summarize
+   * @returns Promise resolving to a context summary (last 300 chars for continuation)
+   */
+  static async generateOutputSummary(text: string): Promise<string> {
+    // Use last 300 chars as context for better continuation
+    // This gives the AI the ending of the previous output to continue from
+    // Note: AI APIs require user activation and cannot be called in background
+    if (text.length <= 300) {
+      return text;
+    }
+    return '...' + text.slice(-300).trim();
   }
 }
 
@@ -344,7 +457,7 @@ class MockAIProvider {
       return sentences[0]?.trim() + '.' || text.slice(0, 100) + '...';
     }
 
-    const maxSentences = options.readingLevel === 'elementary' ? 2 : 3;
+    const maxSentences = options.readingLevel === 'simple' ? 2 : 3;
     const summary = sentences.slice(0, maxSentences).join('. ') + '.';
 
     if (options.mode === 'bullets') {
@@ -390,5 +503,51 @@ class MockAIProvider {
     }
 
     return `[Mock rewrite] ${text}`;
+  }
+
+  /**
+   * Mock generate implementation
+   * @param prompt - Generation prompt
+   * @param options - Generation options
+   * @returns Mock generated text
+   */
+  static generate(prompt: string, options: GenerateOptions): string {
+    console.warn('[AI] Using mock provider - AI features require Chrome 128+ with Gemini Nano enabled');
+
+    // Generate simple, prompt-relevant response
+    const promptLower = prompt.toLowerCase();
+    let mockText = '';
+
+    // Provide minimal, relevant responses based on prompt keywords
+    if (promptLower.includes('song') || promptLower.includes('lyrics')) {
+      mockText = 'Verse 1:\nUnder the stars we dance tonight\nHearts beating in the pale moonlight\n\nChorus:\nThis is our moment, this is our time\nTogether we shine, together we climb';
+    } else if (promptLower.includes('story') || promptLower.includes('tale')) {
+      mockText = 'Once upon a time, in a land far away, there lived a curious traveler who sought adventure beyond the horizon. Each day brought new discoveries and unexpected friendships.';
+    } else if (promptLower.includes('poem') || promptLower.includes('verse')) {
+      mockText = 'Whispers of wind through autumn trees,\nGolden leaves dance in the breeze,\nNature\'s beauty, wild and free,\nA moment of peace for you and me.';
+    } else if (promptLower.includes('email') || promptLower.includes('letter')) {
+      mockText = 'Dear [Recipient],\n\nI hope this message finds you well. I wanted to reach out regarding our recent conversation and share some thoughts on the next steps.\n\nBest regards';
+    } else if (promptLower.includes('list') || promptLower.includes('ideas')) {
+      mockText = '1. Start with a clear goal\n2. Break it into smaller steps\n3. Set realistic timelines\n4. Track your progress\n5. Celebrate small wins';
+    } else {
+      // Generic response for other prompts
+      mockText = `Here's a response to your request: "${prompt.slice(0, 40)}${prompt.length > 40 ? '...' : ''}"\n\nThis is a simple demonstration. With Chrome's built-in AI enabled, you would receive more detailed and contextually relevant content.`;
+    }
+
+    // Adjust length based on options
+    if (options.length === 'short' && options.lengthHint) {
+      // Truncate to approximate short length
+      mockText = mockText.slice(0, Math.min(mockText.length, options.lengthHint));
+      if (mockText.length < options.lengthHint) {
+        // Pad if needed
+        mockText += ' This is a short response tailored to your length preference.';
+        mockText = mockText.slice(0, options.lengthHint);
+      }
+    } else if (options.length === 'long') {
+      // Extend for long format
+      mockText += '\n\nThis extended section provides additional detail and context. With longer content, you can explore topics more thoroughly and include supporting information that adds depth to the response.';
+    }
+
+    return mockText;
   }
 }

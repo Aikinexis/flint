@@ -339,3 +339,19 @@ input[type='range']:focus-visible::-webkit-slider-thumb {
 input[type='range']:focus-visible::-moz-range-thumb {
   box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--primary);
 }
+
+/* Carousel loading border animation */
+@keyframes border-pulse {
+  0%, 100% {
+    border-color: var(--primary);
+    opacity: 1;
+  }
+  50% {
+    border-color: var(--primary);
+    opacity: 0.5;
+  }
+}
+
+.carousel-loading > div:first-child {
+  animation: border-pulse 1.5s ease-in-out infinite;
+}

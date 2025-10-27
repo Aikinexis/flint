@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import type { Settings as SettingsType, PinnedNote } from '../services/storage';
+import type { Settings as SettingsType, PinnedNote, GenerateSettings } from '../services/storage';
 import { StorageService } from '../services/storage';
+import { AIAvailabilityBanner } from './AIAvailabilityBanner';
+import { useAppState } from '../state';
 
 /**
  * Settings component props
@@ -42,6 +44,10 @@ export function Settings({
   onSettingsChange,
   onPinnedNotesChange,
 }: SettingsProps) {
+  // Get AI availability and actions from app state
+  const { state, actions } = useAppState();
+  const aiAvailability = state.aiAvailability;
+
   // Local state for settings
   const [localSettings, setLocalSettings] = useState<SettingsType | null>(null);
   const [pinnedNotes, setPinnedNotes] = useState<PinnedNote[]>([]);
@@ -53,6 +59,16 @@ export function Settings({
   const [selectedNote, setSelectedNote] = useState<PinnedNote | null>(null);
   const [noteTitle, setNoteTitle] = useState('');
   const [noteContent, setNoteContent] = useState('');
+
+  // Generate panel settings state
+  const [generateSettings, setGenerateSettings] = useState<GenerateSettings | null>(null);
+  const [lengthErrors, setLengthErrors] = useState<{ short?: string; medium?: string }>({});
+  
+  // Local input state to allow temporary empty values
+  const [shortLengthInput, setShortLengthInput] = useState<string>('');
+  const [mediumLengthInput, setMediumLengthInput] = useState<string>('');
+  const [shortCharsInput, setShortCharsInput] = useState<string>('');
+  const [mediumCharsInput, setMediumCharsInput] = useState<string>('');
 
   // Load settings and pinned notes from storage on mount
   useEffect(() => {
@@ -82,6 +98,17 @@ export function Settings({
         // Load pinned notes from IndexedDB
         const notes = await StorageService.getPinnedNotes();
         setPinnedNotes(notes);
+
+        // Load generate settings
+        const genSettings = await StorageService.getGenerateSettings();
+        setGenerateSettings(genSettings);
+        
+        // Initialize local input state
+        setShortLengthInput(genSettings.shortLength.toString());
+        setMediumLengthInput(genSettings.mediumLength.toString());
+        // Initialize char inputs (approximate: 5 chars per word)
+        setShortCharsInput((genSettings.shortLength * 5).toString());
+        setMediumCharsInput((genSettings.mediumLength * 5).toString());
       } catch (error) {
         console.error('[Settings] Failed to load data:', error);
       }
@@ -215,6 +242,151 @@ export function Settings({
   };
 
   /**
+   * Clamps a value between min and max (word counts)
+   */
+  const clampLength = (value: number): number => {
+    if (isNaN(value) || value < 5) return 5;
+    if (value > 2000) return 2000;
+    return value;
+  };
+
+  /**
+   * Updates generate settings
+   */
+  const updateGenerateSettings = async (updates: Partial<GenerateSettings>) => {
+    if (!generateSettings) return;
+
+    const newSettings = { ...generateSettings, ...updates };
+    setGenerateSettings(newSettings);
+
+    try {
+      await StorageService.saveGenerateSettings(newSettings);
+    } catch (error) {
+      console.error('[Settings] Failed to save generate settings:', error);
+    }
+  };
+
+  /**
+   * Updates short length during typing (no validation)
+   */
+  const updateShortLength = (value: string) => {
+    // Update local input state to allow empty values
+    setShortLengthInput(value);
+    setLengthErrors((prev) => ({ ...prev, short: '' }));
+    
+    const numValue = parseInt(value);
+    if (!isNaN(numValue)) {
+      updateGenerateSettings({ shortLength: numValue });
+      // Update char input (approximate: 5 chars per word)
+      setShortCharsInput((numValue * 5).toString());
+    }
+  };
+
+  /**
+   * Clamps short length on blur
+   */
+  const clampShortLength = (value: string) => {
+    const numValue = parseInt(value);
+    const clamped = clampLength(numValue);
+    
+    setShortLengthInput(clamped.toString());
+    setShortCharsInput((clamped * 5).toString());
+    setLengthErrors((prev) => ({ ...prev, short: '' }));
+    updateGenerateSettings({ shortLength: clamped });
+  };
+
+  /**
+   * Updates short chars during typing (no validation)
+   */
+  const updateShortChars = (value: string) => {
+    setShortCharsInput(value);
+    setLengthErrors((prev) => ({ ...prev, short: '' }));
+    
+    const numValue = parseInt(value);
+    if (!isNaN(numValue)) {
+      // Convert chars to words (approximate: 5 chars per word)
+      const words = Math.round(numValue / 5);
+      setShortLengthInput(words.toString());
+      updateGenerateSettings({ shortLength: words });
+    }
+  };
+
+  /**
+   * Clamps short chars on blur
+   */
+  const clampShortChars = (value: string) => {
+    const numValue = parseInt(value);
+    const clampedChars = Math.max(25, Math.min(10000, numValue)); // 5 words min, 2000 words max
+    const words = Math.round(clampedChars / 5);
+    const clamped = clampLength(words);
+    
+    setShortLengthInput(clamped.toString());
+    setShortCharsInput((clamped * 5).toString());
+    setLengthErrors((prev) => ({ ...prev, short: '' }));
+    updateGenerateSettings({ shortLength: clamped });
+  };
+
+  /**
+   * Updates medium length during typing (no validation)
+   */
+  const updateMediumLength = (value: string) => {
+    // Update local input state to allow empty values
+    setMediumLengthInput(value);
+    setLengthErrors((prev) => ({ ...prev, medium: '' }));
+    
+    const numValue = parseInt(value);
+    if (!isNaN(numValue)) {
+      updateGenerateSettings({ mediumLength: numValue });
+      // Update char input (approximate: 5 chars per word)
+      setMediumCharsInput((numValue * 5).toString());
+    }
+  };
+
+  /**
+   * Clamps medium length on blur
+   */
+  const clampMediumLength = (value: string) => {
+    const numValue = parseInt(value);
+    const clamped = clampLength(numValue);
+    
+    setMediumLengthInput(clamped.toString());
+    setMediumCharsInput((clamped * 5).toString());
+    setLengthErrors((prev) => ({ ...prev, medium: '' }));
+    updateGenerateSettings({ mediumLength: clamped });
+  };
+
+  /**
+   * Updates medium chars during typing (no validation)
+   */
+  const updateMediumChars = (value: string) => {
+    setMediumCharsInput(value);
+    setLengthErrors((prev) => ({ ...prev, medium: '' }));
+    
+    const numValue = parseInt(value);
+    if (!isNaN(numValue)) {
+      // Convert chars to words (approximate: 5 chars per word)
+      const words = Math.round(numValue / 5);
+      setMediumLengthInput(words.toString());
+      updateGenerateSettings({ mediumLength: words });
+    }
+  };
+
+  /**
+   * Clamps medium chars on blur
+   */
+  const clampMediumChars = (value: string) => {
+    const numValue = parseInt(value);
+    const clampedChars = Math.max(25, Math.min(10000, numValue)); // 5 words min, 2000 words max
+    const words = Math.round(clampedChars / 5);
+    const clamped = clampLength(words);
+    
+    setMediumLengthInput(clamped.toString());
+    setMediumCharsInput((clamped * 5).toString());
+    setLengthErrors((prev) => ({ ...prev, medium: '' }));
+    updateGenerateSettings({ mediumLength: clamped });
+  };
+
+  /**
    * Opens the add note dialog
    */
   const handleAddNote = () => {
@@ -325,6 +497,177 @@ export function Settings({
   return (
     <div className="flint-section flex flex-col h-full overflow-y-auto">
       <h2 className="flint-section-header">Settings</h2>
+
+      {/* AI Availability Banner */}
+      <AIAvailabilityBanner availability={aiAvailability} />
+
+      {/* Clear History Section */}
+      <section style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-muted)' }}>
+        <h3
+          style={{
+            fontSize: 'var(--fs-sm)',
+            fontWeight: 600,
+            color: 'var(--text)',
+            marginBottom: '16px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+          }}
+        >
+          Data Management
+        </h3>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: 'var(--fs-sm)',
+                color: 'var(--text)',
+                fontWeight: 500,
+                marginBottom: '4px',
+              }}
+            >
+              History management
+            </label>
+            <p
+              style={{
+                fontSize: 'var(--fs-xs)',
+                color: 'var(--text-muted)',
+                margin: 0,
+              }}
+            >
+              Export or delete all saved operations
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginLeft: '16px' }}>
+            <button
+              className="flint-btn ghost"
+              onClick={async () => {
+                try {
+                  const history = await StorageService.getHistory();
+                  if (history.length === 0) {
+                    alert('No history to export');
+                    return;
+                  }
+                  
+                  // Format history as readable Markdown
+                  console.log('[Settings] Formatting history as Markdown...');
+                  let markdown = `# Flint History Export\n\n`;
+                  markdown += `**Exported:** ${new Date().toLocaleString()}\n`;
+                  markdown += `**Total Items:** ${history.length}\n\n`;
+                  markdown += `---\n\n`;
+                  
+                  history.forEach((item, index) => {
+                    const date = new Date(item.timestamp).toLocaleString();
+                    const type = item.type.charAt(0).toUpperCase() + item.type.slice(1);
+                    
+                    markdown += `## ${index + 1}. ${type} Operation\n\n`;
+                    markdown += `**Date:** ${date}\n`;
+                    if (item.liked) {
+                      markdown += `**Status:** ❤️ Liked\n`;
+                    }
+                    if (item.metadata?.mode) {
+                      markdown += `**Mode:** ${item.metadata.mode}\n`;
+                    }
+                    if (item.metadata?.preset) {
+                      markdown += `**Preset:** ${item.metadata.preset}\n`;
+                    }
+                    markdown += `\n### Original Text\n\n`;
+                    markdown += `${item.originalText}\n\n`;
+                    markdown += `### Result\n\n`;
+                    markdown += `${item.resultText}\n\n`;
+                    markdown += `---\n\n`;
+                  });
+                  
+                  // Create Markdown blob
+                  console.log('[Settings] Creating Markdown file with', markdown.length, 'characters');
+                  const dataBlob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+                  
+                  // Create download link
+                  const url = URL.createObjectURL(dataBlob);
+                  const link = document.createElement('a');
+                  const filename = `flint-history-${new Date().toISOString().split('T')[0]}.md`;
+                  link.href = url;
+                  link.download = filename;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                  
+                  console.log('[Settings] History exported successfully as', filename);
+                } catch (error) {
+                  console.error('[Settings] Failed to export history:', error);
+                  alert('Failed to export history. Please try again.');
+                }
+              }}
+              disabled={state.history.length === 0}
+              aria-label="Export history"
+              title="Export history as Markdown"
+              style={{
+                height: '36px',
+                width: '36px',
+                padding: '0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: state.history.length === 0 ? 0.5 : 1,
+                cursor: state.history.length === 0 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </button>
+            <button
+              className="flint-btn ghost"
+              onClick={async () => {
+                if (confirm('Are you sure you want to clear all history? This action cannot be undone.')) {
+                  try {
+                    await StorageService.clearHistory();
+                    // Update app state to clear history in UI
+                    actions.clearHistory();
+                    // Notify panels to clear their versions by setting a flag in storage
+                    await chrome.storage.local.set({ 'flint.historyClearedAt': Date.now() });
+                    console.log('[Settings] History cleared successfully');
+                  } catch (error) {
+                    console.error('[Settings] Failed to clear history:', error);
+                    alert('Failed to clear history. Please try again.');
+                  }
+                }
+              }}
+              disabled={state.history.length === 0}
+              aria-label="Clear history"
+              title="Clear all history"
+              style={{
+                height: '36px',
+                padding: '0 16px',
+                opacity: state.history.length === 0 ? 0.5 : 1,
+                cursor: state.history.length === 0 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Clear History
+            </button>
+          </div>
+        </div>
+      </section>
 
       {/* Theme Section */}
       <section style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-muted)' }}>
@@ -503,6 +846,7 @@ export function Settings({
               }}
             />
             <div
+              role="img"
               style={{
                 width: '48px',
                 height: '48px',
@@ -885,6 +1229,283 @@ export function Settings({
           )}
         </div>
       </section>
+
+      {/* Generate Panel Settings Section */}
+      {generateSettings && (
+        <section style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-muted)' }}>
+          <h3
+            style={{
+              fontSize: 'var(--fs-sm)',
+              fontWeight: 600,
+              color: 'var(--text)',
+              marginBottom: '16px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
+            Generate Panel
+          </h3>
+
+          {/* Short length inputs */}
+          <div style={{ marginBottom: '16px' }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: 'var(--fs-sm)',
+                color: 'var(--text-muted)',
+                marginBottom: '8px',
+                fontWeight: 500,
+              }}
+            >
+              Short length
+            </label>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <input
+                  id="short-length"
+                  type="number"
+                  className="flint-input"
+                  min="5"
+                  max="2000"
+                  value={shortLengthInput}
+                  onChange={(e) => updateShortLength(e.target.value)}
+                  onBlur={(e) => clampShortLength(e.target.value)}
+                  placeholder="Words"
+                  aria-label="Short length in words"
+                  aria-invalid={!!lengthErrors.short}
+                  style={{
+                    width: '100%',
+                    borderColor: lengthErrors.short ? '#ef4444' : undefined,
+                  }}
+                />
+                <p
+                  style={{
+                    fontSize: 'var(--fs-xs)',
+                    color: 'var(--text-muted)',
+                    marginTop: '4px',
+                    marginBottom: 0,
+                  }}
+                >
+                  words
+                </p>
+              </div>
+              <div style={{ flex: 1 }}>
+                <input
+                  id="short-chars"
+                  type="number"
+                  className="flint-input"
+                  min="25"
+                  max="10000"
+                  value={shortCharsInput}
+                  onChange={(e) => updateShortChars(e.target.value)}
+                  onBlur={(e) => clampShortChars(e.target.value)}
+                  placeholder="Characters"
+                  aria-label="Short length in characters"
+                  style={{
+                    width: '100%',
+                  }}
+                />
+                <p
+                  style={{
+                    fontSize: 'var(--fs-xs)',
+                    color: 'var(--text-muted)',
+                    marginTop: '4px',
+                    marginBottom: 0,
+                  }}
+                >
+                  chars
+                </p>
+              </div>
+            </div>
+            {lengthErrors.short && (
+              <p
+                id="error-short-length"
+                style={{
+                  fontSize: 'var(--fs-xs)',
+                  color: '#ef4444',
+                  marginTop: '4px',
+                  marginBottom: 0,
+                }}
+              >
+                {lengthErrors.short}
+              </p>
+            )}
+          </div>
+
+          {/* Medium length inputs */}
+          <div style={{ marginBottom: '16px' }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: 'var(--fs-sm)',
+                color: 'var(--text-muted)',
+                marginBottom: '8px',
+                fontWeight: 500,
+              }}
+            >
+              Medium length
+            </label>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <input
+                  id="medium-length"
+                  type="number"
+                  className="flint-input"
+                  min="5"
+                  max="2000"
+                  value={mediumLengthInput}
+                  onChange={(e) => updateMediumLength(e.target.value)}
+                  onBlur={(e) => clampMediumLength(e.target.value)}
+                  placeholder="Words"
+                  aria-label="Medium length in words"
+                  aria-invalid={!!lengthErrors.medium}
+                  style={{
+                    width: '100%',
+                    borderColor: lengthErrors.medium ? '#ef4444' : undefined,
+                  }}
+                />
+                <p
+                  style={{
+                    fontSize: 'var(--fs-xs)',
+                    color: 'var(--text-muted)',
+                    marginTop: '4px',
+                    marginBottom: 0,
+                  }}
+                >
+                  words
+                </p>
+              </div>
+              <div style={{ flex: 1 }}>
+                <input
+                  id="medium-chars"
+                  type="number"
+                  className="flint-input"
+                  min="25"
+                  max="10000"
+                  value={mediumCharsInput}
+                  onChange={(e) => updateMediumChars(e.target.value)}
+                  onBlur={(e) => clampMediumChars(e.target.value)}
+                  placeholder="Characters"
+                  aria-label="Medium length in characters"
+                  style={{
+                    width: '100%',
+                  }}
+                />
+                <p
+                  style={{
+                    fontSize: 'var(--fs-xs)',
+                    color: 'var(--text-muted)',
+                    marginTop: '4px',
+                    marginBottom: 0,
+                  }}
+                >
+                  chars
+                </p>
+              </div>
+            </div>
+            {lengthErrors.medium && (
+              <p
+                id="error-medium-length"
+                style={{
+                  fontSize: 'var(--fs-xs)',
+                  color: '#ef4444',
+                  marginTop: '4px',
+                  marginBottom: 0,
+                }}
+              >
+                {lengthErrors.medium}
+              </p>
+            )}
+          </div>
+
+          {/* Context awareness toggle */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <label
+                htmlFor="context-awareness-toggle"
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--fs-sm)',
+                  color: 'var(--text)',
+                  fontWeight: 500,
+                  marginBottom: '4px',
+                }}
+              >
+                Use previous prompt as context
+              </label>
+              <p
+                style={{
+                  fontSize: 'var(--fs-xs)',
+                  color: 'var(--text-muted)',
+                  margin: 0,
+                }}
+              >
+                When enabled, the AI will reference your last prompt to understand follow-up requests
+              </p>
+            </div>
+            <label
+              className="flint-toggle"
+              style={{
+                position: 'relative',
+                display: 'inline-block',
+                width: '48px',
+                height: '28px',
+                flexShrink: 0,
+                marginLeft: '16px',
+              }}
+            >
+              <input
+                id="context-awareness-toggle"
+                type="checkbox"
+                checked={generateSettings.contextAwarenessEnabled}
+                onChange={(e) => updateGenerateSettings({ contextAwarenessEnabled: e.target.checked })}
+                aria-label="Toggle context awareness"
+                style={{
+                  opacity: 0,
+                  width: 0,
+                  height: 0,
+                }}
+              />
+              <span
+                style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: generateSettings.contextAwarenessEnabled
+                    ? 'var(--primary)'
+                    : 'var(--surface-2)',
+                  transition: '0.2s',
+                  borderRadius: '28px',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                <span
+                  style={{
+                    position: 'absolute',
+                    content: '""',
+                    height: '20px',
+                    width: '20px',
+                    left: generateSettings.contextAwarenessEnabled ? '24px' : '4px',
+                    bottom: '3px',
+                    background: 'white',
+                    transition: '0.2s',
+                    borderRadius: '50%',
+                  }}
+                />
+              </span>
+            </label>
+          </div>
+        </section>
+      )}
 
       {/* Privacy Notice Section */}
       <section

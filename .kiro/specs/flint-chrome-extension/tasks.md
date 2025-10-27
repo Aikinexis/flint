@@ -592,7 +592,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
 
 ## Phase 12: Main Panel and Integration
 
-- [ ] 61. Create main panel HTML structure
+- [x] 61. Create main panel HTML structure
   - Create `src/panel/index.html` with basic HTML structure
   - Add root div for React mounting
   - Link to compiled CSS and JS bundles
@@ -601,7 +601,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 8.1_
   - _Commit: "feat: create main panel HTML structure"_
 
-- [ ] 62. Create main panel React app
+- [x] 62. Create main panel React app
   - Create `src/panel/panel.tsx` as main entry point
   - Set up React root and render app
   - Wrap app with state provider
@@ -611,7 +611,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 8.1_
   - _Commit: "feat: create main panel React app with tab navigation"_
 
-- [ ] 63. Integrate all components into panel
+- [x] 63. Integrate all components into panel
   - Import and render VoiceRecorder in Voice tab
   - Import and render RewritePanel in Rewrite tab
   - Import and render SummaryPanel in Summary tab
@@ -621,7 +621,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 8.1_
   - _Commit: "feat: integrate all components into main panel"_
 
-- [ ] 64. Implement panel-to-content script communication
+- [x] 64. Implement panel-to-content script communication
   - Add message sending functions in panel
   - Send GET_SELECTION message to get selected text
   - Send INSERT_TEXT message to insert transcript
@@ -631,7 +631,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 1.6, 4.2_
   - _Commit: "feat: implement panel-to-content script communication"_
 
-- [ ] 65. Add loading states and error boundaries
+- [x] 65. Add loading states and error boundaries
   - Create loading spinner component
   - Show spinner during AI operations
   - Create error boundary component
@@ -641,7 +641,7 @@ This plan breaks down the Flint Chrome extension into small, actionable tasks. E
   - _Requirements: 8.2, 10.5, 10.6_
   - _Commit: "feat: add loading states and error boundaries"_
 
-- [ ] 66. Implement AI availability check on panel load
+- [x] 66. Implement AI availability check on panel load
   - Call aiService.checkAvailability() on panel mount
   - Store availability status in app state
   - Display banner if AI is unavailable

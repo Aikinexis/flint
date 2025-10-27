@@ -10,7 +10,7 @@ import type { AIAvailability } from '../services/ai';
 /**
  * Tab types for navigation
  */
-export type Tab = 'home' | 'voice' | 'rewrite' | 'summary' | 'history' | 'settings';
+export type Tab = 'home' | 'generate' | 'rewrite' | 'summary' | 'history' | 'settings';
 
 /**
  * Application state interface
@@ -117,6 +117,7 @@ export const initialState: AppState = {
     promptAPI: 'unavailable',
     summarizerAPI: 'unavailable',
     rewriterAPI: 'unavailable',
+    writerAPI: 'unavailable',
   },
 
   // Errors

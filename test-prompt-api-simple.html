@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prompt API Quick Test</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      background: #0c0e13;
+      color: #eef0f6;
+      font-size: 14px;
+    }
+    .result {
+      margin: 10px 0;
+      padding: 10px;
+      background: #111421;
+      border-radius: 4px;
+      border-left: 3px solid #f97316;
+    }
+    .success { border-left-color: #10b981; }
+    .error { border-left-color: #ef4444; }
+    button {
+      padding: 10px 20px;
+      background: #f97316;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Prompt API Quick Test</h1>
+  <button onclick="runTest()">Run Test</button>
+  <div id="output"></div>
+
+  <script>
+    function log(msg, type = 'info') {
+      const output = document.getElementById('output');
+      const div = document.createElement('div');
+      div.className = `result ${type}`;
+      div.textContent = msg;
+      output.appendChild(div);
+    }
+
+    async function runTest() {
+      document.getElementById('output').innerHTML = '';
+      
+      log('Testing window.ai...');
+      log(`'ai' in window: ${('ai' in window)}`);
+      
+      if ('ai' in window) {
+        const ai = window.ai;
+        log(`window.ai exists: ${!!ai}`, 'success');
+        log(`typeof window.ai: ${typeof ai}`);
+        log(`window.ai.canCreateTextSession: ${typeof ai.canCreateTextSession}`);
+        
+        if (typeof ai.canCreateTextSession === 'function') {
+          try {
+            const status = await ai.canCreateTextSession();
+            log(`canCreateTextSession() returned: "${status}"`, 'success');
+            log(`Mapped status: ${status === 'readily' ? 'available' : status === 'after-download' ? 'after-download' : 'unavailable'}`);
+          } catch (error) {
+            log(`Error calling canCreateTextSession(): ${error.message}`, 'error');
+          }
+        } else {
+          log('canCreateTextSession is not a function', 'error');
+        }
+      } else {
+        log('window.ai does not exist', 'error');
+      }
+      
+      log('\nTesting self.ai...');
+      log(`'ai' in self: ${('ai' in self)}`);
+      
+      if ('ai' in self) {
+        const ai = self.ai;
+        log(`self.ai exists: ${!!ai}`, 'success');
+        log(`typeof self.ai: ${typeof ai}`);
+        log(`self.ai.canCreateTextSession: ${typeof ai.canCreateTextSession}`);
+        
+        if (typeof ai.canCreateTextSession === 'function') {
+          try {
+            const status = await ai.canCreateTextSession();
+            log(`canCreateTextSession() returned: "${status}"`, 'success');
+          } catch (error) {
+            log(`Error: ${error.message}`, 'error');
+          }
+        }
+      } else {
+        log('self.ai does not exist', 'error');
+      }
+    }
+    
+    // Auto-run on load
+    window.addEventListener('load', runTest);
+  </script>
+</body>
+</html>

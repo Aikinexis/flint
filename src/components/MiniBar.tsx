@@ -30,7 +30,7 @@ export interface MiniBarProps {
 
 /**
  * MiniBar component - floating toolbar near text selection
- * Provides quick access to voice recording, summarization, and rewriting features
+ * Provides quick access to text generation, summarization, and rewriting features
  */
 export function MiniBar({
   position,
@@ -48,12 +48,12 @@ export function MiniBar({
 
   return (
     <div className="flint-minibar" style={style}>
-      {/* Record button with microphone icon */}
+      {/* Generate button with sparkles icon */}
       <button
         className="flint-icon-btn primary"
         onClick={onRecord}
-        title="Record voice"
-        aria-label="Record voice"
+        title="Generate text"
+        aria-label="Generate text"
       >
         <svg
           width="18"

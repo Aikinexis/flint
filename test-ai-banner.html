@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Availability Banner Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 20px;
+      background: #0c0e13;
+      color: #eef0f6;
+    }
+    .test-section {
+      margin-bottom: 40px;
+      padding: 20px;
+      background: #111421;
+      border-radius: 12px;
+    }
+    h2 {
+      margin-top: 0;
+      color: #f97316;
+    }
+    .status {
+      margin: 10px 0;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>AI Availability Banner Test</h1>
+  
+  <div class="test-section">
+    <h2>Test 1: All APIs Unavailable</h2>
+    <div id="test1"></div>
+    <div class="status">
+      Status: promptAPI=unavailable, summarizerAPI=unavailable, rewriterAPI=unavailable
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 2: APIs Need Download</h2>
+    <div id="test2"></div>
+    <div class="status">
+      Status: promptAPI=after-download, summarizerAPI=after-download, rewriterAPI=after-download
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 3: All APIs Available (No Banner)</h2>
+    <div id="test3"></div>
+    <div class="status">
+      Status: promptAPI=available, summarizerAPI=available, rewriterAPI=available
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 4: Mixed Status</h2>
+    <div id="test4"></div>
+    <div class="status">
+      Status: promptAPI=available, summarizerAPI=unavailable, rewriterAPI=after-download
+    </div>
+  </div>
+
+  <script type="module">
+    // Mock React for testing
+    window.React = {
+      createElement: (type, props, ...children) => {
+        if (typeof type === 'function') {
+          return type(props);
+        }
+        const element = document.createElement(type === 'div' ? 'div' : type);
+        if (props) {
+          Object.entries(props).forEach(([key, value]) => {
+            if (key === 'style' && typeof value === 'object') {
+              Object.assign(element.style, value);
+            } else if (key === 'className') {
+              element.className = value;
+            } else if (key.startsWith('aria-') || key === 'role') {
+              element.setAttribute(key, value);
+            } else if (key === 'children') {
+              // Handle children
+            } else if (key === 'href') {
+              element.href = value;
+            } else if (key === 'target') {
+              element.target = value;
+            } else if (key === 'rel') {
+              element.rel = value;
+            }
+          });
+        }
+        children.flat().forEach(child => {
+          if (typeof child === 'string') {
+            element.appendChild(document.createTextNode(child));
+          } else if (child) {
+            element.appendChild(child);
+          }
+        });
+        return element;
+      }
+    };
+
+    // Simple banner component for testing
+    function AIAvailabilityBanner({ availability }) {
+      const isUnavailable = 
+        availability.promptAPI === 'unavailable' ||
+        availability.summarizerAPI === 'unavailable' ||
+        availability.rewriterAPI === 'unavailable';
+      
+      const needsDownload = 
+        availability.promptAPI === 'after-download' ||
+        availability.summarizerAPI === 'after-download' ||
+        availability.rewriterAPI === 'after-download';
+
+      if (!isUnavailable && !needsDownload) {
+        const div = document.createElement('div');
+        div.textContent = 'No banner shown - all APIs available';
+        div.style.color = '#10b981';
+        div.style.padding = '12px';
+        return div;
+      }
+
+      const banner = document.createElement('div');
+      banner.style.padding = '12px 16px';
+      banner.style.borderRadius = '12px';
+      banner.style.backgroundColor = isUnavailable ? 'rgba(251, 146, 60, 0.1)' : 'rgba(59, 130, 246, 0.1)';
+      banner.style.border = isUnavailable ? '1px solid rgba(251, 146, 60, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)';
+      banner.style.color = '#eef0f6';
+      banner.style.fontSize = '13px';
+      banner.style.lineHeight = '1.5';
+
+      const title = document.createElement('div');
+      title.style.fontWeight = '600';
+      title.style.marginBottom = '4px';
+      title.style.color = isUnavailable ? '#fb923c' : '#3b82f6';
+      title.textContent = isUnavailable ? 'AI Features Unavailable' : 'AI Model Download Required';
+
+      const message = document.createElement('div');
+      message.style.marginBottom = '8px';
+      message.textContent = isUnavailable 
+        ? 'AI features require Chrome 128 or later with Gemini Nano enabled. The extension will use a mock provider to demonstrate functionality with example outputs.'
+        : 'Some AI features require downloading the Gemini Nano model. The download will start automatically when you use AI features. This may take a few minutes.';
+
+      const link = document.createElement('a');
+      link.href = 'https://developer.chrome.com/docs/ai/built-in';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.style.color = isUnavailable ? '#fb923c' : '#3b82f6';
+      link.style.textDecoration = 'underline';
+      link.style.fontWeight = '500';
+      link.textContent = isUnavailable ? 'View setup instructions →' : 'Learn more →';
+
+      banner.appendChild(title);
+      banner.appendChild(message);
+      banner.appendChild(link);
+
+      return banner;
+    }
+
+    // Test cases
+    document.getElementById('test1').appendChild(AIAvailabilityBanner({
+      availability: {
+        promptAPI: 'unavailable',
+        summarizerAPI: 'unavailable',
+        rewriterAPI: 'unavailable'
+      }
+    }));
+
+    document.getElementById('test2').appendChild(AIAvailabilityBanner({
+      availability: {
+        promptAPI: 'after-download',
+        summarizerAPI: 'after-download',
+        rewriterAPI: 'after-download'
+      }
+    }));
+
+    document.getElementById('test3').appendChild(AIAvailabilityBanner({
+      availability: {
+        promptAPI: 'available',
+        summarizerAPI: 'available',
+        rewriterAPI: 'available'
+      }
+    }));
+
+    document.getElementById('test4').appendChild(AIAvailabilityBanner({
+      availability: {
+        promptAPI: 'available',
+        summarizerAPI: 'unavailable',
+        rewriterAPI: 'after-download'
+      }
+    }));
+  </script>
+</body>
+</html>

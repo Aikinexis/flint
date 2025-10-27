@@ -21,15 +21,35 @@ export interface PinnedNote {
  */
 export interface HistoryItem {
   id: string;
-  type: 'voice' | 'summarize' | 'rewrite';
+  type: 'generate' | 'summarize' | 'rewrite';
   originalText: string;
   resultText: string;
   timestamp: number;
+  liked?: boolean;
   metadata?: {
     mode?: string;
     preset?: string;
     confidence?: number;
   };
+}
+
+/**
+ * Prompt history item interface for Generate panel
+ */
+export interface PromptHistoryItem {
+  id: string;
+  text: string;
+  timestamp: number;
+  pinned: boolean;
+}
+
+/**
+ * Generate settings interface for Generate panel configuration
+ */
+export interface GenerateSettings {
+  shortLength: number; // Word count target
+  mediumLength: number; // Word count target
+  contextAwarenessEnabled: boolean;
 }
 
 /**
@@ -167,9 +187,10 @@ class StorageServiceBase {
  * IndexedDB database name and version
  */
 const DB_NAME = 'flint-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const PINNED_NOTES_STORE = 'pinnedNotes';
 const HISTORY_STORE = 'history';
+const PROMPT_HISTORY_STORE = 'promptHistory';
 const MAX_STORAGE_MB = 40;
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -202,18 +223,26 @@ class IndexedDBHelper {
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
+        const oldVersion = event.oldVersion;
 
-        // Create pinned notes store
+        // Create pinned notes store (v1)
         if (!db.objectStoreNames.contains(PINNED_NOTES_STORE)) {
           const notesStore = db.createObjectStore(PINNED_NOTES_STORE, { keyPath: 'id' });
           notesStore.createIndex('updatedAt', 'updatedAt', { unique: false });
         }
 
-        // Create history store
+        // Create history store (v1)
         if (!db.objectStoreNames.contains(HISTORY_STORE)) {
           const historyStore = db.createObjectStore(HISTORY_STORE, { keyPath: 'id' });
           historyStore.createIndex('timestamp', 'timestamp', { unique: false });
           historyStore.createIndex('type', 'type', { unique: false });
+        }
+
+        // Create prompt history store (v2)
+        if (oldVersion < 2 && !db.objectStoreNames.contains(PROMPT_HISTORY_STORE)) {
+          const promptStore = db.createObjectStore(PROMPT_HISTORY_STORE, { keyPath: 'id' });
+          promptStore.createIndex('timestamp', 'timestamp', { unique: false });
+          promptStore.createIndex('pinned', 'pinned', { unique: false });
         }
       };
     });
@@ -441,6 +470,29 @@ export class StorageService extends StorageServiceBase {
   }
 
   /**
+   * Toggles the liked status of a history item
+   * @param id - History item ID
+   * @returns Promise resolving to updated item
+   */
+  static async toggleHistoryLiked(id: string): Promise<HistoryItem | undefined> {
+    try {
+      const item = await IndexedDBHelper.get<HistoryItem>(HISTORY_STORE, id);
+      if (!item) return undefined;
+
+      const updatedItem: HistoryItem = {
+        ...item,
+        liked: !item.liked,
+      };
+
+      await IndexedDBHelper.put(HISTORY_STORE, updatedItem);
+      return updatedItem;
+    } catch (error) {
+      console.error('[Storage] Failed to toggle history liked:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Clears all history items
    * @returns Promise resolving when clear is complete
    */
@@ -500,6 +552,184 @@ export class StorageService extends StorageServiceBase {
       }
     } catch (error) {
       console.error('[Storage] Failed to check storage:', error);
+    }
+  }
+
+  // ===== Prompt History Methods =====
+
+  /**
+   * Gets prompt history items with optional limit
+   * @param limit - Maximum number of items to return (default: all)
+   * @returns Promise resolving to array of prompt history items, sorted by pinned then timestamp
+   */
+  static async getPromptHistory(limit?: number): Promise<PromptHistoryItem[]> {
+    try {
+      const items = await IndexedDBHelper.getAll<PromptHistoryItem>(PROMPT_HISTORY_STORE);
+      // Sort by pinned (true first), then by most recent timestamp
+      const sorted = items.sort((a, b) => {
+        if (a.pinned !== b.pinned) {
+          return a.pinned ? -1 : 1;
+        }
+        return b.timestamp - a.timestamp;
+      });
+      return limit ? sorted.slice(0, limit) : sorted;
+    } catch (error) {
+      console.error('[Storage] Failed to get prompt history:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Saves a prompt to history
+   * @param text - The prompt text to save
+   * @returns Promise resolving when save is complete
+   */
+  static async savePromptToHistory(text: string): Promise<void> {
+    try {
+      // Get current items before adding new one
+      const allItems = await IndexedDBHelper.getAll<PromptHistoryItem>(PROMPT_HISTORY_STORE);
+      
+      // Check if we need to make room (max 4 items in recent history)
+      // If all 4 slots are pinned, don't save the new prompt
+      const pinnedCount = allItems.filter((item) => item.pinned).length;
+      if (allItems.length >= 4 && pinnedCount >= 4) {
+        console.log('[Storage] All 4 slots are pinned, not saving new prompt');
+        return;
+      }
+      
+      // If we have 4 items and at least one is unpinned, delete the oldest unpinned
+      if (allItems.length >= 4) {
+        const unpinnedItems = allItems
+          .filter((item) => !item.pinned)
+          .sort((a, b) => a.timestamp - b.timestamp);
+        
+        if (unpinnedItems.length > 0) {
+          await IndexedDBHelper.delete(PROMPT_HISTORY_STORE, unpinnedItems[0]!.id);
+        }
+      }
+
+      const newItem: PromptHistoryItem = {
+        id: generateId(),
+        text: text,
+        timestamp: Date.now(),
+        pinned: false,
+      };
+
+      await IndexedDBHelper.put(PROMPT_HISTORY_STORE, newItem);
+    } catch (error) {
+      console.error('[Storage] Failed to save prompt to history:', error);
+      // Don't throw - allow operation to continue without saving history
+    }
+  }
+
+  /**
+   * Toggles the pinned status of a prompt
+   * @param id - Prompt history item ID
+   * @returns Promise resolving when toggle is complete
+   */
+  static async togglePromptPin(id: string): Promise<void> {
+    try {
+      const item = await IndexedDBHelper.get<PromptHistoryItem>(PROMPT_HISTORY_STORE, id);
+      if (!item) {
+        console.warn('[Storage] Prompt history item not found:', id);
+        return;
+      }
+
+      const updatedItem: PromptHistoryItem = {
+        ...item,
+        pinned: !item.pinned,
+      };
+
+      await IndexedDBHelper.put(PROMPT_HISTORY_STORE, updatedItem);
+    } catch (error) {
+      console.error('[Storage] Failed to toggle prompt pin:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Deletes a prompt from history
+   * @param id - Prompt history item ID
+   * @returns Promise resolving when delete is complete
+   */
+  static async deletePromptFromHistory(id: string): Promise<void> {
+    try {
+      await IndexedDBHelper.delete(PROMPT_HISTORY_STORE, id);
+    } catch (error) {
+      console.error('[Storage] Failed to delete prompt from history:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cleans up old unpinned prompts (older than 30 days)
+   * @returns Promise resolving to number of items deleted
+   */
+  static async cleanupOldPrompts(): Promise<number> {
+    try {
+      const items = await IndexedDBHelper.getAll<PromptHistoryItem>(PROMPT_HISTORY_STORE);
+      const cutoffTime = Date.now() - THIRTY_DAYS_MS;
+      
+      // Only delete unpinned items older than 30 days
+      const oldUnpinnedItems = items.filter(
+        (item) => !item.pinned && item.timestamp < cutoffTime
+      );
+
+      for (const item of oldUnpinnedItems) {
+        await IndexedDBHelper.delete(PROMPT_HISTORY_STORE, item.id);
+      }
+
+      if (oldUnpinnedItems.length > 0) {
+        console.log(`[Storage] Cleaned up ${oldUnpinnedItems.length} old prompts`);
+      }
+
+      return oldUnpinnedItems.length;
+    } catch (error) {
+      console.error('[Storage] Failed to cleanup old prompts:', error);
+      return 0;
+    }
+  }
+
+  // ===== Generate Settings Methods =====
+
+  /**
+   * Default generate settings (word counts)
+   */
+  private static readonly DEFAULT_GENERATE_SETTINGS: GenerateSettings = {
+    shortLength: 100, // ~100 words
+    mediumLength: 300, // ~300 words
+    contextAwarenessEnabled: true,
+  };
+
+  /**
+   * Gets generate settings from chrome.storage.local
+   * @returns Promise resolving to generate settings
+   */
+  static async getGenerateSettings(): Promise<GenerateSettings> {
+    try {
+      const result = await chrome.storage.local.get('generateSettings');
+      if (result.generateSettings) {
+        // Merge with defaults to handle new settings added in updates
+        return { ...this.DEFAULT_GENERATE_SETTINGS, ...result.generateSettings };
+      }
+      return this.DEFAULT_GENERATE_SETTINGS;
+    } catch (error) {
+      console.error('[Storage] Failed to get generate settings:', error);
+      return this.DEFAULT_GENERATE_SETTINGS;
+    }
+  }
+
+  /**
+   * Saves generate settings to chrome.storage.local
+   * @param settings - The generate settings to save
+   * @returns Promise resolving when save is complete
+   */
+  static async saveGenerateSettings(settings: GenerateSettings): Promise<void> {
+    try {
+      await chrome.storage.local.set({ generateSettings: settings });
+    } catch (error) {
+      console.error('[Storage] Failed to save generate settings:', error);
+      throw error;
     }
   }
 }

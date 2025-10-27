@@ -1,0 +1,12 @@
+feat: check AI availability on panel load
+
+- Add AIAvailabilityBanner component to display status in Settings
+- Show warning when AI APIs are unavailable
+- Show info when APIs need download
+- Display link to setup instructions
+- Indicate when mock provider is being used
+- Hide banner when all APIs are available
+- Include detailed API status breakdown
+- Banner only appears in Settings panel
+
+Requirements: 10.1, 10.2

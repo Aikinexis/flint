@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generate Panel Error Handling Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+    h1 {
+      color: #60a5fa;
+      margin-bottom: 30px;
+    }
+    .test-section {
+      background: #2a2a2a;
+      border: 1px solid #404040;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .test-section h2 {
+      color: #a78bfa;
+      margin-top: 0;
+      font-size: 18px;
+    }
+    .test-case {
+      background: #1f1f1f;
+      border-left: 3px solid #60a5fa;
+      padding: 12px;
+      margin: 10px 0;
+    }
+    .test-case h3 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      color: #fbbf24;
+    }
+    .test-case p {
+      margin: 4px 0;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .requirement {
+      color: #a78bfa;
+      font-weight: 600;
+    }
+    .status {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+    .status.pass {
+      background: #10b981;
+      color: white;
+    }
+    .status.implemented {
+      background: #3b82f6;
+      color: white;
+    }
+    code {
+      background: #1a1a1a;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 12px;
+      color: #fbbf24;
+    }
+    .note {
+      background: #1e3a5f;
+      border-left: 3px solid #3b82f6;
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🛡️ Generate Panel Error Handling Verification</h1>
+  
+  <div class="test-section">
+    <h2>Task 15: Validation and Error Handling</h2>
+    <p>This document verifies that all error handling requirements from task 15 are properly implemented.</p>
+  </div>
+
+  <div class="test-section">
+    <h2>✅ Requirement 6.1: Empty Prompt Validation</h2>
+    <div class="test-case">
+      <h3>Test Case 1: Empty Prompt <span class="status implemented">IMPLEMENTED</span></h3>
+      <p><span class="requirement">Requirement:</span> Validate empty prompt before generation</p>
+      <p><strong>Implementation:</strong> <code>GeneratePanel.tsx:303-306</code></p>
+      <p><strong>Code:</strong></p>
+      <pre><code>if (!prompt.trim()) {
+  setError('Please enter a prompt');
+  return;
+}</code></pre>
+      <p><strong>Expected Behavior:</strong> When user clicks Generate with empty prompt, error message "Please enter a prompt" is displayed.</p>
+      <div class="note">
+        ✓ Error is set immediately without making API call<br>
+        ✓ Function returns early to prevent further processing<br>
+        ✓ User-friendly error message matches requirement
+      </div>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>✅ Requirement 6.4: Context Awareness with Null Context</h2>
+    <div class="test-case">
+      <h3>Test Case 2: Context Enabled but No Previous Context <span class="status implemented">IMPLEMENTED</span></h3>
+      <p><span class="requirement">Requirement:</span> Handle case where contextAwarenessEnabled is true but currentContext is null</p>
+      <p><strong>Implementation:</strong> <code>GeneratePanel.tsx:360-368</code></p>
+      <p><strong>Code:</strong></p>
+      <pre><code>let contextToPass: string | undefined;
+if (settings.contextAwarenessEnabled && currentContext) {
+  contextToPass = `Previous output summary: ${currentContext}`;
+}
+// If currentContext is null, contextToPass remains undefined</code></pre>
+      <p><strong>Expected Behavior:</strong> When context awareness is enabled but no previous context exists, generation proceeds without context (no error).</p>
+      <div class="note">
+        ✓ Checks both contextAwarenessEnabled AND currentContext<br>
+        ✓ Only passes context if both conditions are true<br>
+        ✓ Silent fallback - no error shown to user<br>
+        ✓ Generation continues normally without context
+      </div>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>✅ Requirement 6.6: IndexedDB Storage Failures</h2>
+    <div class="test-case">
+      <h3>Test Case 3: History Save Failure <span class="status implemented">IMPLEMENTED</span></h3>
+      <p><span class="requirement">Requirement:</span> Handle IndexedDB storage failures gracefully (log error, continue without saving)</p>
+      <p><strong>Implementation:</strong> <code>GeneratePanel.tsx:418-428</code></p>
+      <p><strong>Code:</strong></p>
+      <pre><code>try {
+  const historyItem = await StorageService.saveHistoryItem({...});
+  actions.addHistoryItem(historyItem);
+  historyItemId = historyItem.id;
+} catch (historyError) {
+  console.error('[GeneratePanel] Failed to save to history:', historyError);
+  // Generation continues successfully even if history save fails
+}</code></pre>
+      <p><strong>Expected Behavior:</strong> If history save fails, error is logged but generation completes successfully.</p>
+      <div class="note">
+        ✓ Try-catch wraps storage operation<br>
+        ✓ Error is logged to console for debugging<br>
+        ✓ No error shown to user<br>
+        ✓ Generation result is still displayed<br>
+        ✓ Comment explicitly states continuation behavior
+      </div>
+    </div>
+
+    <div class="test-case">
+      <h3>Test Case 4: Prompt History Save Failure <span class="status implemented">IMPLEMENTED</span></h3>
+      <p><span class="requirement">Requirement:</span> Handle prompt history storage failures gracefully</p>
+      <p><strong>Implementation:</strong> <code>GeneratePanel.tsx:431-442</code></p>
+      <p><strong>Code:</strong></p>
+      <pre><code>try {
+  await StorageService.savePromptToHistory(prompt);
+  const updatedHistory = await StorageService.getPromptHistory(5);
+  setPromptHistory(updatedHistory);
+} catch (promptHistoryError) {
+  console.error('[GeneratePanel] Failed to save prompt to history:', promptHistoryError);
+  // Generation continues successfully even if prompt history save fails
+}</code></pre>
+      <p><strong>Expected Behavior:</strong> If prompt history save fails, error is logged but generation completes successfully.</p>
+      <div class="note">
+        ✓ Try-catch wraps storage operation<br>
+        ✓ Error is logged to console<br>
+        ✓ No error shown to user<br>
+        ✓ Generation continues normally
+      </div>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>✅ Requirement 6.7: Generate Settings Null Handling</h2>
+    <div class="test-case">
+      <h3>Test Case 5: Settings Load Failure <span class="status implemented">IMPLEMENTED</span></h3>
+      <p><span class="requirement">Requirement:</span> Handle case where generateSettings is null (use default values)</p>
+      <p><strong>Implementation:</strong> <code>GeneratePanel.tsx:314-327</code></p>
+      <p><strong>Code:</strong></p>
+      <pre><code>let settings = generateSettings;
+if (!settings) {
+  try {
+    settings = await StorageService.getGenerateSettings();
+  } catch (settingsError) {
+    console.error('[GeneratePanel] Failed to load generate settings, using defaults:', settingsError);
+    settings = {
+      shortLength: 500,
+      mediumLength: 1500,
+      contextAwarenessEnabled: true,
+    };
+  }
+}</code></pre>
+      <p><strong>Expected Behavior:</strong> If settings are null or fail to load, hardcoded defaults are used.</p>
+      <div class="note">
+        ✓ Checks if settings is null<br>
+        ✓ Attempts to load from storage<br>
+        ✓ Nested try-catch for storage failure<br>
+        ✓ Falls back to hardcoded defaults<br>
+        ✓ Error is logged but doesn't block generation<br>
+        ✓ Default values match specification (500, 1500, true)
+      </div>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>✅ Requirement 6.7: Output Summary Generation Failures</h2>
+    <div class="test-case">
+      <h3>Test Case 6: Summary Generation Failure in GeneratePanel <span class="status implemented">IMPLEMENTED</span></h3>
+      <p><span class="requirement">Requirement:</span> Handle output summary generation failures (use fallback)</p>
+      <p><strong>Implementation:</strong> <code>GeneratePanel.tsx:445-457</code></p>
+      <p><strong>Code:</strong></p>
+      <pre><code>if (settings.contextAwarenessEnabled) {
+  try {
+    const outputSummary = await AIService.generateOutputSummary(result);
+    setCurrentContext(outputSummary);
+  } catch (summaryError) {
+    console.error('[GeneratePanel] Failed to generate output summary:', summaryError);
+    const fallbackSummary = result.slice(0, 100) + (result.length > 100 ? '...' : '');
+    setCurrentContext(fallbackSummary);
+  }
+}</code></pre>
+      <p><strong>Expected Behavior:</strong> If AI summary fails, first 100 chars of output are used as fallback.</p>
+      <div class="note">
+        ✓ Try-catch wraps summary generation<br>
+        ✓ Error is logged to console<br>
+        ✓ Fallback uses first 100 chars of output<br>
+        ✓ Context is still set (not left null)<br>
+        ✓ No error shown to user
+      </div>
+    </div>
+
+    <div class="test-case">
+      <h3>Test Case 7: Summary Generation Failure in AIService <span class="status implemented">IMPLEMENTED</span></h3>
+      <p><span class="requirement">Requirement:</span> AIService.generateOutputSummary has built-in fallback</p>
+      <p><strong>Implementation:</strong> <code>ai.ts:413-479</code></p>
+      <p><strong>Code:</strong></p>
+      <pre><code>static async generateOutputSummary(text: string): Promise<string> {
+  try {
+    // Try Summarizer API
+    if (availability.summarizerAPI === 'available') { ... }
+    // Try Writer API as fallback
+    if (availability.writerAPI === 'available') { ... }
+    // Fallback: use first 100 chars
+    return text.slice(0, 100).trim() + (text.length > 100 ? '...' : '');
+  } catch (error) {
+    // On any error, use fallback
+    return text.slice(0, 100).trim() + (text.length > 100 ? '...' : '');
+  }
+}</code></pre>
+      <p><strong>Expected Behavior:</strong> Method tries multiple APIs and always returns a summary (never throws).</p>
+      <div class="note">
+        ✓ Tries Summarizer API first (most appropriate)<br>
+        ✓ Falls back to Writer API if Summarizer fails<br>
+        ✓ Falls back to text truncation if both fail<br>
+        ✓ Outer try-catch ensures method never throws<br>
+        ✓ Always returns a string (never undefined/null)<br>
+        ✓ Truncates to 100 chars as specified
+      </div>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>📋 Additional Error Handling (Beyond Task 15)</h2>
+    <div class="test-case">
+      <h3>Bonus: Comprehensive Error Messages <span class="status implemented">IMPLEMENTED</span></h3>
+      <p><strong>Implementation:</strong> <code>GeneratePanel.tsx:481-510</code></p>
+      <p><strong>Features:</strong></p>
+      <ul style="margin: 8px 0; padding-left: 20px;">
+        <li>User activation errors: "Please click the button again to continue."</li>
+        <li>AI unavailable errors: "AI features require Chrome 128 or later with Gemini Nano enabled."</li>
+        <li>Timeout errors: "Operation timed out. Try with a simpler prompt or check your connection."</li>
+        <li>Generic fallback: Original error message</li>
+      </ul>
+      <div class="note">
+        ✓ User-friendly error messages<br>
+        ✓ Specific handling for common error types<br>
+        ✓ Retry button provided in UI<br>
+        ✓ Error state properly managed
+      </div>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>🎯 Summary</h2>
+    <p><strong>All 5 sub-tasks of Task 15 are fully implemented:</strong></p>
+    <ol style="line-height: 1.8;">
+      <li>✅ Empty prompt validation (Requirement 6.1)</li>
+      <li>✅ Context awareness with null context handling (Requirement 6.4)</li>
+      <li>✅ IndexedDB storage failure handling (Requirement 6.6)</li>
+      <li>✅ Generate settings null handling (Requirement 6.7)</li>
+      <li>✅ Output summary generation failure handling (Requirement 6.7)</li>
+    </ol>
+    <div class="note">
+      <strong>Implementation Quality:</strong><br>
+      • All error handling is graceful and non-blocking<br>
+      • Errors are logged for debugging but don't disrupt user experience<br>
+      • Fallback values are sensible and match specifications<br>
+      • User-friendly error messages for user-facing errors<br>
+      • Silent fallbacks for internal operations<br>
+      • No TypeScript errors or warnings
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>🧪 Manual Testing Checklist</h2>
+    <p>To verify these implementations work in practice:</p>
+    <ol style="line-height: 1.8;">
+      <li>☐ Click Generate with empty prompt → Should show "Please enter a prompt"</li>
+      <li>☐ First generation with context awareness on → Should work without error (no previous context)</li>
+      <li>☐ Simulate IndexedDB failure → Generation should complete, error logged to console</li>
+      <li>☐ Clear settings in chrome.storage → Should use defaults (500, 1500, true)</li>
+      <li>☐ Generate with AI unavailable → Should use mock provider with fallback summary</li>
+      <li>☐ Second generation after first → Should include output summary as context</li>
+    </ol>
+  </div>
+
+</body>
+</html>

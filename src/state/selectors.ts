@@ -273,7 +273,7 @@ export const selectHistoryItemById = (state: AppState, id: string): HistoryItem 
  * @returns Filtered history items
  */
 export const selectHistoryByType = memoizeWithParams(
-  (state: AppState, type: 'voice' | 'summarize' | 'rewrite'): HistoryItem[] => {
+  (state: AppState, type: 'generate' | 'summarize' | 'rewrite'): HistoryItem[] => {
     return state.history.filter((item) => item.type === type);
   }
 );
@@ -323,13 +323,13 @@ export const selectRecentHistory = memoizeWithParams(
 export const selectHistoryStats = memoize(
   (state: AppState): {
     total: number;
-    voice: number;
+    generate: number;
     summarize: number;
     rewrite: number;
   } => {
     const stats = {
       total: state.history.length,
-      voice: 0,
+      generate: 0,
       summarize: 0,
       rewrite: 0,
     };

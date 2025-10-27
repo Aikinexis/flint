@@ -353,7 +353,7 @@ class ContentScriptCoordinator {
     this.miniBarInjector.show(position, {
       onRecord: () => {
         console.log('[Flint] Record button clicked');
-        this.sendMessageToPanel('OPEN_VOICE_TAB');
+        this.sendMessageToPanel('OPEN_GENERATE_TAB');
       },
       onSummarize: () => {
         console.log('[Flint] Summarize button clicked');

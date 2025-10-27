@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
-import { copyFileSync, mkdirSync, readdirSync, existsSync } from 'fs';
+import { copyFileSync, mkdirSync, readdirSync, existsSync, readFileSync, writeFileSync } from 'fs';
 
 export default defineConfig({
+  base: './',
   plugins: [
     react(),
     {
@@ -11,6 +12,15 @@ export default defineConfig({
       closeBundle() {
         // Copy manifest.json to dist
         copyFileSync('manifest.json', 'dist/manifest.json');
+        
+        // Move index.html from dist/src/panel to dist and fix paths
+        if (existsSync('dist/src/panel/index.html')) {
+          let html = readFileSync('dist/src/panel/index.html', 'utf-8');
+          // Fix relative paths: ../../panel.js -> ./panel.js
+          html = html.replace(/src="\.\.\/\.\.\//g, 'src="./');
+          html = html.replace(/href="\.\.\/\.\.\//g, 'href="./');
+          writeFileSync('dist/index.html', html);
+        }
         
         // Copy icons folder to dist
         const iconsDir = 'icons';
@@ -36,7 +46,7 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        panel: resolve(__dirname, 'src/panel/index.html'),
+        index: resolve(__dirname, 'src/panel/index.html'),
         background: resolve(__dirname, 'src/background/background.ts'),
         content: resolve(__dirname, 'src/content/contentScript.ts'),
       },
@@ -44,18 +54,21 @@ export default defineConfig({
         entryFileNames: (chunkInfo) => {
           // Place files in their respective directories
           if (chunkInfo.name === 'background') {
-            return 'src/background/[name].js';
+            return 'background.js';
           }
           if (chunkInfo.name === 'content') {
-            return 'src/content/[name].js';
+            return 'content.js';
           }
-          return 'src/[name]/[name].js';
+          if (chunkInfo.name === 'index') {
+            return 'panel.js';
+          }
+          return '[name].js';
         },
         chunkFileNames: 'chunks/[name].[hash].js',
         assetFileNames: (assetInfo) => {
-          // Keep panel assets in panel directory
+          // Keep panel assets in same directory
           if (assetInfo.name?.endsWith('.css')) {
-            return 'src/panel/[name][extname]';
+            return '[name][extname]';
           }
           return 'assets/[name][extname]';
         },

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Flint",
   "version": "1.0.0",
-  "description": "Voice-to-text, summarization, and rewriting with local AI",
+  "description": "Text generation, summarization, and rewriting with local AI",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -18,10 +18,10 @@
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "src/background/background.js"
+    "service_worker": "background.js"
   },
   "side_panel": {
-    "default_path": "src/panel/index.html"
+    "default_path": "index.html"
   },
   "action": {
     "default_title": "Open Flint",
@@ -44,7 +44,7 @@
         "default": "Ctrl+Shift+R",
         "mac": "Command+Shift+R"
       },
-      "description": "Start voice recording"
+      "description": "Open generate panel"
     },
     "summarize": {
       "suggested_key": {

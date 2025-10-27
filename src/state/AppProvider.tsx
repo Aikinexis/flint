@@ -214,6 +214,7 @@ export function AppProvider({ children }: AppProviderProps) {
         promptAPI: 'unavailable',
         summarizerAPI: 'unavailable',
         rewriterAPI: 'unavailable',
+        writerAPI: 'unavailable',
       });
     }
   }, [setAIAvailability]);

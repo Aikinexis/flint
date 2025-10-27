@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prompt API Debug Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 20px;
+      background: #0c0e13;
+      color: #eef0f6;
+    }
+    .test-result {
+      margin: 20px 0;
+      padding: 15px;
+      background: #111421;
+      border-radius: 8px;
+      border: 1px solid #333;
+    }
+    .success { border-color: #10b981; }
+    .error { border-color: #ef4444; }
+    .warning { border-color: #fb923c; }
+    pre {
+      background: #000;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    button {
+      padding: 10px 20px;
+      background: #f97316;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 5px;
+    }
+    button:hover {
+      background: #ea580c;
+    }
+  </style>
+</head>
+<body>
+  <h1>Prompt API Debug Test</h1>
+  
+  <div>
+    <button onclick="testPromptAPI()">Test Prompt API</button>
+    <button onclick="testAllAPIs()">Test All APIs</button>
+    <button onclick="clearResults()">Clear Results</button>
+  </div>
+
+  <div id="results"></div>
+
+  <script>
+    function addResult(title, content, type = 'info') {
+      const resultsDiv = document.getElementById('results');
+      const resultDiv = document.createElement('div');
+      resultDiv.className = `test-result ${type}`;
+      resultDiv.innerHTML = `
+        <h3>${title}</h3>
+        <pre>${content}</pre>
+      `;
+      resultsDiv.appendChild(resultDiv);
+    }
+
+    function clearResults() {
+      document.getElementById('results').innerHTML = '';
+    }
+
+    async function testPromptAPI() {
+      clearResults();
+      
+      // Test 1: Check if window.ai exists
+      addResult(
+        'Test 1: window.ai exists?',
+        `'ai' in window: ${('ai' in window)}\nwindow.ai: ${window.ai}`,
+        ('ai' in window) ? 'success' : 'error'
+      );
+
+      if (!('ai' in window)) {
+        addResult(
+          'Error',
+          'window.ai is not available. Make sure you have:\n' +
+          '1. Chrome 128 or later\n' +
+          '2. Enabled chrome://flags/#prompt-api-for-gemini-nano\n' +
+          '3. Enabled chrome://flags/#optimization-guide-on-device-model',
+          'error'
+        );
+        return;
+      }
+
+      // Test 2: Check canCreateTextSession method
+      const ai = (window as any).ai;
+      addResult(
+        'Test 2: ai.canCreateTextSession exists?',
+        `typeof ai.canCreateTextSession: ${typeof ai.canCreateTextSession}\nai.canCreateTextSession: ${ai.canCreateTextSession}`,
+        (typeof ai.canCreateTextSession === 'function') ? 'success' : 'error'
+      );
+
+      if (typeof ai.canCreateTextSession !== 'function') {
+        addResult(
+          'Error',
+          'ai.canCreateTextSession is not a function',
+          'error'
+        );
+        return;
+      }
+
+      // Test 3: Call canCreateTextSession
+      try {
+        const status = await ai.canCreateTextSession();
+        addResult(
+          'Test 3: canCreateTextSession() result',
+          `Status: ${status}\nType: ${typeof status}`,
+          status === 'readily' ? 'success' : status === 'after-download' ? 'warning' : 'error'
+        );
+
+        if (status === 'readily') {
+          addResult(
+            'Success!',
+            'Prompt API is available and ready to use',
+            'success'
+          );
+        } else if (status === 'after-download') {
+          addResult(
+            'Download Required',
+            'Prompt API requires downloading the Gemini Nano model',
+            'warning'
+          );
+        } else {
+          addResult(
+            'Unavailable',
+            `Prompt API returned status: ${status}`,
+            'error'
+          );
+        }
+      } catch (error) {
+        addResult(
+          'Test 3: canCreateTextSession() error',
+          `Error: ${error.message}\nStack: ${error.stack}`,
+          'error'
+        );
+      }
+
+      // Test 4: Try to create a session (requires user activation)
+      try {
+        addResult(
+          'Test 4: Attempting to create session',
+          'This requires user activation (button click)...',
+          'info'
+        );
+        
+        const session = await ai.createTextSession();
+        addResult(
+          'Test 4: Session created!',
+          `Session: ${session}\nType: ${typeof session}`,
+          'success'
+        );
+
+        // Test 5: Try a simple prompt
+        try {
+          const result = await session.prompt('Say hello');
+          addResult(
+            'Test 5: Prompt result',
+            `Result: ${result}`,
+            'success'
+          );
+        } catch (error) {
+          addResult(
+            'Test 5: Prompt error',
+            `Error: ${error.message}`,
+            'error'
+          );
+        }
+      } catch (error) {
+        addResult(
+          'Test 4: Session creation error',
+          `Error: ${error.message}\n\nThis is expected if:\n- Model is not downloaded yet\n- User activation is required`,
+          'warning'
+        );
+      }
+    }
+
+    async function testAllAPIs() {
+      clearResults();
+
+      // Test Prompt API
+      addResult('Testing Prompt API...', '', 'info');
+      try {
+        if ('ai' in window && typeof (window as any).ai.canCreateTextSession === 'function') {
+          const status = await (window as any).ai.canCreateTextSession();
+          addResult(
+            'Prompt API',
+            `Status: ${status}\nMapped: ${status === 'readily' ? 'available' : status === 'after-download' ? 'after-download' : 'unavailable'}`,
+            status === 'readily' ? 'success' : 'warning'
+          );
+        } else {
+          addResult('Prompt API', 'Not found in window.ai', 'error');
+        }
+      } catch (error) {
+        addResult('Prompt API', `Error: ${error.message}`, 'error');
+      }
+
+      // Test Summarizer API
+      addResult('Testing Summarizer API...', '', 'info');
+      try {
+        if ('Summarizer' in self) {
+          const status = await (self as any).Summarizer.availability();
+          addResult(
+            'Summarizer API',
+            `Status: ${status}\nMapped: ${status === 'available' ? 'available' : status === 'downloadable' ? 'after-download' : 'unavailable'}`,
+            status === 'available' ? 'success' : 'warning'
+          );
+        } else {
+          addResult('Summarizer API', 'Not found in self', 'error');
+        }
+      } catch (error) {
+        addResult('Summarizer API', `Error: ${error.message}`, 'error');
+      }
+
+      // Test Rewriter API
+      addResult('Testing Rewriter API...', '', 'info');
+      try {
+        if ('Rewriter' in self) {
+          const status = await (self as any).Rewriter.availability();
+          addResult(
+            'Rewriter API',
+            `Status: ${status}\nMapped: ${status === 'available' ? 'available' : status === 'downloadable' ? 'after-download' : 'unavailable'}`,
+            status === 'available' ? 'success' : 'warning'
+          );
+        } else {
+          addResult('Rewriter API', 'Not found in self', 'error');
+        }
+      } catch (error) {
+        addResult('Rewriter API', `Error: ${error.message}`, 'error');
+      }
+    }
+
+    // Auto-run on load
+    window.addEventListener('load', () => {
+      addResult(
+        'Page Loaded',
+        'Click "Test Prompt API" to run detailed tests\nClick "Test All APIs" to check all three APIs',
+        'info'
+      );
+    });
+  </script>
+</body>
+</html>

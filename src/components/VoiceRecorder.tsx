@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { SpeechService, SpeechError } from '../services/speech';
+import { messagingService } from '../services/messaging';
 
 /**
  * VoiceRecorder component props
@@ -105,7 +106,7 @@ export function VoiceRecorder({
 
   /**
    * Handles insert button click
-   * Sends INSERT_TEXT message to content script via background worker
+   * Sends INSERT_TEXT message to content script via messaging service
    */
   const handleInsert = async () => {
     if (!finalTranscript) {
@@ -113,19 +114,15 @@ export function VoiceRecorder({
     }
 
     try {
-      // Send INSERT_TEXT message to background worker
-      const response = await chrome.runtime.sendMessage({
-        type: 'INSERT_TEXT',
-        payload: { text: finalTranscript },
-        source: 'panel'
-      });
+      // Use messaging service to insert text
+      const result = await messagingService.insertText(finalTranscript);
 
-      if (response && response.success) {
+      if (result.success) {
         // Show success feedback
-        console.log('[VoiceRecorder] Text inserted successfully:', response.data?.message);
+        console.log('[VoiceRecorder] Text inserted successfully:', result.data);
         
         // If clipboard fallback was used, show a different message
-        if (response.data?.usedClipboard) {
+        if (result.usedClipboard) {
           setError('Text copied to clipboard. Please paste it manually.');
         } else {
           // Clear transcript after successful insertion
@@ -138,13 +135,14 @@ export function VoiceRecorder({
         }
       } else {
         // Show error message
-        const errorMessage = response?.error || 'Failed to insert text';
+        const errorMessage = result.error || 'Failed to insert text';
         console.error('[VoiceRecorder] Insert failed:', errorMessage);
         setError(errorMessage);
       }
     } catch (error) {
-      console.error('[VoiceRecorder] Error sending insert message:', error);
-      setError('Failed to insert text. Please try again.');
+      console.error('[VoiceRecorder] Error inserting text:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to insert text. Please try again.';
+      setError(errorMessage);
     }
   };
 
@@ -189,10 +187,66 @@ export function VoiceRecorder({
 
   return (
     <div className="flint-section flex flex-col h-full">
-      <h2 className="flint-section-header">Voice to text</h2>
+      <h2 className="flint-section-header">Generate</h2>
 
       {/* Transcript Area - scrollable, no border */}
-      <div className="flex-1 flex flex-col min-h-0" style={{ marginBottom: '16px' }}>
+      <div className="flex-1 flex flex-col min-h-0" style={{ marginBottom: '16px', position: 'relative', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+        {/* Clear button - top right, always show when there's any text */}
+        {(finalTranscript.trim() || partialTranscript.trim()) && (
+          <button
+            onClick={handleClear}
+            disabled={isRecording}
+            aria-label="Clear transcript"
+            title="Clear all"
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              width: '28px',
+              height: '28px',
+              padding: '0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              background: 'var(--bg)',
+              color: 'var(--text-muted)',
+              cursor: isRecording ? 'not-allowed' : 'pointer',
+              borderRadius: 'var(--radius-sm)',
+              transition: 'all 0.15s ease',
+              zIndex: 100,
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+            }}
+            onMouseEnter={(e) => {
+              if (!isRecording) {
+                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                e.currentTarget.style.color = '#ef4444';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isRecording) {
+                e.currentTarget.style.background = 'var(--bg)';
+                e.currentTarget.style.color = 'var(--text-muted)';
+              }
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        )}
+        
         <div 
           style={{ 
             width: '100%',
@@ -230,14 +284,40 @@ export function VoiceRecorder({
       {/* Transcribe Button */}
       <div style={{ marginBottom: '16px' }}>
         <button
-          className={`flint-btn ${isRecording ? 'recording' : 'primary'}`}
+          className={`flint-btn ${isRecording ? 'recording' : 'primary'} transcribe-btn`}
           onClick={handleRecord}
           aria-label={isRecording ? 'Stop transcribing' : 'Start transcribing'}
           aria-live="polite"
-          style={{ width: '100%' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.setAttribute('data-hovered', 'true');
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.removeAttribute('data-hovered');
+          }}
+          style={{ 
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            overflow: 'hidden',
+            transition: 'all 0.2s ease',
+            border: isRecording ? undefined : 'none',
+            boxShadow: isRecording ? undefined : 'none',
+          }}
         >
           {renderMicIcon()}
-          {isRecording ? 'Stop' : 'Transcribe'}
+          <span
+            style={{
+              maxWidth: isRecording ? '100px' : '0',
+              opacity: isRecording ? 1 : 0,
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap',
+            }}
+            className="transcribe-text"
+          >
+            {isRecording ? 'Stop' : 'Transcribe'}
+          </span>
         </button>
       </div>
 
@@ -383,4 +463,28 @@ export function VoiceRecorder({
       )}
     </div>
   );
+}
+
+// Add hover styles for transcribe button
+const style = document.createElement('style');
+style.textContent = `
+  .transcribe-btn:not(.recording) {
+    border: none !important;
+    box-shadow: none !important;
+  }
+  
+  .transcribe-btn:not(.recording):hover,
+  .transcribe-btn:not(.recording):focus-visible {
+    border: 1px solid var(--primary) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  }
+  
+  .flint-btn[data-hovered] .transcribe-text {
+    max-width: 100px !important;
+    opacity: 1 !important;
+  }
+`;
+if (!document.getElementById('voice-recorder-styles')) {
+  style.id = 'voice-recorder-styles';
+  document.head.appendChild(style);
 }

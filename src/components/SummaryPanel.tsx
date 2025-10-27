@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import type { PinnedNote } from '../services/storage';
+import { StorageService } from '../services/storage';
 import { AIService } from '../services/ai';
+import { VersionCarousel, type Version } from './VersionCarousel';
+import { useAppState } from '../state';
 
 /**
  * SummaryPanel component props
@@ -30,7 +33,7 @@ type SummaryMode = 'bullets' | 'paragraph' | 'brief';
 /**
  * Reading level options
  */
-type ReadingLevel = 'elementary' | 'middle-school' | 'high-school' | 'college';
+type ReadingLevel = 'simple' | 'moderate' | 'detailed' | 'complex';
 
 /**
  * SummaryPanel component for text summarization
@@ -41,25 +44,83 @@ export function SummaryPanel({
   pinnedNotes = [],
   onSummaryComplete,
 }: SummaryPanelProps) {
+  // Get app state and actions for updating history
+  const { state, actions } = useAppState();
+  
   // Component state
-  const [inputText, setInputText] = useState(initialText);
   const [mode, setMode] = useState<SummaryMode>('bullets');
-  const [readingLevel, setReadingLevel] = useState<ReadingLevel>('high-school');
-  const [summary, setSummary] = useState('');
+  const [readingLevel, setReadingLevel] = useState<ReadingLevel>('moderate');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMockProvider, setIsMockProvider] = useState(false);
-  const [showCopySuccess, setShowCopySuccess] = useState(false);
+  
+  // Version carousel state - initialize with empty version
+  const [versions, setVersions] = useState<Version[]>(() => [{
+    id: `original-${Date.now()}`,
+    text: initialText,
+    label: 'Original',
+    isOriginal: true,
+    isLiked: false,
+    timestamp: Date.now(),
+  }]);
+  const [currentVersionIndex, setCurrentVersionIndex] = useState(0);
+  const [wordCount, setWordCount] = useState(0);
+  const [charCount, setCharCount] = useState(0);
 
-  // Load selected text from storage when component mounts
+  // Load selected text from storage when component mounts (only once)
   useEffect(() => {
+    let mounted = true;
+    
     chrome.storage.local.get('flint.selectedText').then((result) => {
+      if (!mounted) return;
+      
       if (result['flint.selectedText']) {
-        setInputText(result['flint.selectedText']);
+        const text = result['flint.selectedText'];
+        // Replace with version containing selected text
+        setVersions([{
+          id: `original-${Date.now()}`,
+          text,
+          label: 'Original',
+          isOriginal: true,
+          isLiked: false,
+          timestamp: Date.now(),
+        }]);
+        setCurrentVersionIndex(0);
         // Clear the stored text after loading
         chrome.storage.local.remove('flint.selectedText');
       }
     });
+    
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Listen for history clear events
+  useEffect(() => {
+    const handleStorageChange = (
+      changes: { [key: string]: chrome.storage.StorageChange },
+      areaName: string
+    ) => {
+      if (areaName === 'local' && changes['flint.historyClearedAt']) {
+        console.log('[SummaryPanel] History cleared, resetting versions');
+        // Reset versions to empty original version
+        setVersions([{
+          id: `original-${Date.now()}`,
+          text: '',
+          label: 'Original',
+          isOriginal: true,
+          isLiked: false,
+          timestamp: Date.now(),
+        }]);
+        setCurrentVersionIndex(0);
+      }
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    return () => {
+      chrome.storage.onChanged.removeListener(handleStorageChange);
+    };
   }, []);
 
   /**
@@ -81,16 +142,17 @@ export function SummaryPanel({
    * Validates input and triggers summarize operation
    */
   const handleSummarize = async () => {
+    const currentVersion = versions[currentVersionIndex];
+    
     // Validate that we have text
-    if (!inputText.trim()) {
+    if (!currentVersion || !currentVersion.text.trim()) {
       setError('Please enter text to summarize');
       return;
     }
 
-    // Clear previous error and results
+    // Clear previous error
     setError(null);
     setIsMockProvider(false);
-    setSummary('');
     setIsProcessing(true);
 
     try {
@@ -106,23 +168,54 @@ export function SummaryPanel({
       const pinnedNotesContent = pinnedNotes.map(note => `${note.title}: ${note.content}`);
 
       // Call AI service with timeout
-      const summarizePromise = AIService.summarize(inputText, {
+      const summarizePromise = AIService.summarize(currentVersion.text, {
         mode,
         readingLevel,
         pinnedNotes: pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
       });
 
-      // Add 5 second timeout
+      // Add 60 second timeout
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Operation timed out after 5 seconds')), 5000)
+        setTimeout(() => reject(new Error('Operation timed out after 60 seconds')), 60000)
       );
 
       const summaryResult = await Promise.race([summarizePromise, timeoutPromise]);
 
       console.log('[SummaryPanel] Summarize completed successfully');
 
-      // Store summary in state
-      setSummary(summaryResult);
+      // Save to history
+      let historyItemId: string | undefined;
+      try {
+        const historyItem = await StorageService.saveHistoryItem({
+          type: 'summarize',
+          originalText: currentVersion.text,
+          resultText: summaryResult,
+          metadata: {
+            mode,
+          },
+        });
+        // Update app state with new history item
+        actions.addHistoryItem(historyItem);
+        historyItemId = historyItem.id;
+      } catch (historyError) {
+        console.error('[SummaryPanel] Failed to save to history:', historyError);
+      }
+
+      // Create new version and add to carousel
+      const modeLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
+      const newVersion: Version = {
+        id: `summary-${Date.now()}`,
+        text: summaryResult,
+        label: `Summary ${versions.length}`,
+        title: `${modeLabel} - ${readingLevel}`,
+        isOriginal: false,
+        isLiked: false,
+        timestamp: Date.now(),
+        historyId: historyItemId,
+      };
+
+      setVersions(prev => [...prev, newVersion]);
+      setCurrentVersionIndex(versions.length); // Navigate to new version
 
       // Call completion callback if provided
       if (onSummaryComplete) {
@@ -145,7 +238,7 @@ export function SummaryPanel({
         }
         // Timeout error
         else if (message.includes('timed out') || message.includes('timeout')) {
-          errorMessage = 'Operation timed out after 5 seconds. Try with shorter text or check your connection.';
+          errorMessage = 'Operation timed out after 60 seconds. Try with shorter text or check your connection.';
         }
         // Generic error with original message
         else {
@@ -171,118 +264,146 @@ export function SummaryPanel({
   };
 
   /**
+   * Handles version navigation
+   */
+  const handleNavigate = (index: number) => {
+    setCurrentVersionIndex(index);
+  };
+
+  /**
+   * Handles version deletion
+   */
+  const handleDelete = (id: string) => {
+    setVersions(prev => prev.filter(v => v.id !== id));
+  };
+
+  /**
+   * Handles version like toggle
+   */
+  const handleToggleLike = async (id: string) => {
+    // Find the version to get its history ID
+    const version = versions.find((v) => v.id === id);
+    console.log('[SummaryPanel] Toggle like for version:', id, 'historyId:', version?.historyId);
+    
+    // Update version state
+    setVersions(prev => prev.map(v => 
+      v.id === id ? { ...v, isLiked: !v.isLiked } : v
+    ));
+    
+    // Update history if this version has a history ID
+    if (version?.historyId) {
+      try {
+        console.log('[SummaryPanel] Updating history item:', version.historyId);
+        const updatedHistoryItem = await StorageService.toggleHistoryLiked(version.historyId);
+        console.log('[SummaryPanel] History item updated successfully');
+        
+        // Update app state history to reflect the change
+        if (updatedHistoryItem) {
+          actions.setHistory(
+            state.history.map((item) =>
+              item.id === version.historyId ? updatedHistoryItem : item
+            )
+          );
+        }
+      } catch (error) {
+        console.error('[SummaryPanel] Failed to update history liked status:', error);
+      }
+    } else {
+      console.warn('[SummaryPanel] No historyId found for version:', id);
+    }
+  };
+
+  /**
+   * Handles version edit
+   */
+  const handleEdit = (id: string, newText: string) => {
+    setVersions(prev => prev.map(v => 
+      v.id === id ? { ...v, text: newText } : v
+    ));
+  };
+
+  /**
+   * Handles title edit
+   */
+  const handleEditTitle = (id: string, newTitle: string) => {
+    setVersions(prev => prev.map(v => 
+      v.id === id ? { ...v, title: newTitle } : v
+    ));
+  };
+
+  /**
    * Handles clear button click
    * Resets all state to initial values
    */
   const handleClear = () => {
-    setInputText('');
-    setSummary('');
+    setVersions([{
+      id: `original-${Date.now()}`,
+      text: '',
+      label: 'Original',
+      isOriginal: true,
+      isLiked: false,
+      timestamp: Date.now(),
+    }]);
+    setCurrentVersionIndex(0);
     setError(null);
     setIsMockProvider(false);
   };
 
   /**
-   * Handles copy to clipboard button click
-   * Copies summary to clipboard and shows success feedback for 2 seconds
+   * Handles copy button click from carousel
    */
-  const handleCopy = async () => {
-    if (!summary) return;
-
-    try {
-      await navigator.clipboard.writeText(summary);
-      setShowCopySuccess(true);
-
-      // Hide checkmark after 2 seconds
-      setTimeout(() => {
-        setShowCopySuccess(false);
-      }, 2000);
-
-      console.log('[SummaryPanel] Summary copied to clipboard');
-    } catch (err) {
-      console.error('[SummaryPanel] Failed to copy to clipboard:', err);
-      
-      // Show error message
-      setError('Failed to copy to clipboard. Please try again or copy manually.');
-      
-      // Clear error after 3 seconds
-      setTimeout(() => {
-        setError(null);
-      }, 3000);
-    }
+  const handleCopy = (id: string) => {
+    console.log('[SummaryPanel] Text copied to clipboard:', id);
   };
 
   /**
-   * Formats summary text based on selected mode
-   * Applies appropriate styling for bullets, paragraph, or outline
+   * Handles text change from carousel (for counter display)
    */
-  const formatSummary = (text: string, summaryMode: SummaryMode) => {
-    if (!text) return null;
-
-    // For bullets mode, ensure proper list formatting
-    if (summaryMode === 'bullets') {
-      const lines = text.split('\n').filter(line => line.trim());
-      return (
-        <ul style={{ 
-          margin: 0, 
-          paddingLeft: '20px',
-          listStyleType: 'disc',
-        }}>
-          {lines.map((line, index) => {
-            // Remove leading bullet characters if present
-            const cleanLine = line.replace(/^[•\-*]\s*/, '').trim();
-            return cleanLine ? (
-              <li key={index} style={{ marginBottom: '8px' }}>
-                {cleanLine}
-              </li>
-            ) : null;
-          })}
-        </ul>
-      );
-    }
-
-    // For brief mode, display as simple text (headline style)
-    if (summaryMode === 'brief') {
-      return (
-        <p style={{ 
-          margin: 0,
-          lineHeight: '1.6',
-          fontSize: 'var(--fs-lg)',
-          fontWeight: 500,
-        }}>
-          {text.trim()}
-        </p>
-      );
-    }
-
-    // For paragraph mode, preserve line breaks and paragraphs
-    const paragraphs = text.split('\n\n').filter(p => p.trim());
-    return (
-      <div style={{ margin: 0 }}>
-        {paragraphs.map((paragraph, index) => (
-          <p key={index} style={{ 
-            margin: index > 0 ? '12px 0 0 0' : 0,
-            lineHeight: '1.6',
-          }}>
-            {paragraph.trim()}
-          </p>
-        ))}
-      </div>
-    );
+  const handleTextChange = (words: number, chars: number) => {
+    setWordCount(words);
+    setCharCount(chars);
   };
 
   return (
     <div className="flint-section flex flex-col h-full">
-      <h2 className="flint-section-header">Summarize text</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <h2 className="flint-section-header" style={{ marginBottom: 0 }}>Summarize text</h2>
+        {versions.length > 0 && (
+          <div
+            style={{
+              fontSize: 'var(--fs-xs)',
+              color: 'var(--text-muted)',
+              fontWeight: 500,
+              userSelect: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+            aria-label={`${wordCount} ${wordCount === 1 ? 'word' : 'words'}, ${charCount} ${charCount === 1 ? 'character' : 'characters'}`}
+          >
+            <span>{wordCount}w</span>
+            <span style={{ opacity: 0.5 }}>·</span>
+            <span>{charCount}c</span>
+          </div>
+        )}
+      </div>
 
-      {/* Input textarea - scrollable */}
+      {/* Version carousel - replaces the original text field */}
       <div className="flex-1 flex flex-col min-h-0" style={{ marginBottom: '16px' }}>
-        <textarea
-          className="flint-textarea w-full h-full resize-none"
+        <VersionCarousel
+          versions={versions}
+          currentIndex={currentVersionIndex}
+          onNavigate={handleNavigate}
+          onDelete={handleDelete}
+          onToggleLike={handleToggleLike}
+          onCopy={handleCopy}
+          onClearAll={handleClear}
+          onEdit={handleEdit}
+          onEditTitle={handleEditTitle}
+          onTextChange={handleTextChange}
+          isLoading={isProcessing}
           placeholder="Paste or type text to summarize..."
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          disabled={isProcessing}
-          aria-label="Text to summarize"
+          alwaysShowActions={true}
         />
       </div>
 
@@ -357,21 +478,21 @@ export function SummaryPanel({
             backgroundSize: '12px',
           }}
         >
-          <option value="elementary">Elementary</option>
-          <option value="middle-school">Middle School</option>
-          <option value="high-school">High School</option>
-          <option value="college">College</option>
+          <option value="simple">Simple</option>
+          <option value="moderate">Moderate</option>
+          <option value="detailed">Detailed</option>
+          <option value="complex">Complex</option>
         </select>
       </div>
 
-      {/* Action buttons */}
-      <div className="flint-button-group" style={{ marginBottom: '16px' }}>
+      {/* Action button */}
+      <div style={{ marginBottom: '16px' }}>
         <button
           className="flint-btn primary"
           onClick={handleSummarize}
           disabled={isProcessing}
           aria-label="Summarize text"
-          style={{ flex: 1 }}
+          style={{ width: '100%' }}
         >
           {isProcessing ? (
             <>
@@ -409,14 +530,6 @@ export function SummaryPanel({
               Summarize
             </>
           )}
-        </button>
-        <button
-          className="flint-btn ghost"
-          onClick={handleClear}
-          disabled={isProcessing}
-          aria-label="Clear all"
-        >
-          Clear
         </button>
       </div>
 
@@ -529,107 +642,7 @@ export function SummaryPanel({
         </div>
       )}
 
-      {/* Summary result display with copy button */}
-      {summary && (
-        <div
-          style={{
-            marginTop: '16px',
-          }}
-          role="region"
-          aria-label="Summary result"
-        >
-          {/* Result header with copy button */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '12px',
-            }}
-          >
-            <label
-              style={{
-                fontSize: 'var(--fs-sm)',
-                color: 'var(--text-muted)',
-                fontWeight: 500,
-              }}
-            >
-              Summary
-            </label>
-            <button
-              className="flint-btn ghost"
-              onClick={handleCopy}
-              disabled={showCopySuccess}
-              aria-label={showCopySuccess ? 'Copied to clipboard' : 'Copy summary to clipboard'}
-              style={{
-                height: '32px',
-                padding: '0 12px',
-                fontSize: 'var(--fs-xs)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
-              {showCopySuccess ? (
-                <>
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                    style={{
-                      color: '#10b981',
-                    }}
-                  >
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                  <span style={{ color: '#10b981' }}>Copied!</span>
-                </>
-              ) : (
-                <>
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                  </svg>
-                  Copy
-                </>
-              )}
-            </button>
-          </div>
 
-          {/* Formatted summary result */}
-          <div
-            style={{
-              padding: '16px',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--stroke)',
-              fontSize: 'var(--fs-md)',
-              color: 'var(--text)',
-              lineHeight: '1.6',
-              maxHeight: '400px',
-              overflowY: 'auto',
-            }}
-          >
-            {formatSummary(summary, mode)}
-          </div>
-        </div>
-      )}
 
       {/* Pinned notes indicator */}
       {pinnedNotes.length > 0 && (

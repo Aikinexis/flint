@@ -16,7 +16,7 @@ type MessageType =
   | 'SHOW_MINI_BAR'
   | 'HIDE_MINI_BAR'
   // Panel messages
-  | 'OPEN_VOICE_TAB'
+  | 'OPEN_GENERATE_TAB'
   | 'OPEN_SUMMARY_TAB'
   | 'OPEN_REWRITE_TAB'
   | 'OPEN_SETTINGS_TAB'
@@ -100,7 +100,7 @@ async function registerContentScripts(): Promise<void> {
     await chrome.scripting.registerContentScripts([
       {
         id: CONTENT_SCRIPT_ID,
-        js: ['src/content/content.js'],
+        js: ['content.js'],
         matches: ['<all_urls>'],
         runAt: 'document_idle',
         allFrames: false
@@ -132,13 +132,22 @@ async function registerContentScripts(): Promise<void> {
  */
 async function unregisterContentScripts(): Promise<void> {
   try {
-    await chrome.scripting.unregisterContentScripts({
+    // First check if any scripts are registered
+    const registered = await chrome.scripting.getRegisteredContentScripts({
       ids: [CONTENT_SCRIPT_ID]
     });
-    console.log('[Flint Background] Content scripts unregistered successfully');
+    
+    // Only unregister if scripts exist
+    if (registered.length > 0) {
+      await chrome.scripting.unregisterContentScripts({
+        ids: [CONTENT_SCRIPT_ID]
+      });
+      console.log('[Flint Background] Content scripts unregistered successfully');
+    } else {
+      console.log('[Flint Background] No content scripts to unregister (expected on first install)');
+    }
   } catch (error) {
-    // Ignore errors if no scripts are registered
-    // This is expected on first install
+    // Silently ignore errors - they're expected on first install
     if (error instanceof Error && !error.message.includes('not found')) {
       console.warn('[Flint Background] Error unregistering content scripts:', error.message);
     }
@@ -227,7 +236,7 @@ async function handleContentScriptMessage(
   payload?: unknown
 ): Promise<MessageResponse> {
   switch (type) {
-    case 'OPEN_VOICE_TAB':
+    case 'OPEN_GENERATE_TAB':
     case 'OPEN_SUMMARY_TAB':
     case 'OPEN_REWRITE_TAB':
     case 'OPEN_SETTINGS_TAB':
@@ -468,15 +477,15 @@ chrome.commands.onCommand.addListener(async (command) => {
         break;
 
       case 'record':
-        // Open side panel to Voice tab
+        // Open side panel to Generate tab
         await chrome.sidePanel.open({ tabId: activeTab.id });
-        // Send message to panel to switch to Voice tab
+        // Send message to panel to switch to Generate tab
         setTimeout(() => {
           chrome.runtime.sendMessage({
-            type: 'OPEN_VOICE_TAB',
+            type: 'OPEN_GENERATE_TAB',
             source: 'background',
           }).catch((err) => {
-            console.error('[Flint Background] Failed to open Voice tab:', err);
+            console.error('[Flint Background] Failed to open Generate tab:', err);
           });
         }, 100);
         break;

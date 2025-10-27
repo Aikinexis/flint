@@ -1,7 +1,7 @@
 {
   "name": "flint-chrome-extension",
   "version": "1.0.0",
-  "description": "Voice-to-text, summarization, and rewriting with local AI for Chrome",
+  "description": "Text generation, summarization, and rewriting with local AI for Chrome",
   "type": "module",
   "scripts": {
     "dev": "vite build --watch --mode development",
@@ -58,7 +58,7 @@
   "keywords": [
     "chrome-extension",
     "ai",
-    "voice-to-text",
+    "text-generation",
     "summarization",
     "rewriting"
   ],
