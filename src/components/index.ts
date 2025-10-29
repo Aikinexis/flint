@@ -12,9 +12,6 @@ export type { RewritePanelProps } from './RewritePanel';
 export { SummaryPanel } from './SummaryPanel';
 export type { SummaryPanelProps } from './SummaryPanel';
 
-export { CompareView } from './CompareView';
-export type { CompareViewProps } from './CompareView';
-
 export { Settings } from './Settings';
 export type { SettingsProps } from './Settings';
 
@@ -29,7 +26,6 @@ export type { SidebarProps, NavigationItem } from './Sidebar';
 export { Toolbar } from './Toolbar';
 
 export { MiniBar } from './MiniBar';
-export type { MiniBarProps } from './MiniBar';
 
 export { LoadingSpinner } from './LoadingSpinner';
 export type { LoadingSpinnerProps } from './LoadingSpinner';
@@ -39,3 +35,18 @@ export type { ErrorBoundaryProps } from './ErrorBoundary';
 
 export { AIAvailabilityBanner } from './AIAvailabilityBanner';
 export type { AIAvailabilityBannerProps } from './AIAvailabilityBanner';
+
+export { UnifiedEditor } from './UnifiedEditor';
+export type { UnifiedEditorProps, SelectionRange } from './UnifiedEditor';
+
+export { ToolControlsContainer } from './ToolControlsContainer';
+export type { ToolControlsProps, ToolType } from './ToolControlsContainer';
+
+export { ProjectManager } from './ProjectManager';
+export type { ProjectManagerProps } from './ProjectManager';
+
+export { HistoryPanel } from './HistoryPanel';
+export type { HistoryPanelProps } from './HistoryPanel';
+
+export { SnapshotItem } from './SnapshotItem';
+export type { SnapshotItemProps } from './SnapshotItem';

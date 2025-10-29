@@ -3,7 +3,6 @@ import type { PinnedNote, GenerateSettings, PromptHistoryItem } from '../service
 import { StorageService } from '../services/storage';
 import { AIService } from '../services/ai';
 import { VersionCarousel, type Version } from './VersionCarousel';
-import { useAppState } from '../state';
 
 /**
  * GeneratePanel component props
@@ -28,8 +27,7 @@ export function GeneratePanel({
   pinnedNotes = [],
   onGenerateComplete,
 }: GeneratePanelProps) {
-  // Get app state and actions for updating history
-  const { state, actions } = useAppState();
+  // App state no longer needed after history removal
   
   // Component state
   const [prompt, setPrompt] = useState('');
@@ -393,27 +391,8 @@ export function GeneratePanel({
 
       console.log('[GeneratePanel] Generation completed successfully');
 
-      // Save to history (Requirement 6.6)
-      // Handle IndexedDB storage failures gracefully - log error and continue without saving
+      // History saving removed - now using snapshots instead
       let historyItemId: string | undefined;
-      try {
-        const historyItem = await StorageService.saveHistoryItem({
-          type: 'generate',
-          originalText: prompt,
-          resultText: result,
-          metadata: {
-            preset: 'generate',
-          },
-        });
-        // Update app state with new history item
-        actions.addHistoryItem(historyItem);
-        historyItemId = historyItem.id;
-        console.log('[GeneratePanel] History item saved with ID:', historyItemId);
-      } catch (historyError) {
-        // Gracefully handle storage failure - log error and continue (Requirement 6.6)
-        console.error('[GeneratePanel] Failed to save to history:', historyError);
-        // Generation continues successfully even if history save fails
-      }
 
       // Save prompt to prompt history (Requirement 6.6)
       // Handle IndexedDB storage failures gracefully - log error and continue without saving
@@ -547,27 +526,7 @@ export function GeneratePanel({
       prev.map((v) => (v.id === id ? { ...v, isLiked: !v.isLiked } : v))
     );
     
-    // Update history if this version has a history ID
-    if (version?.historyId) {
-      try {
-        console.log('[GeneratePanel] Updating history item:', version.historyId);
-        const updatedHistoryItem = await StorageService.toggleHistoryLiked(version.historyId);
-        console.log('[GeneratePanel] History item updated successfully');
-        
-        // Update app state history to reflect the change
-        if (updatedHistoryItem) {
-          actions.setHistory(
-            state.history.map((item) =>
-              item.id === version.historyId ? updatedHistoryItem : item
-            )
-          );
-        }
-      } catch (error) {
-        console.error('[GeneratePanel] Failed to update history liked status:', error);
-      }
-    } else {
-      console.warn('[GeneratePanel] No historyId found for version:', id);
-    }
+    // History update removed - now using snapshots instead
   };
 
   /**

@@ -101,7 +101,7 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border-left: 1px solid var(--stroke);
+  border-left: 1px solid var(--border-muted);
   z-index: 100;
 }
 
@@ -114,12 +114,18 @@ body {
   width: 0;
   overflow: hidden;
   background: var(--bg);
-  transition: width 0.3s ease;
+  transition: width 0.3s ease, right 0.3s ease;
 }
 
 .content-area.expanded {
   width: calc(100% - 72px);
   overflow-y: auto;
+}
+
+/* Adjust content area when history panel is open - panel slides from left */
+.content-area.history-panel-open {
+  left: 280px;
+  width: calc(100% - 72px - 280px);
 }
 
 /* Sidebar Content Container */
@@ -192,11 +198,14 @@ body {
   display: flex;
   align-items: center;
   cursor: pointer;
+  box-shadow: none;
 }
 
 .sidebar-nav .flint-btn:hover {
   background: var(--surface-2);
   color: var(--text);
+  box-shadow: none;
+  animation: none;
 }
 
 .sidebar-nav .flint-btn:focus-visible {
@@ -204,9 +213,15 @@ body {
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 50%, transparent);
 }
 
+.sidebar-nav .flint-btn:active {
+  transform: none;
+  box-shadow: none;
+}
+
 .sidebar-nav .flint-btn.active {
   background: linear-gradient(135deg, oklch(0.5 0.1 var(--accent-hue)) 0%, oklch(0.4 0.12 var(--accent-hue)) 100%);
   color: oklch(0.12 0 255);
+  box-shadow: none;
 }
 
 .light .sidebar-nav .flint-btn.active {
@@ -221,6 +236,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.sidebar-nav .icon svg {
+  color: inherit;
 }
 
 /* Collapsed State Styles */
@@ -354,4 +373,31 @@ input[type='range']:focus-visible::-moz-range-thumb {
 
 .carousel-loading > div:first-child {
   animation: border-pulse 1.5s ease-in-out infinite;
+}
+
+/* Inline replacement highlight animation */
+@keyframes inline-replace-flash {
+  0% {
+    background-color: transparent;
+  }
+  20% {
+    background-color: color-mix(in oklab, var(--primary) 20%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.inline-replace-highlight {
+  animation: inline-replace-flash 600ms ease-out;
+}
+
+/* Spin animation for loading indicators */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

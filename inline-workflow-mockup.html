@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flint Inline Workflow Mockup</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0c0e13;
+      color: #f4f6fa;
+      height: 100vh;
+      display: flex;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 72px;
+      background: #14161d;
+      border-right: 1px solid #2a3144;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 0;
+      gap: 12px;
+    }
+    .sidebar-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: transparent;
+      border: none;
+      color: #8b92a7;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      transition: all 0.2s;
+    }
+    .sidebar-btn:hover { background: #1c1f2a; color: #f4f6fa; }
+    .sidebar-btn.active { background: linear-gradient(135deg, #4a90e2, #357abd); color: #fff; }
+
+    /* Main Content */
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Header */
+    .header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #2a3144;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h1 { font-size: 20px; font-weight: 600; }
+    .header-actions { display: flex; gap: 8px; }
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: transparent;
+      border: 1px solid #2a3144;
+      color: #8b92a7;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .icon-btn:hover { background: #1c1f2a; color: #f4f6fa; }
+
+    /* Editor Area */
+    .editor-container {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Main Textarea */
+    .main-editor {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+    }
+    .main-editor textarea {
+      width: 100%;
+      min-height: 100%;
+      background: transparent;
+      border: none;
+      color: #f4f6fa;
+      font-size: 15px;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+      font-family: inherit;
+    }
+    .main-editor textarea::selection {
+      background: rgba(74, 144, 226, 0.3);
+    }
+
+    /* Tool Panel (slides in from right) */
+    .tool-panel {
+      width: 320px;
+      background: #14161d;
+      border-left: 1px solid #2a3144;
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .tool-panel h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .tool-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .preset-btn {
+      padding: 12px 16px;
+      background: #1c1f2a;
+      border: 1px solid #2a3144;
+      border-radius: 8px;
+      color: #f4f6fa;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s;
+    }
+    .preset-btn:hover { background: #252936; border-color: #4a90e2; }
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .input-group label {
+      font-size: 13px;
+      color: #8b92a7;
+    }
+    .input-group input {
+      padding: 10px 12px;
+      background: #1c1f2a;
+      border: 1px solid #2a3144;
+      border-radius: 6px;
+      color: #f4f6fa;
+      font-size: 14px;
+    }
+    .primary-btn {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #4a90e2, #357abd);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    .primary-btn:hover { opacity: 0.9; }
+
+    /* Mini Bar (appears on selection) */
+    .mini-bar {
+      position: fixed;
+      display: flex;
+      gap: 8px;
+      background: #1c1f2a;
+      border: 1px solid #2a3144;
+      border-radius: 12px;
+      padding: 6px 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      z-index: 1000;
+      /* Positioned dynamically above selection */
+      top: 200px;
+      left: 300px;
+    }
+    .mini-bar button {
+      width: 32px;
+      height: 32px;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: #f4f6fa;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+    .mini-bar button:hover { background: rgba(255, 255, 255, 0.1); }
+
+    /* Version History Sidebar */
+    .history-sidebar {
+      width: 280px;
+      background: #14161d;
+      border-left: 1px solid #2a3144;
+      padding: 16px;
+      overflow-y: auto;
+      display: none; /* Hidden by default, shown when History tab active */
+    }
+    .history-sidebar.active { display: block; }
+    .history-item {
+      padding: 12px;
+      background: #1c1f2a;
+      border: 1px solid #2a3144;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .history-item:hover { border-color: #4a90e2; }
+    .history-item .timestamp {
+      color: #8b92a7;
+      font-size: 11px;
+      margin-top: 4px;
+    }
+
+    .note {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #1c1f2a;
+      border: 1px solid #4a90e2;
+      border-radius: 8px;
+      padding: 16px;
+      max-width: 400px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .note strong { color: #4a90e2; }
+  </style>
+</head>
+<body>
+  <!-- Sidebar Navigation -->
+  <div class="sidebar">
+    <div class="sidebar-btn active" title="Generate">✨</div>
+    <div class="sidebar-btn" title="Rewrite">✎</div>
+    <div class="sidebar-btn" title="Summary">∑</div>
+    <div style="flex: 1"></div>
+    <div class="sidebar-btn" title="History">🕐</div>
+    <div class="sidebar-btn" title="Settings">⚙</div>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="content">
+    <!-- Header -->
+    <div class="header">
+      <h1>Generate</h1>
+      <div class="header-actions">
+        <button class="icon-btn" title="Copy">📋</button>
+        <button class="icon-btn" title="Clear">🗑</button>
+      </div>
+    </div>
+
+    <!-- Editor Container -->
+    <div class="editor-container">
+      <!-- Main Shared Textarea -->
+      <div class="main-editor">
+        <textarea placeholder="Start writing or paste your text here...">This is your main document. It stays the same across all tabs.
+
+Select any text and the mini bar appears above it with quick actions.
+
+Or use the sidebar tools for more detailed options.
+
+When you click Generate, Rewrite, or Summary - it works on THIS document inline.
+
+All changes are saved to version history so you can undo/redo/branch.</textarea>
+      </div>
+
+      <!-- Tool Panel (changes based on active tab) -->
+      <div class="tool-panel">
+        <h2>Generate Content</h2>
+        
+        <div class="tool-section">
+          <div class="input-group">
+            <label>What do you want to write?</label>
+            <input type="text" placeholder="e.g., Write an introduction about AI...">
+          </div>
+
+          <div class="input-group">
+            <label>Tone</label>
+            <select style="padding: 10px 12px; background: #1c1f2a; border: 1px solid #2a3144; border-radius: 6px; color: #f4f6fa;">
+              <option>Professional</option>
+              <option>Casual</option>
+              <option>Academic</option>
+            </select>
+          </div>
+
+          <button class="primary-btn">Generate</button>
+        </div>
+
+        <div class="tool-section">
+          <h2 style="font-size: 14px; margin-top: 12px;">Quick Presets</h2>
+          <button class="preset-btn">Continue writing</button>
+          <button class="preset-btn">Write conclusion</button>
+          <button class="preset-btn">Add examples</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mini Bar (appears on text selection) -->
+  <div class="mini-bar">
+    <button title="Summarize">∑</button>
+    <button title="Rewrite">✎</button>
+    <button title="Generate">✨</button>
+    <button title="Close">×</button>
+  </div>
+
+  <!-- Explanation Note -->
+  <div class="note">
+    <strong>Key Changes:</strong><br>
+    • One shared textarea across all tabs<br>
+    • Sidebar tabs show different tools/options<br>
+    • Mini bar for quick inline actions<br>
+    • All edits happen in-place<br>
+    • Version history tracks changes
+  </div>
+
+  <script>
+    // Demo: Make textarea selection show mini bar
+    const textarea = document.querySelector('textarea');
+    const miniBar = document.querySelector('.mini-bar');
+    
+    textarea.addEventListener('mouseup', () => {
+      const selection = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
+      if (selection.length > 3) {
+        // Position mini bar (simplified for demo)
+        const rect = textarea.getBoundingClientRect();
+        miniBar.style.display = 'flex';
+        miniBar.style.top = (rect.top + 100) + 'px';
+        miniBar.style.left = (rect.left + 200) + 'px';
+      } else {
+        miniBar.style.display = 'none';
+      }
+    });
+
+    // Demo: Tab switching
+    const tabs = document.querySelectorAll('.sidebar-btn');
+    const header = document.querySelector('.header h1');
+    const toolPanel = document.querySelector('.tool-panel');
+    
+    tabs.forEach((tab, i) => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        const titles = ['Generate', 'Rewrite', 'Summary', '', 'History', 'Settings'];
+        header.textContent = titles[i];
+        
+        // Tool panel content would change based on tab
+        if (i === 0) {
+          toolPanel.innerHTML = `
+            <h2>Generate Content</h2>
+            <div class="tool-section">
+              <div class="input-group">
+                <label>What do you want to write?</label>
+                <input type="text" placeholder="e.g., Write an introduction...">
+              </div>
+              <button class="primary-btn">Generate</button>
+            </div>
+          `;
+        } else if (i === 1) {
+          toolPanel.innerHTML = `
+            <h2>Rewrite Text</h2>
+            <div class="tool-section">
+              <button class="preset-btn">Make more formal</button>
+              <button class="preset-btn">Make more casual</button>
+              <button class="preset-btn">Simplify</button>
+              <button class="preset-btn">Expand</button>
+              <button class="primary-btn">Rewrite Selection</button>
+            </div>
+          `;
+        } else if (i === 2) {
+          toolPanel.innerHTML = `
+            <h2>Summarize</h2>
+            <div class="tool-section">
+              <button class="preset-btn">Key points</button>
+              <button class="preset-btn">Brief summary</button>
+              <button class="preset-btn">Detailed outline</button>
+              <button class="primary-btn">Summarize Selection</button>
+            </div>
+          `;
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -5,7 +5,7 @@
 
 import { ReactNode, useState, useCallback, useEffect } from 'react';
 import { AppContext, initialState, type AppState, type AppActions, type Tab } from './store';
-import { StorageService, type Settings, type PinnedNote, type HistoryItem } from '../services/storage';
+import { StorageService, type Settings, type PinnedNote } from '../services/storage';
 import { AIService, type AIAvailability } from '../services/ai';
 
 interface AppProviderProps {
@@ -26,6 +26,14 @@ export function AppProvider({ children }: AppProviderProps) {
 
   const setIsProcessing = useCallback((isProcessing: boolean) => {
     setState((prev) => ({ ...prev, isProcessing }));
+  }, []);
+
+  const setIsHistoryPanelOpen = useCallback((isOpen: boolean) => {
+    setState((prev) => ({ ...prev, isHistoryPanelOpen: isOpen }));
+  }, []);
+
+  const toggleHistoryPanel = useCallback(() => {
+    setState((prev) => ({ ...prev, isHistoryPanelOpen: !prev.isHistoryPanelOpen }));
   }, []);
 
   // ===== Settings Actions =====
@@ -138,55 +146,6 @@ export function AppProvider({ children }: AppProviderProps) {
     }
   }, []);
 
-  // ===== History Actions =====
-
-  const setHistory = useCallback((history: HistoryItem[]) => {
-    setState((prev) => ({ ...prev, history }));
-  }, []);
-
-  const addHistoryItem = useCallback(async (item: HistoryItem) => {
-    // Optimistically update state
-    setState((prev) => ({
-      ...prev,
-      history: [item, ...prev.history],
-    }));
-
-    // Persist to storage
-    try {
-      await StorageService.saveHistoryItem(item);
-    } catch (error) {
-      console.error('[AppProvider] Failed to add history item:', error);
-      // Revert optimistic update on error
-      setState((prev) => ({
-        ...prev,
-        history: prev.history.filter((h) => h.id !== item.id),
-        error: error instanceof Error ? error.message : 'Failed to save history item',
-      }));
-    }
-  }, []);
-
-  const clearHistory = useCallback(async () => {
-    // Store old history for rollback
-    let oldHistory: HistoryItem[] = [];
-    setState((prev) => {
-      oldHistory = prev.history;
-      return { ...prev, history: [] };
-    });
-
-    // Persist to storage
-    try {
-      await StorageService.clearHistory();
-    } catch (error) {
-      console.error('[AppProvider] Failed to clear history:', error);
-      // Revert on error
-      setState((prev) => ({
-        ...prev,
-        history: oldHistory,
-        error: error instanceof Error ? error.message : 'Failed to clear history',
-      }));
-    }
-  }, []);
-
   // ===== Current Operation Actions =====
 
   const setCurrentText = useCallback((currentText: string) => {
@@ -230,15 +189,14 @@ export function AppProvider({ children }: AppProviderProps) {
   const actions: AppActions = {
     setActiveTab,
     setIsProcessing,
+    setIsHistoryPanelOpen,
+    toggleHistoryPanel,
     setSettings,
     updateSettings,
     setPinnedNotes,
     addPinnedNote,
     updatePinnedNote,
     deletePinnedNote,
-    setHistory,
-    addHistoryItem,
-    clearHistory,
     setCurrentText,
     setCurrentResult,
     setAIAvailability,
@@ -271,11 +229,6 @@ export function AppProvider({ children }: AppProviderProps) {
         console.log('[AppProvider] Loaded pinned notes:', notes.length);
         setPinnedNotes(notes);
 
-        // Load recent history from IndexedDB (limit to 50 items for performance)
-        const history = await StorageService.getHistory(50);
-        console.log('[AppProvider] Loaded history items:', history.length);
-        setHistory(history);
-
         // Check AI availability
         await checkAIAvailability();
 
@@ -287,28 +240,7 @@ export function AppProvider({ children }: AppProviderProps) {
     };
 
     loadInitialData();
-  }, [setSettings, setPinnedNotes, setHistory, checkAIAvailability, setError]);
-
-  // ===== Cleanup Old History =====
-
-  useEffect(() => {
-    // Clean up old history items on mount
-    const cleanupHistory = async () => {
-      try {
-        const deletedCount = await StorageService.cleanupOldHistory();
-        if (deletedCount > 0) {
-          console.log(`[AppProvider] Cleaned up ${deletedCount} old history items`);
-          // Reload history after cleanup
-          const history = await StorageService.getHistory(50);
-          setHistory(history);
-        }
-      } catch (error) {
-        console.error('[AppProvider] Failed to cleanup old history:', error);
-      }
-    };
-
-    cleanupHistory();
-  }, [setHistory]);
+  }, [setSettings, setPinnedNotes, checkAIAvailability, setError]);
 
   // ===== Storage Listeners =====
 

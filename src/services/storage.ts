@@ -44,6 +44,30 @@ export interface PromptHistoryItem {
 }
 
 /**
+ * Project interface for managing multiple writing projects
+ */
+export interface Project {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * Snapshot interface for version history
+ */
+export interface Snapshot {
+  id: string;
+  projectId: string;
+  content: string;
+  actionType: 'generate' | 'rewrite' | 'summarize';
+  actionDescription: string;
+  timestamp: number;
+  selectionRange?: { start: number; end: number };
+}
+
+/**
  * Generate settings interface for Generate panel configuration
  */
 export interface GenerateSettings {
@@ -60,6 +84,7 @@ export interface Settings {
   theme: 'light' | 'dark' | 'system';
   localOnlyMode: boolean;
   accentHue: number; // Hue value (0-360) for OKLCH color system
+  historyMigrated?: boolean; // Flag to track if history has been migrated to snapshots
 }
 
 /**
@@ -175,12 +200,15 @@ class StorageServiceBase {
  * IndexedDB database name and version
  */
 const DB_NAME = 'flint-db';
-const DB_VERSION = 2;
+const DB_VERSION = 4;
 const PINNED_NOTES_STORE = 'pinnedNotes';
 const HISTORY_STORE = 'history';
 const PROMPT_HISTORY_STORE = 'promptHistory';
+const PROJECTS_STORE = 'projects';
+const SNAPSHOTS_STORE = 'snapshots';
 const MAX_STORAGE_MB = 40;
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+const MAX_SNAPSHOTS_PER_PROJECT = 50;
 
 /**
  * IndexedDB helper class
@@ -231,6 +259,20 @@ class IndexedDBHelper {
           const promptStore = db.createObjectStore(PROMPT_HISTORY_STORE, { keyPath: 'id' });
           promptStore.createIndex('timestamp', 'timestamp', { unique: false });
           promptStore.createIndex('pinned', 'pinned', { unique: false });
+        }
+
+        // Create projects store (v3)
+        if (oldVersion < 3 && !db.objectStoreNames.contains(PROJECTS_STORE)) {
+          const projectsStore = db.createObjectStore(PROJECTS_STORE, { keyPath: 'id' });
+          projectsStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+          projectsStore.createIndex('createdAt', 'createdAt', { unique: false });
+        }
+
+        // Create snapshots store (v4)
+        if (oldVersion < 4 && !db.objectStoreNames.contains(SNAPSHOTS_STORE)) {
+          const snapshotsStore = db.createObjectStore(SNAPSHOTS_STORE, { keyPath: 'id' });
+          snapshotsStore.createIndex('projectId', 'projectId', { unique: false });
+          snapshotsStore.createIndex('timestamp', 'timestamp', { unique: false });
         }
       };
     });
@@ -718,6 +760,380 @@ export class StorageService extends StorageServiceBase {
     } catch (error) {
       console.error('[Storage] Failed to save generate settings:', error);
       throw error;
+    }
+  }
+
+  // ===== Project Methods =====
+
+  /**
+   * Creates a new project
+   * @param title - Project title
+   * @param content - Initial project content
+   * @returns Promise resolving to the created project
+   */
+  static async createProject(title: string, content: string = ''): Promise<Project> {
+    try {
+      const now = Date.now();
+      const project: Project = {
+        id: generateId(),
+        title,
+        content,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await IndexedDBHelper.put(PROJECTS_STORE, project);
+      return project;
+    } catch (error) {
+      console.error('[Storage] Failed to create project:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets all projects sorted by most recently updated
+   * @returns Promise resolving to array of projects
+   */
+  static async getProjects(): Promise<Project[]> {
+    try {
+      const projects = await IndexedDBHelper.getAll<Project>(PROJECTS_STORE);
+      // Sort by most recently updated
+      return projects.sort((a, b) => b.updatedAt - a.updatedAt);
+    } catch (error) {
+      console.error('[Storage] Failed to get projects:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Gets a single project by ID
+   * @param id - Project ID
+   * @returns Promise resolving to project or undefined
+   */
+  static async getProject(id: string): Promise<Project | undefined> {
+    try {
+      return await IndexedDBHelper.get<Project>(PROJECTS_STORE, id);
+    } catch (error) {
+      console.error('[Storage] Failed to get project:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Updates a project with partial updates
+   * @param id - Project ID
+   * @param updates - Partial project updates (title, content, etc.)
+   * @returns Promise resolving to updated project or undefined if not found
+   */
+  static async updateProject(
+    id: string,
+    updates: Partial<Omit<Project, 'id' | 'createdAt'>>
+  ): Promise<Project | undefined> {
+    try {
+      const existingProject = await IndexedDBHelper.get<Project>(PROJECTS_STORE, id);
+      if (!existingProject) {
+        console.warn('[Storage] Project not found for update:', id);
+        return undefined;
+      }
+
+      const updatedProject: Project = {
+        ...existingProject,
+        ...updates,
+        updatedAt: Date.now(),
+      };
+
+      await IndexedDBHelper.put(PROJECTS_STORE, updatedProject);
+      return updatedProject;
+    } catch (error) {
+      console.error('[Storage] Failed to update project:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Deletes a project by ID
+   * @param id - Project ID
+   * @returns Promise resolving when delete is complete
+   */
+  static async deleteProject(id: string): Promise<void> {
+    try {
+      await IndexedDBHelper.delete(PROJECTS_STORE, id);
+    } catch (error) {
+      console.error('[Storage] Failed to delete project:', error);
+      throw error;
+    }
+  }
+
+  // ===== Snapshot Methods =====
+
+  /**
+   * Creates a new snapshot for a project
+   * @param projectId - ID of the project this snapshot belongs to
+   * @param content - Content of the document at this point in time
+   * @param actionType - Type of AI operation that created this snapshot
+   * @param actionDescription - Human-readable description of the action
+   * @param selectionRange - Optional selection range that was modified
+   * @returns Promise resolving to the created snapshot
+   */
+  static async createSnapshot(
+    projectId: string,
+    content: string,
+    actionType: 'generate' | 'rewrite' | 'summarize',
+    actionDescription: string,
+    selectionRange?: { start: number; end: number }
+  ): Promise<Snapshot> {
+    try {
+      const snapshot: Snapshot = {
+        id: generateId(),
+        projectId,
+        content,
+        actionType,
+        actionDescription,
+        timestamp: Date.now(),
+        selectionRange,
+      };
+
+      await IndexedDBHelper.put(SNAPSHOTS_STORE, snapshot);
+
+      // Clean up old snapshots if we exceed the limit
+      await this.deleteOldSnapshots(projectId, MAX_SNAPSHOTS_PER_PROJECT);
+
+      return snapshot;
+    } catch (error) {
+      console.error('[Storage] Failed to create snapshot:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets all snapshots for a project, sorted by most recent first
+   * @param projectId - ID of the project
+   * @returns Promise resolving to array of snapshots
+   */
+  static async getSnapshots(projectId: string): Promise<Snapshot[]> {
+    try {
+      const db = await IndexedDBHelper.getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(SNAPSHOTS_STORE, 'readonly');
+        const store = transaction.objectStore(SNAPSHOTS_STORE);
+        const index = store.index('projectId');
+        const request = index.getAll(projectId);
+
+        request.onsuccess = () => {
+          const snapshots = request.result as Snapshot[];
+          // Sort by most recent first
+          const sorted = snapshots.sort((a, b) => b.timestamp - a.timestamp);
+          resolve(sorted);
+        };
+
+        request.onerror = () => {
+          console.error('[Storage] Failed to get snapshots:', request.error);
+          reject(request.error);
+        };
+      });
+    } catch (error) {
+      console.error('[Storage] Failed to get snapshots:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Deletes old snapshots for a project, keeping only the most recent ones
+   * @param projectId - ID of the project
+   * @param limit - Maximum number of snapshots to keep (default: 50)
+   * @returns Promise resolving to number of snapshots deleted
+   */
+  static async deleteOldSnapshots(projectId: string, limit: number = MAX_SNAPSHOTS_PER_PROJECT): Promise<number> {
+    try {
+      const snapshots = await this.getSnapshots(projectId);
+      
+      // If we're under the limit, no need to delete anything
+      if (snapshots.length <= limit) {
+        return 0;
+      }
+
+      // Delete the oldest snapshots (those beyond the limit)
+      const snapshotsToDelete = snapshots.slice(limit);
+      
+      for (const snapshot of snapshotsToDelete) {
+        await IndexedDBHelper.delete(SNAPSHOTS_STORE, snapshot.id);
+      }
+
+      if (snapshotsToDelete.length > 0) {
+        console.log(`[Storage] Deleted ${snapshotsToDelete.length} old snapshots for project ${projectId}`);
+      }
+
+      return snapshotsToDelete.length;
+    } catch (error) {
+      console.error('[Storage] Failed to delete old snapshots:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Gets a single snapshot by ID
+   * @param id - Snapshot ID
+   * @returns Promise resolving to snapshot or undefined
+   */
+  static async getSnapshot(id: string): Promise<Snapshot | undefined> {
+    try {
+      return await IndexedDBHelper.get<Snapshot>(SNAPSHOTS_STORE, id);
+    } catch (error) {
+      console.error('[Storage] Failed to get snapshot:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Deletes all snapshots for a project
+   * @param projectId - ID of the project
+   * @returns Promise resolving when delete is complete
+   */
+  static async deleteProjectSnapshots(projectId: string): Promise<void> {
+    try {
+      const snapshots = await this.getSnapshots(projectId);
+      for (const snapshot of snapshots) {
+        await IndexedDBHelper.delete(SNAPSHOTS_STORE, snapshot.id);
+      }
+      console.log(`[Storage] Deleted all snapshots for project ${projectId}`);
+    } catch (error) {
+      console.error('[Storage] Failed to delete project snapshots:', error);
+      throw error;
+    }
+  }
+
+  // ===== Migration Methods =====
+
+  /**
+   * Migrates existing history items to snapshots format
+   * Creates a default project for orphaned history items
+   * @returns Promise resolving to migration result
+   */
+  static async migrateHistoryToSnapshots(): Promise<{
+    success: boolean;
+    migratedCount: number;
+    projectId?: string;
+    error?: string;
+  }> {
+    try {
+      // Check if migration has already been completed
+      const settings = await this.getSettings();
+      if (settings.historyMigrated) {
+        console.log('[Storage] History migration already completed');
+        return { success: true, migratedCount: 0 };
+      }
+
+      // Get all existing history items
+      const historyItems = await this.getHistory();
+      
+      if (historyItems.length === 0) {
+        console.log('[Storage] No history items to migrate');
+        // Mark migration as complete even if there's nothing to migrate
+        await this.updateSettings({ historyMigrated: true });
+        return { success: true, migratedCount: 0 };
+      }
+
+      console.log(`[Storage] Starting migration of ${historyItems.length} history items`);
+
+      // Create a default project for migrated history
+      const defaultProject = await this.createProject(
+        'Migrated History',
+        'This project contains your previous history items converted to snapshots.'
+      );
+
+      console.log(`[Storage] Created default project: ${defaultProject.id}`);
+
+      // Convert each history item to a snapshot
+      let migratedCount = 0;
+      for (const item of historyItems) {
+        try {
+          // Generate action description based on history item metadata
+          let actionDescription = '';
+          
+          switch (item.type) {
+            case 'generate':
+              actionDescription = 'Generated text';
+              break;
+            case 'rewrite':
+              if (item.metadata?.preset) {
+                actionDescription = `Rewrote with ${item.metadata.preset} preset`;
+              } else {
+                actionDescription = 'Rewrote text';
+              }
+              break;
+            case 'summarize':
+              if (item.metadata?.mode) {
+                actionDescription = `Summarized as ${item.metadata.mode}`;
+              } else {
+                actionDescription = 'Summarized text';
+              }
+              break;
+          }
+
+          // Create snapshot from history item
+          const snapshot: Snapshot = {
+            id: generateId(),
+            projectId: defaultProject.id,
+            content: item.resultText,
+            actionType: item.type,
+            actionDescription,
+            timestamp: item.timestamp,
+            // No selection range for migrated items
+          };
+
+          await IndexedDBHelper.put(SNAPSHOTS_STORE, snapshot);
+          migratedCount++;
+        } catch (error) {
+          console.error(`[Storage] Failed to migrate history item ${item.id}:`, error);
+          // Continue with other items even if one fails
+        }
+      }
+
+      console.log(`[Storage] Successfully migrated ${migratedCount} history items`);
+
+      // Mark migration as complete
+      await this.updateSettings({ historyMigrated: true });
+
+      return {
+        success: true,
+        migratedCount,
+        projectId: defaultProject.id,
+      };
+    } catch (error) {
+      console.error('[Storage] History migration failed:', error);
+      return {
+        success: false,
+        migratedCount: 0,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Checks if history migration is needed and runs it if necessary
+   * Should be called on app initialization
+   * @returns Promise resolving when check is complete
+   */
+  static async checkAndMigrateHistory(): Promise<void> {
+    try {
+      const settings = await this.getSettings();
+      
+      // Skip if already migrated
+      if (settings.historyMigrated) {
+        return;
+      }
+
+      console.log('[Storage] Checking for history migration...');
+      const result = await this.migrateHistoryToSnapshots();
+      
+      if (result.success && result.migratedCount > 0) {
+        console.log(
+          `[Storage] Migration complete: ${result.migratedCount} items migrated to project ${result.projectId}`
+        );
+      }
+    } catch (error) {
+      console.error('[Storage] Failed to check and migrate history:', error);
+      // Don't throw - allow app to continue even if migration fails
     }
   }
 }

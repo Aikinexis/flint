@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import type { PinnedNote } from '../services/storage';
-import { StorageService } from '../services/storage';
+// StorageService import removed - history functionality replaced by snapshots
 import { AIService } from '../services/ai';
 import { VersionCarousel, type Version } from './VersionCarousel';
 import { useAppState } from '../state';
+import { usePanelMiniBar } from '../hooks/usePanelMiniBar';
+import { MiniBar } from './MiniBar';
 
 /**
  * SummaryPanel component props
@@ -23,6 +25,16 @@ export interface SummaryPanelProps {
    * Callback when summary completes successfully
    */
   onSummaryComplete?: (summary: string) => void;
+
+  /**
+   * Callback when user clicks summarize in carousel mini bar
+   */
+  onMiniBarSummarize?: (text: string) => void;
+
+  /**
+   * Callback when user clicks rewrite in carousel mini bar
+   */
+  onMiniBarRewrite?: (text: string) => void;
 }
 
 /**
@@ -43,12 +55,25 @@ export function SummaryPanel({
   initialText = '',
   pinnedNotes = [],
   onSummaryComplete,
+  onMiniBarSummarize,
+  onMiniBarRewrite,
 }: SummaryPanelProps) {
-  // Get app state and actions for updating history
-  const { state, actions } = useAppState();
+  // Get app actions (state no longer needed after history removal)
+  const { actions } = useAppState();
   
   // Ref to track last processed initialText
   const lastInitialTextRef = useRef<string>(initialText);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const miniBarRef = useRef<HTMLDivElement>(null);
+
+  // Selection mini bar
+  const { anchor, clear } = usePanelMiniBar(miniBarRef);
+
+  const handleSendTo = (panel: 'rewrite' | 'summary', text: string) => {
+    actions.setActiveTab(panel);
+    actions.setCurrentText(text);
+    clear();
+  };
   
   // Component state
   const [mode, setMode] = useState<SummaryMode>('bullets');
@@ -179,23 +204,8 @@ export function SummaryPanel({
 
       console.log('[SummaryPanel] Summarize completed successfully');
 
-      // Save to history
+      // History saving removed - now using snapshots instead
       let historyItemId: string | undefined;
-      try {
-        const historyItem = await StorageService.saveHistoryItem({
-          type: 'summarize',
-          originalText: currentVersion.text,
-          resultText: summaryResult,
-          metadata: {
-            mode,
-          },
-        });
-        // Update app state with new history item
-        actions.addHistoryItem(historyItem);
-        historyItemId = historyItem.id;
-      } catch (historyError) {
-        console.error('[SummaryPanel] Failed to save to history:', historyError);
-      }
 
       // Create new version and add to carousel
       const modeLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
@@ -287,26 +297,7 @@ export function SummaryPanel({
     ));
     
     // Update history if this version has a history ID
-    if (version?.historyId) {
-      try {
-        console.log('[SummaryPanel] Updating history item:', version.historyId);
-        const updatedHistoryItem = await StorageService.toggleHistoryLiked(version.historyId);
-        console.log('[SummaryPanel] History item updated successfully');
-        
-        // Update app state history to reflect the change
-        if (updatedHistoryItem) {
-          actions.setHistory(
-            state.history.map((item) =>
-              item.id === version.historyId ? updatedHistoryItem : item
-            )
-          );
-        }
-      } catch (error) {
-        console.error('[SummaryPanel] Failed to update history liked status:', error);
-      }
-    } else {
-      console.warn('[SummaryPanel] No historyId found for version:', id);
-    }
+    // History update removed - now using snapshots instead
   };
 
   /**
@@ -363,7 +354,7 @@ export function SummaryPanel({
   };
 
   return (
-    <div className="flint-section flex flex-col h-full">
+    <div ref={scrollContainerRef} className="flint-section flex flex-col h-full" style={{ position: 'relative', overflow: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
         <h2 className="flint-section-header" style={{ marginBottom: 0 }}>Summarize text</h2>
         {versions.length > 0 && (
@@ -386,6 +377,9 @@ export function SummaryPanel({
         )}
       </div>
 
+      {/* Mini bar for text selection */}
+      <MiniBar anchor={anchor} onClose={clear} onSend={handleSendTo} toolbarRef={miniBarRef} />
+
       {/* Version carousel - replaces the original text field */}
       <div className="flex-1 flex flex-col min-h-0" style={{ marginBottom: '16px' }}>
         <VersionCarousel
@@ -402,134 +396,138 @@ export function SummaryPanel({
           isLoading={isProcessing}
           placeholder="Paste or type text to summarize..."
           alwaysShowActions={true}
+          onMiniBarSummarize={onMiniBarSummarize}
+          onMiniBarRewrite={onMiniBarRewrite}
         />
       </div>
 
-      {/* Mode selector - radio buttons */}
-      <div style={{ marginBottom: '16px' }}>
-        <label
-          style={{
-            display: 'block',
-            fontSize: 'var(--fs-sm)',
-            color: 'var(--text-muted)',
-            marginBottom: '8px',
-            fontWeight: 500,
-          }}
-        >
-          Summary format
-        </label>
-        <div
-          style={{
-            display: 'flex',
-            gap: '8px',
-          }}
-          role="radiogroup"
-          aria-label="Summary format"
-        >
-          {(['bullets', 'paragraph', 'brief'] as const).map((modeOption) => (
-            <button
-              key={modeOption}
-              className={`flint-btn ${mode === modeOption ? 'primary' : 'ghost'}`}
-              onClick={() => handleModeChange(modeOption)}
-              disabled={isProcessing}
-              role="radio"
-              aria-checked={mode === modeOption}
-              aria-label={`${modeOption} format`}
-              style={{ flex: 1 }}
-            >
-              {modeOption.charAt(0).toUpperCase() + modeOption.slice(1)}
-            </button>
-          ))}
+      {/* Controls in horizontal layout */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        {/* Mode selector - radio buttons */}
+        <div style={{ flex: 1 }}>
+          <label
+            style={{
+              display: 'block',
+              fontSize: 'var(--fs-sm)',
+              color: 'var(--text-muted)',
+              marginBottom: '8px',
+              fontWeight: 500,
+            }}
+          >
+            Format
+          </label>
+          <div
+            style={{
+              display: 'flex',
+              gap: '4px',
+            }}
+            role="radiogroup"
+            aria-label="Summary format"
+          >
+            {(['bullets', 'paragraph', 'brief'] as const).map((modeOption) => (
+              <button
+                key={modeOption}
+                className={`flint-btn ${mode === modeOption ? 'primary' : 'ghost'}`}
+                onClick={() => handleModeChange(modeOption)}
+                disabled={isProcessing}
+                role="radio"
+                aria-checked={mode === modeOption}
+                aria-label={`${modeOption} format`}
+                style={{ flex: 1, fontSize: 'var(--fs-xs)' }}
+              >
+                {modeOption.charAt(0).toUpperCase() + modeOption.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Reading level dropdown */}
+        <div style={{ width: '140px' }}>
+          <label
+            htmlFor="reading-level-select"
+            style={{
+              display: 'block',
+              fontSize: 'var(--fs-sm)',
+              color: 'var(--text-muted)',
+              marginBottom: '8px',
+              fontWeight: 500,
+            }}
+          >
+            Level
+          </label>
+          <select
+            id="reading-level-select"
+            className="flint-input"
+            value={readingLevel}
+            onChange={(e) => handleReadingLevelChange(e.target.value)}
+            disabled={isProcessing}
+            aria-label="Select reading level"
+            style={{
+              width: '100%',
+              height: '48px',
+              padding: '12px 32px 12px 12px',
+              cursor: 'pointer',
+              appearance: 'none',
+              fontSize: 'var(--fs-sm)',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 12px center',
+              backgroundSize: '12px',
+            }}
+          >
+            <option value="simple">Simple</option>
+            <option value="moderate">Moderate</option>
+            <option value="detailed">Detailed</option>
+            <option value="complex">Complex</option>
+          </select>
         </div>
       </div>
 
-      {/* Reading level dropdown */}
-      <div style={{ marginBottom: '16px' }}>
-        <label
-          htmlFor="reading-level-select"
-          style={{
-            display: 'block',
-            fontSize: 'var(--fs-sm)',
-            color: 'var(--text-muted)',
-            marginBottom: '8px',
-            fontWeight: 500,
-          }}
-        >
-          Reading level
-        </label>
-        <select
-          id="reading-level-select"
-          className="flint-input"
-          value={readingLevel}
-          onChange={(e) => handleReadingLevelChange(e.target.value)}
-          disabled={isProcessing}
-          aria-label="Select reading level"
-          style={{
-            width: '100%',
-            height: '48px',
-            padding: '12px 40px 12px 16px',
-            cursor: 'pointer',
-            appearance: 'none',
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-            backgroundRepeat: 'no-repeat',
-            backgroundPosition: 'right 16px center',
-            backgroundSize: '12px',
-          }}
-        >
-          <option value="simple">Simple</option>
-          <option value="moderate">Moderate</option>
-          <option value="detailed">Detailed</option>
-          <option value="complex">Complex</option>
-        </select>
-      </div>
-
       {/* Action button */}
-      <div style={{ marginBottom: '16px' }}>
-        <button
-          className="flint-btn primary"
-          onClick={handleSummarize}
-          disabled={isProcessing}
-          aria-label="Summarize text"
-          style={{ width: '100%' }}
-        >
-          {isProcessing ? (
-            <>
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ animation: 'spin 1s linear infinite' }}
-                aria-hidden="true"
-              >
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-              </svg>
-              Processing...
-            </>
-          ) : (
-            <>
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-              </svg>
-              Summarize
-            </>
-          )}
-        </button>
-      </div>
+      <button
+        className="flint-btn primary"
+        onClick={handleSummarize}
+        disabled={isProcessing}
+        aria-label="Summarize text"
+        style={{ width: '100%', marginBottom: '16px' }}
+      >
+        {isProcessing ? (
+          <>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ animation: 'spin 1s linear infinite' }}
+              aria-hidden="true"
+            >
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            Processing...
+          </>
+        ) : (
+          <>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+            </svg>
+            Summarize
+          </>
+        )}
+      </button>
 
       {/* Error message with retry option */}
       {error && (

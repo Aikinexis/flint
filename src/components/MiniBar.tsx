@@ -1,146 +1,266 @@
-/**
- * MiniBar component props
- */
-export interface MiniBarProps {
-  /**
-   * Position for the mini bar
-   */
-  position?: { x: number; y: number };
-  
-  /**
-   * Callback when record button is clicked
-   */
-  onRecord?: () => void;
-  
-  /**
-   * Callback when summarize button is clicked
-   */
-  onSummarize?: () => void;
-  
-  /**
-   * Callback when rewrite button is clicked
-   */
-  onRewrite?: () => void;
-  
-  /**
-   * Callback when close button is clicked
-   */
-  onClose?: () => void;
-}
+import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { AIService } from '../services/ai';
+import { replaceTextInline } from '../utils/inlineReplace';
 
-/**
- * MiniBar component - floating toolbar near text selection
- * Provides quick access to text generation, summarization, and rewriting features
- */
-export function MiniBar({
-  position,
-  onRecord,
-  onSummarize,
-  onRewrite,
-  onClose,
-}: MiniBarProps) {
-  const style = position
-    ? {
-        left: `${position.x}px`,
-        top: `${position.y}px`,
+type Props = {
+  anchor: { x: number; y: number; text: string } | null;
+  onClose(): void;
+  onSend(panel: 'rewrite' | 'summary', text: string): void;
+  toolbarRef: React.RefObject<HTMLDivElement>;
+  /** Optional: Textarea element for inline replacement */
+  textareaRef?: React.RefObject<HTMLTextAreaElement>;
+  /** Optional: Selection range for inline replacement */
+  selectionRange?: { start: number; end: number };
+  /** Optional: Pinned notes for AI context */
+  pinnedNotes?: string[];
+  /** Optional: Callback to create snapshot before AI operation */
+  onBeforeOperation?: (operationType: 'rewrite' | 'summarize') => Promise<void>;
+};
+
+export const MiniBar: React.FC<Props> = ({ 
+  anchor, 
+  onClose, 
+  onSend, 
+  toolbarRef,
+  textareaRef,
+  selectionRange,
+  pinnedNotes = [],
+  onBeforeOperation,
+}) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  if (!anchor) return null;
+
+  /**
+   * Handle summarize button click with inline replacement
+   */
+  const handleSummarize = async () => {
+    // If no textarea ref provided, fall back to old behavior (navigate to tab)
+    if (!textareaRef?.current || !selectionRange) {
+      onSend('summary', anchor.text);
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      // Create snapshot before operation if callback provided
+      if (onBeforeOperation) {
+        await onBeforeOperation('summarize');
       }
-    : undefined;
 
-  return (
-    <div className="flint-minibar" style={style}>
-      {/* Generate button with sparkles icon */}
+      // Call AI service to summarize
+      const result = await AIService.summarize(anchor.text, {
+        mode: 'bullets',
+        readingLevel: 'moderate',
+        pinnedNotes,
+      });
+
+      // Replace text inline
+      await replaceTextInline(
+        textareaRef.current,
+        result,
+        selectionRange.start,
+        selectionRange.end
+      );
+
+      // Close mini bar after successful replacement
+      onClose();
+    } catch (error) {
+      console.error('[MiniBar] Summarize error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to summarize text');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  /**
+   * Handle rewrite button click with inline replacement
+   */
+  const handleRewrite = async () => {
+    // If no textarea ref provided, fall back to old behavior (navigate to tab)
+    if (!textareaRef?.current || !selectionRange) {
+      onSend('rewrite', anchor.text);
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      // Create snapshot before operation if callback provided
+      if (onBeforeOperation) {
+        await onBeforeOperation('rewrite');
+      }
+
+      // Call AI service to rewrite with default tone
+      const result = await AIService.rewrite(anchor.text, {
+        tone: 'as-is',
+        pinnedNotes,
+      });
+
+      // Replace text inline
+      await replaceTextInline(
+        textareaRef.current,
+        result,
+        selectionRange.start,
+        selectionRange.end
+      );
+
+      // Close mini bar after successful replacement
+      onClose();
+    } catch (error) {
+      console.error('[MiniBar] Rewrite error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to rewrite text');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
+  const ui = (
+    <div
+      ref={toolbarRef}
+      style={{
+        position: 'fixed',
+        display: 'none', // Will be set to 'flex' by usePanelMiniBar
+        gap: 8,
+        background: 'var(--bg-light, #1c1f2a)',
+        border: '1px solid var(--border, #2a3144)',
+        borderRadius: 12,
+        padding: '6px 8px',
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
+        zIndex: 2147483647,
+        pointerEvents: 'auto',
+      }}
+      onMouseDown={(e) => e.preventDefault()}
+    >
       <button
-        className="flint-icon-btn primary"
-        onClick={onRecord}
-        title="Generate text"
-        aria-label="Generate text"
+        onPointerDown={handleSummarize}
+        disabled={isProcessing}
+        aria-label="Summarize"
+        style={{
+          all: 'unset',
+          width: '22px',
+          height: '22px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: isProcessing ? 'wait' : 'pointer',
+          borderRadius: '6px',
+          color: '#F4F6FA',
+          transition: 'background 0.12s ease',
+          opacity: isProcessing ? 0.5 : 1,
+        }}
+        onMouseEnter={(e) => {
+          if (!isProcessing) {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent';
+        }}
       >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-          <path d="M12 19v4" />
-          <path d="M8 23h8" />
-        </svg>
+        {isProcessing ? (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" opacity="0.25" />
+            <path d="M12 2 A10 10 0 0 1 22 12" strokeLinecap="round">
+              <animateTransform
+                attributeName="transform"
+                type="rotate"
+                from="0 12 12"
+                to="360 12 12"
+                dur="1s"
+                repeatCount="indefinite"
+              />
+            </path>
+          </svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="8" y1="6" x2="21" y2="6" />
+            <line x1="8" y1="12" x2="21" y2="12" />
+            <line x1="8" y1="18" x2="21" y2="18" />
+            <line x1="3" y1="6" x2="3.01" y2="6" />
+            <line x1="3" y1="12" x2="3.01" y2="12" />
+            <line x1="3" y1="18" x2="3.01" y2="18" />
+          </svg>
+        )}
       </button>
-
-      {/* Summarize button with list icon */}
       <button
-        className="flint-icon-btn primary"
-        onClick={onSummarize}
-        title="Summarize"
-        aria-label="Summarize selection"
-      >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <line x1="8" y1="6" x2="21" y2="6" />
-          <line x1="8" y1="12" x2="21" y2="12" />
-          <line x1="8" y1="18" x2="21" y2="18" />
-          <line x1="3" y1="6" x2="3.01" y2="6" />
-          <line x1="3" y1="12" x2="3.01" y2="12" />
-          <line x1="3" y1="18" x2="3.01" y2="18" />
-        </svg>
-      </button>
-
-      {/* Rewrite button with edit icon */}
-      <button
-        className="flint-icon-btn primary"
-        onClick={onRewrite}
+        onPointerDown={handleRewrite}
+        disabled={isProcessing}
+        aria-label="Rewrite"
         title="Rewrite"
-        aria-label="Rewrite selection"
+        style={{
+          all: 'unset',
+          width: '22px',
+          height: '22px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: isProcessing ? 'wait' : 'pointer',
+          borderRadius: '6px',
+          color: '#F4F6FA',
+          transition: 'background 0.12s ease',
+          opacity: isProcessing ? 0.5 : 1,
+        }}
+        onMouseEnter={(e) => {
+          if (!isProcessing) {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent';
+        }}
       >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-        </svg>
+        {isProcessing ? (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" opacity="0.25" />
+            <path d="M12 2 A10 10 0 0 1 22 12" strokeLinecap="round">
+              <animateTransform
+                attributeName="transform"
+                type="rotate"
+                from="0 12 12"
+                to="360 12 12"
+                dur="1s"
+                repeatCount="indefinite"
+              />
+            </path>
+          </svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg>
+        )}
       </button>
-
-      {/* Close button with X icon */}
       <button
-        className="flint-icon-btn ghost"
-        onClick={onClose}
+        onPointerDown={onClose}
+        aria-label="Close"
         title="Close"
-        aria-label="Close mini bar"
+        style={{
+          all: 'unset',
+          width: '22px',
+          height: '22px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          borderRadius: '6px',
+          color: '#F4F6FA',
+          transition: 'background 0.12s ease',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent';
+        }}
       >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
       </button>
     </div>
   );
-}
+
+  return createPortal(ui, document.body);
+};

@@ -4,7 +4,7 @@
  */
 
 import type { AppState } from './store';
-import type { PinnedNote, HistoryItem } from '../services/storage';
+import type { PinnedNote } from '../services/storage';
 
 /**
  * Simple memoization helper for single-argument selectors
@@ -25,31 +25,7 @@ function memoize<T, R>(fn: (arg: T) => R): (arg: T) => R {
   };
 }
 
-/**
- * Memoization helper for selectors with additional parameters
- * @param fn - Selector function to memoize
- * @returns Memoized selector function
- */
-function memoizeWithParams<T, P, R>(fn: (state: T, params: P) => R): (state: T, params: P) => R {
-  const cache = new Map<string, R>();
-
-  return (state: T, params: P): R => {
-    const key = JSON.stringify(params);
-    if (cache.has(key)) {
-      return cache.get(key)!;
-    }
-    const result = fn(state, params);
-    cache.set(key, result);
-    // Keep cache size reasonable
-    if (cache.size > 100) {
-      const firstKey = cache.keys().next().value as string;
-      if (firstKey) {
-        cache.delete(firstKey);
-      }
-    }
-    return result;
-  };
-}
+// memoizeWithParams removed - no longer needed after history selectors removal
 
 // ===== Basic Selectors =====
 
@@ -131,13 +107,6 @@ export const selectLocalOnlyMode = (state: AppState) => state.settings.localOnly
 export const selectPinnedNotes = (state: AppState) => state.pinnedNotes;
 
 /**
- * Selects all history items
- * @param state - Application state
- * @returns Array of history items
- */
-export const selectHistory = (state: AppState) => state.history;
-
-/**
  * Selects AI availability status
  * @param state - Application state
  * @returns AI availability for all APIs
@@ -193,30 +162,12 @@ export const selectPinnedNotesCount = (state: AppState): number => {
 };
 
 /**
- * Gets the count of history items
- * @param state - Application state
- * @returns Number of history items
- */
-export const selectHistoryCount = (state: AppState): number => {
-  return state.history.length;
-};
-
-/**
  * Checks if there are any pinned notes
  * @param state - Application state
  * @returns True if there are pinned notes
  */
 export const selectHasPinnedNotes = (state: AppState): boolean => {
   return state.pinnedNotes.length > 0;
-};
-
-/**
- * Checks if there is any history
- * @param state - Application state
- * @returns True if there are history items
- */
-export const selectHasHistory = (state: AppState): boolean => {
-  return state.history.length > 0;
 };
 
 /**
@@ -256,93 +207,6 @@ export const selectPinnedNoteById = (state: AppState, id: string): PinnedNote | 
 };
 
 /**
- * Finds a history item by ID
- * @param state - Application state
- * @param id - History item ID to find
- * @returns History item or undefined
- */
-export const selectHistoryItemById = (state: AppState, id: string): HistoryItem | undefined => {
-  return state.history.find((item) => item.id === id);
-};
-
-/**
- * Filters history by type
- * Memoized with parameters to avoid recomputing
- * @param state - Application state
- * @param type - History item type to filter by
- * @returns Filtered history items
- */
-export const selectHistoryByType = memoizeWithParams(
-  (state: AppState, type: 'generate' | 'summarize' | 'rewrite'): HistoryItem[] => {
-    return state.history.filter((item) => item.type === type);
-  }
-);
-
-/**
- * Searches history by text content
- * Memoized with parameters to avoid recomputing
- * @param state - Application state
- * @param query - Search query
- * @returns Matching history items
- */
-export const selectFilteredHistory = memoizeWithParams(
-  (state: AppState, query: string): HistoryItem[] => {
-    if (!query.trim()) {
-      return state.history;
-    }
-
-    const lowerQuery = query.toLowerCase();
-    return state.history.filter(
-      (item) =>
-        item.originalText.toLowerCase().includes(lowerQuery) ||
-        item.resultText.toLowerCase().includes(lowerQuery) ||
-        item.type.toLowerCase().includes(lowerQuery)
-    );
-  }
-);
-
-/**
- * Gets recent history items (last N items)
- * Memoized with parameters to avoid recomputing
- * @param state - Application state
- * @param limit - Maximum number of items to return
- * @returns Recent history items
- */
-export const selectRecentHistory = memoizeWithParams(
-  (state: AppState, limit: number): HistoryItem[] => {
-    return state.history.slice(0, limit);
-  }
-);
-
-/**
- * Gets history statistics
- * Memoized to avoid recomputing on every render
- * @param state - Application state
- * @returns History statistics
- */
-export const selectHistoryStats = memoize(
-  (state: AppState): {
-    total: number;
-    generate: number;
-    summarize: number;
-    rewrite: number;
-  } => {
-    const stats = {
-      total: state.history.length,
-      generate: 0,
-      summarize: 0,
-      rewrite: 0,
-    };
-
-    for (const item of state.history) {
-      stats[item.type]++;
-    }
-
-    return stats;
-  }
-);
-
-/**
  * Checks if there is an active operation (current text and processing)
  * @param state - Application state
  * @returns True if an operation is active
@@ -358,15 +222,6 @@ export const selectHasActiveOperation = (state: AppState): boolean => {
  */
 export const selectHasResult = (state: AppState): boolean => {
   return state.currentResult !== null && state.currentResult.length > 0;
-};
-
-/**
- * Gets the most recent history item
- * @param state - Application state
- * @returns Most recent history item or undefined
- */
-export const selectMostRecentHistoryItem = (state: AppState): HistoryItem | undefined => {
-  return state.history[0];
 };
 
 /**
@@ -388,13 +243,3 @@ export const selectPinnedNotesSortedByUpdated = memoize((state: AppState): Pinne
 export const selectPinnedNotesSortedByTitle = memoize((state: AppState): PinnedNote[] => {
   return [...state.pinnedNotes].sort((a, b) => a.title.localeCompare(b.title));
 });
-
-/**
- * Gets history items sorted by timestamp (newest first)
- * Already sorted in state, but provided for consistency
- * @param state - Application state
- * @returns Sorted history items
- */
-export const selectHistorySortedByTimestamp = (state: AppState): HistoryItem[] => {
-  return state.history; // Already sorted newest first
-};

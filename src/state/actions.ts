@@ -4,7 +4,7 @@
  */
 
 import type { AppState, Tab } from './store';
-import type { Settings, PinnedNote, HistoryItem } from '../services/storage';
+import type { Settings, PinnedNote } from '../services/storage';
 import type { AIAvailability } from '../services/ai';
 
 /**
@@ -14,6 +14,8 @@ export enum ActionType {
   // UI actions
   SET_ACTIVE_TAB = 'SET_ACTIVE_TAB',
   SET_IS_PROCESSING = 'SET_IS_PROCESSING',
+  SET_IS_HISTORY_PANEL_OPEN = 'SET_IS_HISTORY_PANEL_OPEN',
+  TOGGLE_HISTORY_PANEL = 'TOGGLE_HISTORY_PANEL',
 
   // Settings actions
   SET_SETTINGS = 'SET_SETTINGS',
@@ -24,11 +26,6 @@ export enum ActionType {
   ADD_PINNED_NOTE = 'ADD_PINNED_NOTE',
   UPDATE_PINNED_NOTE = 'UPDATE_PINNED_NOTE',
   DELETE_PINNED_NOTE = 'DELETE_PINNED_NOTE',
-
-  // History actions
-  SET_HISTORY = 'SET_HISTORY',
-  ADD_HISTORY_ITEM = 'ADD_HISTORY_ITEM',
-  CLEAR_HISTORY = 'CLEAR_HISTORY',
 
   // Current operation actions
   SET_CURRENT_TEXT = 'SET_CURRENT_TEXT',
@@ -52,6 +49,15 @@ export interface SetActiveTabAction {
 export interface SetIsProcessingAction {
   type: ActionType.SET_IS_PROCESSING;
   payload: boolean;
+}
+
+export interface SetIsHistoryPanelOpenAction {
+  type: ActionType.SET_IS_HISTORY_PANEL_OPEN;
+  payload: boolean;
+}
+
+export interface ToggleHistoryPanelAction {
+  type: ActionType.TOGGLE_HISTORY_PANEL;
 }
 
 export interface SetSettingsAction {
@@ -87,20 +93,6 @@ export interface DeletePinnedNoteAction {
   payload: string; // note id
 }
 
-export interface SetHistoryAction {
-  type: ActionType.SET_HISTORY;
-  payload: HistoryItem[];
-}
-
-export interface AddHistoryItemAction {
-  type: ActionType.ADD_HISTORY_ITEM;
-  payload: HistoryItem;
-}
-
-export interface ClearHistoryAction {
-  type: ActionType.CLEAR_HISTORY;
-}
-
 export interface SetCurrentTextAction {
   type: ActionType.SET_CURRENT_TEXT;
   payload: string;
@@ -127,15 +119,14 @@ export interface SetErrorAction {
 export type Action =
   | SetActiveTabAction
   | SetIsProcessingAction
+  | SetIsHistoryPanelOpenAction
+  | ToggleHistoryPanelAction
   | SetSettingsAction
   | UpdateSettingsAction
   | SetPinnedNotesAction
   | AddPinnedNoteAction
   | UpdatePinnedNoteAction
   | DeletePinnedNoteAction
-  | SetHistoryAction
-  | AddHistoryItemAction
-  | ClearHistoryAction
   | SetCurrentTextAction
   | SetCurrentResultAction
   | SetAIAvailabilityAction
@@ -154,6 +145,15 @@ export const setActiveTab = (tab: Tab): SetActiveTabAction => ({
 export const setIsProcessing = (isProcessing: boolean): SetIsProcessingAction => ({
   type: ActionType.SET_IS_PROCESSING,
   payload: isProcessing,
+});
+
+export const setIsHistoryPanelOpen = (isOpen: boolean): SetIsHistoryPanelOpenAction => ({
+  type: ActionType.SET_IS_HISTORY_PANEL_OPEN,
+  payload: isOpen,
+});
+
+export const toggleHistoryPanel = (): ToggleHistoryPanelAction => ({
+  type: ActionType.TOGGLE_HISTORY_PANEL,
 });
 
 // Settings action creators
@@ -189,21 +189,6 @@ export const updatePinnedNote = (
 export const deletePinnedNote = (id: string): DeletePinnedNoteAction => ({
   type: ActionType.DELETE_PINNED_NOTE,
   payload: id,
-});
-
-// History action creators
-export const setHistory = (history: HistoryItem[]): SetHistoryAction => ({
-  type: ActionType.SET_HISTORY,
-  payload: history,
-});
-
-export const addHistoryItem = (item: HistoryItem): AddHistoryItemAction => ({
-  type: ActionType.ADD_HISTORY_ITEM,
-  payload: item,
-});
-
-export const clearHistory = (): ClearHistoryAction => ({
-  type: ActionType.CLEAR_HISTORY,
 });
 
 // Current operation action creators
@@ -248,6 +233,18 @@ export function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         isProcessing: action.payload,
+      };
+
+    case ActionType.SET_IS_HISTORY_PANEL_OPEN:
+      return {
+        ...state,
+        isHistoryPanelOpen: action.payload,
+      };
+
+    case ActionType.TOGGLE_HISTORY_PANEL:
+      return {
+        ...state,
+        isHistoryPanelOpen: !state.isHistoryPanelOpen,
       };
 
     // Settings actions
@@ -295,25 +292,6 @@ export function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         pinnedNotes: state.pinnedNotes.filter((note) => note.id !== action.payload),
-      };
-
-    // History actions
-    case ActionType.SET_HISTORY:
-      return {
-        ...state,
-        history: action.payload,
-      };
-
-    case ActionType.ADD_HISTORY_ITEM:
-      return {
-        ...state,
-        history: [action.payload, ...state.history],
-      };
-
-    case ActionType.CLEAR_HISTORY:
-      return {
-        ...state,
-        history: [],
       };
 
     // Current operation actions

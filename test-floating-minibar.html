@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Floating UI MiniBar Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    
+    .test-section {
+      margin: 30px 0;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: #f9f9f9;
+    }
+    
+    h1 {
+      color: #333;
+    }
+    
+    h2 {
+      color: #555;
+      margin-top: 0;
+    }
+    
+    p {
+      margin: 15px 0;
+    }
+    
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 14px;
+      resize: vertical;
+    }
+    
+    .instructions {
+      background: #e3f2fd;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    
+    .instructions h3 {
+      margin-top: 0;
+      color: #1976d2;
+    }
+    
+    .instructions ul {
+      margin: 10px 0;
+      padding-left: 20px;
+    }
+    
+    .instructions li {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Floating UI MiniBar Test</h1>
+  
+  <div class="instructions">
+    <h3>Testing Instructions</h3>
+    <ul>
+      <li>Open the Flint extension side panel</li>
+      <li>Navigate to the Rewrite or Summary tab</li>
+      <li>Select text in the panel's textarea or content areas</li>
+      <li>The mini bar should appear above your selection using Floating UI</li>
+      <li>It should stay positioned correctly even when scrolling</li>
+      <li>Multi-line selections should anchor to the last line</li>
+    </ul>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Case 1: Regular Paragraph</h2>
+    <p>
+      This is a test paragraph with enough text to demonstrate the selection toolbar functionality. 
+      Try selecting different portions of this text to see how the mini bar positions itself. 
+      The toolbar should appear above your selection and stay properly positioned even if you scroll 
+      or resize the window. This implementation uses Floating UI to handle all the complex positioning 
+      logic automatically.
+    </p>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Case 2: Multi-line Text</h2>
+    <p>
+      Select across multiple lines to test the inline middleware.
+      The mini bar should anchor to the last visual line of your selection.
+      This ensures it appears in a logical position even for complex selections.
+      Try selecting from the middle of one line to the middle of another.
+      The positioning should remain stable and intuitive.
+    </p>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Case 3: Textarea</h2>
+    <textarea placeholder="Type or paste text here, then select some of it to test the mini bar...">
+The Floating UI implementation fixes the "stuck in title bar" issue by:
+
+1. Using fixed positioning relative to the viewport instead of absolute positioning
+2. Creating a virtual element that represents the selection's bounding rectangle
+3. Using the inline() middleware to anchor to the actual inline line box
+4. Automatically handling scroll, resize, and content changes with autoUpdate
+5. Using flip() and shift() middleware to keep the toolbar onscreen
+
+This approach is more reliable than manual coordinate conversion because it lets Floating UI handle all the edge cases like transforms, scrolling containers, and multi-line selections.
+    </textarea>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Case 4: Edge Cases</h2>
+    <p>
+      Test near the edges of the viewport. Select text at the very top or bottom of the panel.
+      The flip() middleware should reposition the toolbar to stay visible. Select text near the 
+      left or right edges to test the shift() middleware with padding.
+    </p>
+  </div>
+
+  <div class="test-section">
+    <h2>Expected Behavior</h2>
+    <ul>
+      <li>✅ Mini bar appears above selection (8px offset)</li>
+      <li>✅ Stays positioned correctly during scroll</li>
+      <li>✅ Flips to below if no room above</li>
+      <li>✅ Shifts horizontally to stay onscreen (8px padding)</li>
+      <li>✅ Multi-line selections anchor to last line</li>
+      <li>✅ No "stuck in title bar" issue</li>
+      <li>✅ Works with transforms and nested containers</li>
+    </ul>
+  </div>
+
+  <script>
+    console.log('Floating UI MiniBar test page loaded');
+    console.log('Open the Flint extension side panel to test the new implementation');
+  </script>
+</body>
+</html>

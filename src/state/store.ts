@@ -4,13 +4,13 @@
  */
 
 import { createContext, useContext } from 'react';
-import type { Settings, PinnedNote, HistoryItem } from '../services/storage';
+import type { Settings, PinnedNote } from '../services/storage';
 import type { AIAvailability } from '../services/ai';
 
 /**
  * Tab types for navigation
  */
-export type Tab = 'home' | 'generate' | 'rewrite' | 'summary' | 'history' | 'settings';
+export type Tab = 'home' | 'generate' | 'rewrite' | 'summary' | 'settings';
 
 /**
  * Application state interface
@@ -19,11 +19,11 @@ export interface AppState {
   // UI state
   activeTab: Tab;
   isProcessing: boolean;
+  isHistoryPanelOpen: boolean;
 
   // Data
   settings: Settings;
   pinnedNotes: PinnedNote[];
-  history: HistoryItem[];
 
   // Current operation
   currentText: string;
@@ -43,6 +43,8 @@ export interface AppActions {
   // UI actions
   setActiveTab: (tab: Tab) => void;
   setIsProcessing: (isProcessing: boolean) => void;
+  setIsHistoryPanelOpen: (isOpen: boolean) => void;
+  toggleHistoryPanel: () => void;
 
   // Settings actions
   setSettings: (settings: Settings) => void;
@@ -53,11 +55,6 @@ export interface AppActions {
   addPinnedNote: (note: PinnedNote) => void;
   updatePinnedNote: (id: string, note: Partial<PinnedNote>) => void;
   deletePinnedNote: (id: string) => void;
-
-  // History actions
-  setHistory: (history: HistoryItem[]) => void;
-  addHistoryItem: (item: HistoryItem) => void;
-  clearHistory: () => void;
 
   // Current operation actions
   setCurrentText: (text: string) => void;
@@ -96,11 +93,11 @@ export const initialState: AppState = {
   // UI state
   activeTab: 'home',
   isProcessing: false,
+  isHistoryPanelOpen: false,
 
   // Data
   settings: DEFAULT_SETTINGS,
   pinnedNotes: [],
-  history: [],
 
   // Current operation
   currentText: '',

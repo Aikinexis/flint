@@ -10,7 +10,7 @@
 
 import { createSelectionHandler, SelectionHandler } from './selection';
 import { createCaretHandler, CaretHandler, InsertionResult } from './caret';
-import { createMiniBarInjector, MiniBarInjector, Position } from './injector';
+import { createMiniBarInjector, MiniBarInjector } from './injector';
 
 /**
  * Message types for communication with panel and background
@@ -157,13 +157,8 @@ class ContentScriptCoordinator {
 
         this.lastSelectionText = currentText;
 
-        // Get selection position for mini bar placement
-        const position = this.getSelectionPosition();
-        
-        if (position) {
-          // Show mini bar near selection
-          this.showMiniBar(position);
-        }
+        // Show mini bar near selection
+        this.showMiniBar();
       }, 200); // Wait 200ms for selection to stabilize
     });
   }
@@ -358,16 +353,7 @@ class ContentScriptCoordinator {
    */
   private handleShowMiniBar(): MessageResponse {
     try {
-      const position = this.getSelectionPosition();
-
-      if (!position) {
-        return {
-          success: false,
-          error: 'Could not determine selection position'
-        };
-      }
-
-      this.showMiniBar(position);
+      this.showMiniBar();
 
       return {
         success: true,
@@ -404,53 +390,11 @@ class ContentScriptCoordinator {
   }
 
   /**
-   * Get the position of the current text selection
-   * Used for positioning the mini bar
-   */
-  private getSelectionPosition(): Position | null {
-    try {
-      // Check if selection is in a textarea or input field
-      const activeElement = document.activeElement;
-      if (activeElement instanceof HTMLTextAreaElement || activeElement instanceof HTMLInputElement) {
-        // For form fields, position mini bar at the top-center of the field
-        const rect = activeElement.getBoundingClientRect();
-        const x = rect.left + rect.width / 2 + window.scrollX;
-        const y = rect.top + window.scrollY;
-        return { x, y };
-      }
-
-      // For regular text selections
-      const selection = window.getSelection();
-
-      if (!selection || selection.rangeCount === 0) {
-        return null;
-      }
-
-      const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-
-      // Check if rect is valid (not collapsed to 0,0)
-      if (rect.width === 0 && rect.height === 0) {
-        return null;
-      }
-
-      // Calculate position at the center-top of the selection
-      const x = rect.left + rect.width / 2 + window.scrollX;
-      const y = rect.top + window.scrollY;
-
-      return { x, y };
-    } catch (error) {
-      console.error('[Flint] Error getting selection position:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Show the mini bar at the specified position
+   * Show the mini bar near the current selection
    * Sets up callbacks for mini bar button actions
    */
-  private showMiniBar(position: Position): void {
-    this.miniBarInjector.show(position, {
+  private showMiniBar(): void {
+    this.miniBarInjector.show({
       onRecord: () => {
         this.sendMessageToPanel('OPEN_GENERATE_TAB');
       },

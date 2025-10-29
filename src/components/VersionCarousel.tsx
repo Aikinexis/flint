@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { CarouselMiniBar } from './CarouselMiniBar';
 
 /**
  * Version data structure
@@ -87,6 +88,16 @@ export interface VersionCarouselProps {
    * Whether the textarea should be read-only (user cannot edit)
    */
   readOnly?: boolean;
+
+  /**
+   * Callback when user clicks summarize in carousel mini bar
+   */
+  onMiniBarSummarize?: (text: string) => void;
+
+  /**
+   * Callback when user clicks rewrite in carousel mini bar
+   */
+  onMiniBarRewrite?: (text: string) => void;
 }
 
 /**
@@ -108,15 +119,20 @@ export function VersionCarousel({
   placeholder = 'No content yet',
   alwaysShowActions = false,
   readOnly = false,
+  onMiniBarSummarize,
+  onMiniBarRewrite,
 }: VersionCarouselProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [editText, setEditText] = useState('');
   const [editTitle, setEditTitle] = useState('');
   const [showCopySuccess, setShowCopySuccess] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const currentVersion = versions[currentIndex];
   const canGoLeft = currentIndex > 0;
   const canGoRight = currentIndex < versions.length - 1;
+
+
 
   // Calculate word and character counts for current version
   const wordCount = editText.trim() === '' ? 0 : editText.trim().split(/\s+/).length;
@@ -281,6 +297,7 @@ export function VersionCarousel({
 
         {/* Editable textarea */}
         <textarea
+          ref={textareaRef}
           className="flint-input"
           value={editText}
           onChange={(e) => {
@@ -703,6 +720,15 @@ export function VersionCarousel({
             )}
           </div>
         </div>
+      )}
+
+      {/* Carousel Mini Bar - only show if callbacks are provided */}
+      {onMiniBarSummarize && onMiniBarRewrite && (
+        <CarouselMiniBar
+          textareaRef={textareaRef}
+          onSummarize={onMiniBarSummarize}
+          onRewrite={onMiniBarRewrite}
+        />
       )}
     </div>
   );

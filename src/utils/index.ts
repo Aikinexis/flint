@@ -5,3 +5,4 @@
 export * from './id';
 export * from './throttle';
 export * from './dom';
+export * from './inlineReplace';

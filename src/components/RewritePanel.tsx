@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import type { PinnedNote } from '../services/storage';
-import { StorageService } from '../services/storage';
+// StorageService import removed - history functionality replaced by snapshots
 import { AIService } from '../services/ai';
 import { VersionCarousel, type Version } from './VersionCarousel';
 import { useAppState } from '../state';
+import { usePanelMiniBar } from '../hooks/usePanelMiniBar';
+import { MiniBar } from './MiniBar';
 
 /**
  * RewritePanel component props
@@ -23,6 +25,16 @@ export interface RewritePanelProps {
    * Callback when rewrite completes successfully (deprecated - now handled internally)
    */
   onRewriteComplete?: (original: string, rewritten: string) => void;
+
+  /**
+   * Callback when user clicks summarize in carousel mini bar
+   */
+  onMiniBarSummarize?: (text: string) => void;
+
+  /**
+   * Callback when user clicks rewrite in carousel mini bar
+   */
+  onMiniBarRewrite?: (text: string) => void;
 }
 
 
@@ -34,9 +46,11 @@ export interface RewritePanelProps {
 export function RewritePanel({ 
   initialText = '', 
   pinnedNotes = [],
+  onMiniBarSummarize,
+  onMiniBarRewrite,
 }: RewritePanelProps) {
-  // Get app state and actions for updating history
-  const { state, actions } = useAppState();
+  // Get app actions (state no longer needed after history removal)
+  const { actions } = useAppState();
   
   // Component state
   const [customPrompt, setCustomPrompt] = useState('');
@@ -46,12 +60,25 @@ export function RewritePanel({
   const [isMockProvider, setIsMockProvider] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
+
+
   
   // Refs
   const promptInputRef = useRef<HTMLInputElement>(null);
   const speechRecognitionRef = useRef<any>(null);
   const presetMenuRef = useRef<HTMLDivElement>(null);
   const lastInitialTextRef = useRef<string>(initialText);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const miniBarRef = useRef<HTMLDivElement>(null);
+
+  // Selection mini bar
+  const { anchor, clear } = usePanelMiniBar(miniBarRef);
+
+  const handleSendTo = (panel: 'rewrite' | 'summary', text: string) => {
+    actions.setActiveTab(panel);
+    actions.setCurrentText(text);
+    clear();
+  };
 
   // Preset options
   const presets = [
@@ -333,23 +360,8 @@ export function RewritePanel({
 
       console.log('[RewritePanel] Rewrite completed successfully');
 
-      // Save to history
+      // History saving removed - now using snapshots instead
       let historyItemId: string | undefined;
-      try {
-        const historyItem = await StorageService.saveHistoryItem({
-          type: 'rewrite',
-          originalText: currentVersion.text,
-          resultText: rewrittenText,
-          metadata: {
-            preset: customPrompt,
-          },
-        });
-        // Update app state with new history item
-        actions.addHistoryItem(historyItem);
-        historyItemId = historyItem.id;
-      } catch (historyError) {
-        console.error('[RewritePanel] Failed to save to history:', historyError);
-      }
 
       // Create new version and add to carousel
       const newVersion: Version = {
@@ -434,27 +446,7 @@ export function RewritePanel({
       v.id === id ? { ...v, isLiked: !v.isLiked } : v
     ));
     
-    // Update history if this version has a history ID
-    if (version?.historyId) {
-      try {
-        console.log('[RewritePanel] Updating history item:', version.historyId);
-        const updatedHistoryItem = await StorageService.toggleHistoryLiked(version.historyId);
-        console.log('[RewritePanel] History item updated successfully');
-        
-        // Update app state history to reflect the change
-        if (updatedHistoryItem) {
-          actions.setHistory(
-            state.history.map((item) =>
-              item.id === version.historyId ? updatedHistoryItem : item
-            )
-          );
-        }
-      } catch (error) {
-        console.error('[RewritePanel] Failed to update history liked status:', error);
-      }
-    } else {
-      console.warn('[RewritePanel] No historyId found for version:', id);
-    }
+    // History update removed - now using snapshots instead
   };
 
   /**
@@ -510,7 +502,7 @@ export function RewritePanel({
 
 
   return (
-    <div className="flint-section flex flex-col h-full">
+    <div ref={scrollContainerRef} className="flint-section flex flex-col h-full" style={{ position: 'relative', overflow: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
         <h2 className="flint-section-header" style={{ marginBottom: 0 }}>Rewrite text</h2>
         {versions.length > 0 && (
@@ -533,6 +525,9 @@ export function RewritePanel({
         )}
       </div>
 
+      {/* Mini bar for text selection */}
+      <MiniBar anchor={anchor} onClose={clear} onSend={handleSendTo} toolbarRef={miniBarRef} />
+
       {/* Version carousel - replaces the original text field */}
       <div className="flex-1 flex flex-col min-h-0" style={{ marginBottom: '16px' }}>
         <VersionCarousel
@@ -549,6 +544,8 @@ export function RewritePanel({
           isLoading={isProcessing}
           placeholder="Paste or type text to rewrite..."
           alwaysShowActions={true}
+          onMiniBarSummarize={onMiniBarSummarize}
+          onMiniBarRewrite={onMiniBarRewrite}
         />
       </div>
 

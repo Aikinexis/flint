@@ -36,11 +36,10 @@ export interface MiniBarCallbacks {
  */
 export interface MiniBarInjector {
   /**
-   * Show the mini bar at the specified position
-   * @param position Coordinates where mini bar should appear
+   * Show the mini bar near the current text selection
    * @param callbacks Button click handlers
    */
-  show(position: Position, callbacks: MiniBarCallbacks): void;
+  show(callbacks: MiniBarCallbacks): void;
 
   /**
    * Hide and remove the mini bar from the page
@@ -95,7 +94,7 @@ class MiniBarInjectorImpl implements MiniBarInjector {
     this.bar = document.createElement('div');
     this.bar.className = 'flint-bar';
     this.bar.style.cssText = `
-      position: fixed;
+      position: absolute;
       display: none;
       pointer-events: auto;
       background: rgba(50, 50, 50, 0.95);
@@ -255,20 +254,41 @@ class MiniBarInjectorImpl implements MiniBarInjector {
   /**
    * Show the mini bar near the text selection
    */
-  show(position: Position, callbacks: MiniBarCallbacks): void {
+  show(callbacks: MiniBarCallbacks): void {
     if (!this.bar) return;
 
     // Store callbacks
     this.callbacks = callbacks;
+
+    // Get current selection to calculate viewport position
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+
+    console.log('[Flint Minibar] Selection rect:', {
+      top: rect.top,
+      bottom: rect.bottom,
+      left: rect.left,
+      right: rect.right,
+      width: rect.width,
+      height: rect.height
+    });
 
     // Calculate position with offset above selection
     const minibarWidth = 180;
     const minibarHeight = 40;
     const offset = 8;
 
-    // Convert to viewport coordinates (subtract scroll since we use fixed positioning)
-    let left = position.x - window.scrollX - minibarWidth / 2;
-    let top = position.y - window.scrollY - minibarHeight - offset;
+    // Use viewport coordinates directly from getBoundingClientRect
+    // This automatically accounts for all scrolling (window + containers)
+    let left = rect.left + rect.width / 2 - minibarWidth / 2;
+    let top = rect.top - minibarHeight - offset;
+
+    console.log('[Flint Minibar] Calculated position before bounds check:', { left, top });
 
     // Keep within viewport bounds
     const viewportWidth = window.innerWidth;
@@ -281,17 +301,25 @@ class MiniBarInjectorImpl implements MiniBarInjector {
 
     if (top < 10) {
       // Flip below if not enough space above
-      top = position.y - window.scrollY + offset;
+      top = rect.bottom + offset;
     }
 
     if (top + minibarHeight > viewportHeight - 10) {
       top = viewportHeight - minibarHeight - 10;
     }
 
+    console.log('[Flint Minibar] Final position after bounds check:', { left, top });
+
     // Position and show minibar
     this.bar.style.left = `${Math.round(left)}px`;
     this.bar.style.top = `${Math.round(top)}px`;
     this.bar.style.display = 'flex';
+
+    console.log('[Flint Minibar] Applied styles:', {
+      left: this.bar.style.left,
+      top: this.bar.style.top,
+      position: this.bar.style.position
+    });
 
     // Delay before showing to avoid jumpiness during selection
     setTimeout(() => {
@@ -354,8 +382,8 @@ class MiniBarInjectorImpl implements MiniBarInjector {
     };
 
     // Add scroll listener to window and document
-    window.addEventListener('scroll', this.scrollHandler, { passive: true });
-    document.addEventListener('scroll', this.scrollHandler, { passive: true });
+    window.addEventListener('scroll', this.scrollHandler, { passive: true, capture: true });
+    document.addEventListener('scroll', this.scrollHandler, { passive: true, capture: true });
   }
 
   /**
@@ -363,8 +391,8 @@ class MiniBarInjectorImpl implements MiniBarInjector {
    */
   private removeScrollListener(): void {
     if (this.scrollHandler) {
-      window.removeEventListener('scroll', this.scrollHandler);
-      document.removeEventListener('scroll', this.scrollHandler);
+      window.removeEventListener('scroll', this.scrollHandler, true);
+      document.removeEventListener('scroll', this.scrollHandler, true);
       this.scrollHandler = null;
     }
   }
