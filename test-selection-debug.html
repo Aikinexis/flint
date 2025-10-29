@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selection Debug Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0c0e13;
+            color: #f4f6fa;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #6366f1;
+        }
+
+        .editor-container {
+            background: #14161d;
+            border: 2px solid #2a3144;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            background: #1c1f2a;
+            border: 1px solid #2a3144;
+            border-radius: 8px;
+            padding: 16px;
+            color: #f4f6fa;
+            font-size: 15px;
+            line-height: 1.6;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        textarea:focus {
+            outline: 2px solid #6366f1;
+            outline-offset: 2px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:active {
+            opacity: 0.8;
+        }
+
+        .debug-panel {
+            background: #1c1f2a;
+            border: 2px solid #6366f1;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .debug-panel h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: #6366f1;
+        }
+
+        .debug-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #2a3144;
+        }
+
+        .debug-row:last-child {
+            border-bottom: none;
+        }
+
+        .debug-label {
+            color: #9ca3af;
+            font-weight: 500;
+        }
+
+        .debug-value {
+            color: #f4f6fa;
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+
+        .debug-value.good {
+            color: #10b981;
+        }
+
+        .debug-value.bad {
+            color: #ef4444;
+        }
+
+        .event-log {
+            background: #0c0e13;
+            border: 1px solid #2a3144;
+            border-radius: 8px;
+            padding: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 16px;
+        }
+
+        .event-log-entry {
+            padding: 4px 0;
+            color: #9ca3af;
+        }
+
+        .event-log-entry.capture {
+            color: #10b981;
+        }
+
+        .event-log-entry.button {
+            color: #6366f1;
+            font-weight: 600;
+        }
+
+        .event-log-entry.error {
+            color: #ef4444;
+        }
+
+        .instructions {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .instructions h3 {
+            color: #6366f1;
+            margin-bottom: 8px;
+        }
+
+        .instructions ol {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔍 Selection Capture Debug Test</h1>
+
+        <div class="instructions">
+            <h3>Test Instructions:</h3>
+            <ol>
+                <li>Type or paste some text in the textarea below</li>
+                <li>Select some text with your mouse</li>
+                <li>Watch the "Captured Selection" values update</li>
+                <li>Click the "Rewrite" button</li>
+                <li>Check if the captured selection is still correct</li>
+            </ol>
+        </div>
+
+        <div class="debug-panel">
+            <h2>📊 Real-Time Selection State</h2>
+            <div class="debug-row">
+                <span class="debug-label">Current Selection Start:</span>
+                <span class="debug-value" id="current-start">0</span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">Current Selection End:</span>
+                <span class="debug-value" id="current-end">0</span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">Captured Selection Start:</span>
+                <span class="debug-value good" id="captured-start">0</span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">Captured Selection End:</span>
+                <span class="debug-value good" id="captured-end">0</span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">Selected Text:</span>
+                <span class="debug-value" id="selected-text">(none)</span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">Textarea Has Focus:</span>
+                <span class="debug-value" id="has-focus">false</span>
+            </div>
+        </div>
+
+        <div class="editor-container">
+            <textarea id="editor"
+                placeholder="Type or paste text here, then select some text...">This is sample text for testing selection capture. Try selecting different parts of this text and watch the debug panel above update in real-time. Then click the Rewrite button to see if the selection is preserved.</textarea>
+
+            <div class="controls">
+                <button id="rewrite-btn">Rewrite Selection</button>
+                <button id="summarize-btn">Summarize Selection</button>
+                <button id="clear-log-btn" style="background: #374151;">Clear Log</button>
+            </div>
+
+            <div class="event-log" id="event-log"></div>
+        </div>
+    </div>
+
+    <script>
+        const editor = document.getElementById('editor');
+        const currentStartEl = document.getElementById('current-start');
+        const currentEndEl = document.getElementById('current-end');
+        const capturedStartEl = document.getElementById('captured-start');
+        const capturedEndEl = document.getElementById('captured-end');
+        const selectedTextEl = document.getElementById('selected-text');
+        const hasFocusEl = document.getElementById('has-focus');
+        const eventLog = document.getElementById('event-log');
+        const rewriteBtn = document.getElementById('rewrite-btn');
+        const summarizeBtn = document.getElementById('summarize-btn');
+        const clearLogBtn = document.getElementById('clear-log-btn');
+
+        // Captured selection (simulating the ref)
+        let capturedSelection = { start: 0, end: 0 };
+
+        function logEvent(message, type = 'normal') {
+            const entry = document.createElement('div');
+            entry.className = `event-log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            eventLog.appendChild(entry);
+            eventLog.scrollTop = eventLog.scrollHeight;
+        }
+
+        function updateDebugPanel() {
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            const selectedText = editor.value.substring(start, end);
+            const hasFocus = document.activeElement === editor;
+
+            currentStartEl.textContent = start;
+            currentEndEl.textContent = end;
+            selectedTextEl.textContent = selectedText || '(none)';
+            hasFocusEl.textContent = hasFocus ? 'true' : 'false';
+            hasFocusEl.className = hasFocus ? 'debug-value good' : 'debug-value bad';
+        }
+
+        function captureSelection() {
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+
+            capturedSelection = { start, end };
+
+            capturedStartEl.textContent = start;
+            capturedEndEl.textContent = end;
+
+            const selectedText = editor.value.substring(start, end);
+            if (start !== end) {
+                logEvent(`✓ Captured selection: [${start}, ${end}] = "${selectedText.substring(0, 30)}${selectedText.length > 30 ? '...' : ''}"`, 'capture');
+            } else {
+                logEvent(`✓ Captured cursor position: ${start}`, 'capture');
+            }
+        }
+
+        // Attach all the same events as the real component
+        editor.addEventListener('select', () => {
+            logEvent('Event: select');
+            captureSelection();
+            updateDebugPanel();
+        });
+
+        editor.addEventListener('click', () => {
+            logEvent('Event: click');
+            captureSelection();
+            updateDebugPanel();
+        });
+
+        editor.addEventListener('keyup', () => {
+            logEvent('Event: keyup');
+            captureSelection();
+            updateDebugPanel();
+        });
+
+        editor.addEventListener('blur', () => {
+            logEvent('Event: blur (focus lost)', 'error');
+            captureSelection();
+            updateDebugPanel();
+        });
+
+        editor.addEventListener('mouseup', () => {
+            logEvent('Event: mouseup');
+            captureSelection();
+            updateDebugPanel();
+        });
+
+        editor.addEventListener('focus', () => {
+            logEvent('Event: focus (focus gained)', 'capture');
+            updateDebugPanel();
+        });
+
+        // Update debug panel continuously
+        setInterval(updateDebugPanel, 100);
+
+        // Button handlers
+        rewriteBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // Prevent focus loss
+            logEvent('🔵 REWRITE BUTTON CLICKED (mousedown with preventDefault)', 'button');
+        });
+
+        rewriteBtn.addEventListener('click', () => {
+            logEvent('🔵 REWRITE BUTTON CLICKED (click event)', 'button');
+
+            // Simulate what the real code does
+            const { start, end } = capturedSelection;
+            logEvent(`Using captured selection: [${start}, ${end}]`, 'button');
+
+            if (start === end) {
+                logEvent('❌ ERROR: No text selected!', 'error');
+                alert('Please select text first!');
+            } else {
+                const text = editor.value.substring(start, end);
+                logEvent(`✓ Would rewrite: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`, 'button');
+                alert(`Would rewrite ${end - start} characters:\n\n"${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`);
+            }
+        });
+
+        summarizeBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            logEvent('🟣 SUMMARIZE BUTTON CLICKED (mousedown with preventDefault)', 'button');
+        });
+
+        summarizeBtn.addEventListener('click', () => {
+            logEvent('🟣 SUMMARIZE BUTTON CLICKED (click event)', 'button');
+
+            const { start, end } = capturedSelection;
+            logEvent(`Using captured selection: [${start}, ${end}]`, 'button');
+
+            if (start === end) {
+                logEvent('❌ ERROR: No text selected!', 'error');
+                alert('Please select text first!');
+            } else {
+                const text = editor.value.substring(start, end);
+                logEvent(`✓ Would summarize: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`, 'button');
+                alert(`Would summarize ${end - start} characters:\n\n"${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`);
+            }
+        });
+
+        clearLogBtn.addEventListener('click', () => {
+            eventLog.innerHTML = '';
+            logEvent('Event log cleared');
+        });
+
+        // Initial log
+        logEvent('Debug test initialized. Select text and click buttons to test.');
+    </script>
+</body>
+
+</html>

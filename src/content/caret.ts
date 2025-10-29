@@ -18,6 +18,20 @@ export interface CaretPosition {
 }
 
 /**
+ * Context around the cursor for text generation
+ */
+export interface CursorContext {
+  /** Text before the cursor (limited by maxLength) */
+  before: string;
+  /** Text after the cursor (limited by maxLength) */
+  after: string;
+  /** Total text in the element */
+  fullText: string;
+  /** Cursor position in the full text */
+  cursorPosition: number;
+}
+
+/**
  * Result of a text insertion or replacement operation
  */
 export interface InsertionResult {
@@ -38,6 +52,13 @@ export interface CaretHandler {
    * @returns CaretPosition object or null if no caret
    */
   getCaretPosition(): CaretPosition | null;
+
+  /**
+   * Get context around the cursor for text generation
+   * @param maxContextLength Maximum characters to include before/after cursor (default: 500)
+   * @returns CursorContext with text before and after cursor, or null if no cursor
+   */
+  getCursorContext(maxContextLength?: number): CursorContext | null;
 
   /**
    * Insert text at the current caret position with clipboard fallback
@@ -107,6 +128,90 @@ class CaretHandlerImpl implements CaretHandler {
     } catch (error) {
       console.error('[Flint] Error getting caret position:', error);
       return null;
+    }
+  }
+
+  /**
+   * Get context around the cursor for text generation
+   * @param maxContextLength Maximum characters to include before/after cursor (default: 500)
+   */
+  getCursorContext(maxContextLength: number = 500): CursorContext | null {
+    try {
+      const activeElement = document.activeElement;
+
+      if (!activeElement || !(activeElement instanceof HTMLElement)) {
+        return null;
+      }
+
+      // Handle textarea and input elements
+      if (activeElement instanceof HTMLTextAreaElement || 
+          activeElement instanceof HTMLInputElement) {
+        const fullText = activeElement.value;
+        const cursorPosition = activeElement.selectionStart ?? 0;
+
+        // Get text before cursor (limited by maxContextLength)
+        const beforeStart = Math.max(0, cursorPosition - maxContextLength);
+        const before = fullText.substring(beforeStart, cursorPosition);
+
+        // Get text after cursor (limited by maxContextLength)
+        const afterEnd = Math.min(fullText.length, cursorPosition + maxContextLength);
+        const after = fullText.substring(cursorPosition, afterEnd);
+
+        return {
+          before,
+          after,
+          fullText,
+          cursorPosition
+        };
+      }
+
+      // Handle contenteditable elements
+      if (this.isContentEditable(activeElement)) {
+        const fullText = activeElement.textContent || '';
+        const selection = window.getSelection();
+        
+        if (!selection || selection.rangeCount === 0) {
+          return null;
+        }
+
+        const range = selection.getRangeAt(0);
+        const cursorPosition = this.getTextOffsetInElement(activeElement, range.startContainer, range.startOffset);
+
+        // Get text before cursor (limited by maxContextLength)
+        const beforeStart = Math.max(0, cursorPosition - maxContextLength);
+        const before = fullText.substring(beforeStart, cursorPosition);
+
+        // Get text after cursor (limited by maxContextLength)
+        const afterEnd = Math.min(fullText.length, cursorPosition + maxContextLength);
+        const after = fullText.substring(cursorPosition, afterEnd);
+
+        return {
+          before,
+          after,
+          fullText,
+          cursorPosition
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('[Flint] Error getting cursor context:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get the text offset of a position within a contenteditable element
+   */
+  private getTextOffsetInElement(element: HTMLElement, node: Node, offset: number): number {
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      range.setEnd(node, offset);
+      return range.toString().length;
+    } catch (error) {
+      console.error('[Flint] Error calculating text offset:', error);
+      return 0;
     }
   }
 

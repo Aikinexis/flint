@@ -43,9 +43,21 @@ export interface ToolControlsProps {
   selection?: { start: number; end: number };
 
   /**
+   * Reference to UnifiedEditor for showing indicators and getting captured selection
+   */
+  editorRef?: React.RefObject<{ 
+    showCursorIndicator: () => void; 
+    hideCursorIndicator: () => void; 
+    showSelectionOverlay: () => void;
+    hideSelectionOverlay: () => void;
+    updateCapturedSelection: (start: number, end: number) => void;
+    getCapturedSelection: () => { start: number; end: number };
+  }>;
+
+  /**
    * Callback when an operation starts
    */
-  onOperationStart?: () => void;
+  onOperationStart?: (operationType?: 'generate' | 'rewrite' | 'summarize') => void;
 
   /**
    * Callback when an operation completes successfully
@@ -68,6 +80,7 @@ export function ToolControlsContainer({
   pinnedNotes = [],
   content,
   selection: _selection,
+  editorRef,
   onOperationStart,
   onOperationComplete,
   onOperationError,
@@ -82,8 +95,8 @@ export function ToolControlsContainer({
   const [isGenerateRecording, setIsGenerateRecording] = useState(false);
 
   // Rewrite controls state
-  const [customPrompt, setCustomPrompt] = useState('');
-  const [selectedPreset, setSelectedPreset] = useState<string>('');
+  const [customPrompt, setCustomPrompt] = useState('Simplify');
+  const [selectedPreset, setSelectedPreset] = useState<string>('Simplify');
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [isRewriteRecording, setIsRewriteRecording] = useState(false);
 
@@ -169,8 +182,20 @@ export function ToolControlsContainer({
       return;
     }
 
+    // Validate captured selection exists (for cursor position)
+    const capturedSelection = editorRef?.current?.getCapturedSelection();
+    if (!capturedSelection) {
+      console.warn('[ToolControls] No captured selection, will default to end of content');
+    } else if (capturedSelection.start < 0 || capturedSelection.start > content.length) {
+      console.warn('[ToolControls] Invalid cursor position, will default to end of content');
+    }
+
+    // Show cursor indicator BEFORE starting operation
+    console.log('[ToolControls] Showing cursor indicator, editorRef:', editorRef?.current);
+    editorRef?.current?.showCursorIndicator();
+
     setIsProcessing(true);
-    onOperationStart?.();
+    onOperationStart?.('generate');
 
     try {
       const settings = generateSettings || {
@@ -185,10 +210,39 @@ export function ToolControlsContainer({
       if (selectedLength === 'short') lengthHint = settings.shortLength;
       else if (selectedLength === 'medium') lengthHint = settings.mediumLength;
 
+      // Get surrounding context based on cursor position
+      let surroundingContext: string | undefined;
+      if (capturedSelection && settings.contextAwarenessEnabled) {
+        const cursorPos = capturedSelection.start;
+        const contextLength = 500; // Characters to include before/after cursor
+        
+        if (cursorPos === 0) {
+          // At start - provide text after cursor
+          const textAfter = content.substring(0, contextLength);
+          if (textAfter.trim()) {
+            surroundingContext = `Text after insertion point:\n${textAfter}`;
+          }
+        } else if (cursorPos >= content.length) {
+          // At end - provide text before cursor
+          const textBefore = content.substring(Math.max(0, content.length - contextLength));
+          if (textBefore.trim()) {
+            surroundingContext = `Text before insertion point:\n${textBefore}`;
+          }
+        } else {
+          // In middle - provide text before and after
+          const textBefore = content.substring(Math.max(0, cursorPos - contextLength / 2), cursorPos);
+          const textAfter = content.substring(cursorPos, Math.min(content.length, cursorPos + contextLength / 2));
+          if (textBefore.trim() || textAfter.trim()) {
+            surroundingContext = `Text before insertion point:\n${textBefore}\n\n[INSERTION POINT]\n\nText after insertion point:\n${textAfter}`;
+          }
+        }
+      }
+
       const result = await AIService.generate(prompt, {
         pinnedNotes: pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
         length: selectedLength,
         lengthHint,
+        context: surroundingContext,
       });
 
       await StorageService.savePromptToHistory(prompt);
@@ -199,6 +253,8 @@ export function ToolControlsContainer({
       onOperationError?.(message);
     } finally {
       setIsProcessing(false);
+      // Hide cursor indicator after operation
+      editorRef?.current?.hideCursorIndicator();
     }
   };
 
@@ -206,30 +262,66 @@ export function ToolControlsContainer({
    * Handles rewrite operation
    */
   const handleRewrite = async () => {
-    if (!content.trim()) {
-      onOperationError?.('Please enter text to rewrite');
+    console.log('[ToolControls] 🔵 REWRITE BUTTON CLICKED');
+    console.log('[ToolControls] customPrompt:', customPrompt);
+    console.log('[ToolControls] editorRef:', editorRef);
+    console.log('[ToolControls] editorRef.current:', editorRef?.current);
+
+    // CRITICAL: Get captured selection from editor ref (not from prop which is cleared)
+    const capturedSelection = editorRef?.current?.getCapturedSelection();
+    console.log('[ToolControls] 🔵 CAPTURED SELECTION FROM REF:', capturedSelection);
+
+    // Validate captured selection exists
+    if (!capturedSelection) {
+      onOperationError?.('Please select text or position your cursor first');
+      return;
+    }
+
+    // Validate selection range is within bounds
+    if (capturedSelection.start < 0 || capturedSelection.end > content.length || capturedSelection.start > capturedSelection.end) {
+      onOperationError?.('Selection is no longer valid. Please select text again.');
+      return;
+    }
+
+    // Get selected text using captured selection
+    const textToRewrite = capturedSelection.start !== capturedSelection.end
+      ? content.substring(capturedSelection.start, capturedSelection.end)
+      : content;
+
+    console.log('[ToolControls] Text to rewrite:', textToRewrite.substring(0, 50) + '...');
+
+    if (!textToRewrite.trim()) {
+      onOperationError?.('Please type or paste text in the editor first');
       return;
     }
 
     if (!customPrompt.trim()) {
-      onOperationError?.('Please enter rewrite instructions');
+      onOperationError?.('Please choose a preset from the dropdown (↓) or type rewrite instructions');
       return;
     }
 
     setIsProcessing(true);
-    onOperationStart?.();
+    onOperationStart?.('rewrite');
 
     try {
       const pinnedNotesContent = pinnedNotes.map(note => `${note.title}: ${note.content}`);
       
-      const result = await AIService.rewrite(content, {
-        customPrompt: customPrompt.trim(),
+      // Enhance "Simplify" preset to also make text shorter
+      const enhancedPrompt = customPrompt.trim() === 'Simplify' 
+        ? 'Simplify and make it shorter'
+        : customPrompt.trim();
+      
+      console.log('[ToolControls] Calling AIService.rewrite...');
+      const result = await AIService.rewrite(textToRewrite, {
+        customPrompt: enhancedPrompt,
         pinnedNotes: pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
       });
 
+      console.log('[ToolControls] Rewrite complete, result length:', result.length);
       onOperationComplete?.(result, 'rewrite');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Rewrite failed';
+      console.error('[ToolControls] Rewrite error:', error);
       onOperationError?.(message);
     } finally {
       setIsProcessing(false);
@@ -240,24 +332,48 @@ export function ToolControlsContainer({
    * Handles summarize operation
    */
   const handleSummarize = async () => {
-    if (!content.trim()) {
-      onOperationError?.('Please enter text to summarize');
+    // CRITICAL: Get captured selection from editor ref (not from prop which is cleared)
+    const capturedSelection = editorRef?.current?.getCapturedSelection();
+    console.log('[ToolControls] Summarize - captured selection from ref:', capturedSelection);
+
+    // Validate captured selection exists
+    if (!capturedSelection) {
+      onOperationError?.('Please select text or position your cursor first');
+      return;
+    }
+
+    // Validate selection range is within bounds
+    if (capturedSelection.start < 0 || capturedSelection.end > content.length || capturedSelection.start > capturedSelection.end) {
+      onOperationError?.('Selection is no longer valid. Please select text again.');
+      return;
+    }
+
+    // Get selected text using captured selection
+    const textToSummarize = capturedSelection.start !== capturedSelection.end
+      ? content.substring(capturedSelection.start, capturedSelection.end)
+      : content;
+
+    if (!textToSummarize.trim()) {
+      onOperationError?.('Please select or enter text to summarize');
       return;
     }
 
     setIsProcessing(true);
-    onOperationStart?.();
+    onOperationStart?.('summarize');
 
     try {
       const pinnedNotesContent = pinnedNotes.map(note => `${note.title}: ${note.content}`);
       
-      const result = await AIService.summarize(content, {
+      const result = await AIService.summarize(textToSummarize, {
         mode,
         readingLevel,
         pinnedNotes: pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
       });
 
-      onOperationComplete?.(result, 'summarize');
+      // Format markdown bullets (*) to actual bullet points (•)
+      const formattedResult = result.replace(/^\* /gm, '• ');
+
+      onOperationComplete?.(formattedResult, 'summarize');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Summarize failed';
       onOperationError?.(message);
@@ -744,7 +860,10 @@ export function ToolControlsContainer({
 
             <button
               className="flint-btn primary"
-              onClick={handleRewrite}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleRewrite();
+              }}
               disabled={isProcessing}
               aria-label="Rewrite"
               aria-busy={isProcessing}
@@ -839,7 +958,10 @@ export function ToolControlsContainer({
           {/* Summarize button */}
           <button
             className="flint-btn primary"
-            onClick={handleSummarize}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              handleSummarize();
+            }}
             disabled={isProcessing}
             style={{ 
               width: '100%',

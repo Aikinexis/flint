@@ -17,6 +17,7 @@ import { createMiniBarInjector, MiniBarInjector } from './injector';
  */
 type MessageType = 
   | 'GET_SELECTION'
+  | 'GET_CURSOR_CONTEXT'
   | 'INSERT_TEXT'
   | 'REPLACE_TEXT'
   | 'SHOW_MINI_BAR'
@@ -200,6 +201,9 @@ class ContentScriptCoordinator {
       case 'GET_SELECTION':
         return this.handleGetSelection();
 
+      case 'GET_CURSOR_CONTEXT':
+        return this.handleGetCursorContext(message.payload?.maxLength);
+
       case 'INSERT_TEXT':
         return this.handleInsertText(message.payload?.text);
 
@@ -247,6 +251,34 @@ class ContentScriptCoordinator {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to get selection'
+      };
+    }
+  }
+
+  /**
+   * Handle GET_CURSOR_CONTEXT message
+   * Returns text context around the cursor for generation
+   */
+  private handleGetCursorContext(maxLength?: number): MessageResponse {
+    try {
+      const context = this.caretHandler.getCursorContext(maxLength);
+
+      if (!context) {
+        return {
+          success: false,
+          error: 'No cursor position found or not in editable field'
+        };
+      }
+
+      return {
+        success: true,
+        data: context
+      };
+    } catch (error) {
+      console.error('[Flint] Error getting cursor context:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get cursor context'
       };
     }
   }
@@ -396,22 +428,41 @@ class ContentScriptCoordinator {
   private showMiniBar(): void {
     this.miniBarInjector.show({
       onRecord: () => {
-        this.sendMessageToPanel('OPEN_GENERATE_TAB');
+        // Get cursor context for generation
+        const context = this.caretHandler.getCursorContext();
+        this.sendMessageToPanel('OPEN_GENERATE_TAB', { context });
       },
       onSummarize: () => {
+        // Preserve selection before opening panel
+        this.selectionHandler.preserveSelection();
+        
         const text = this.selectionHandler.getSelectedText();
         if (text) {
           this.sendMessageToPanel('OPEN_SUMMARY_TAB', { text });
+          
+          // Restore selection after a short delay to ensure it stays visible
+          setTimeout(() => {
+            this.selectionHandler.restoreSelection();
+          }, 100);
         }
       },
       onRewrite: () => {
+        // Preserve selection before opening panel
+        this.selectionHandler.preserveSelection();
+        
         const text = this.selectionHandler.getSelectedText();
         if (text) {
           this.sendMessageToPanel('OPEN_REWRITE_TAB', { text });
+          
+          // Restore selection after a short delay to ensure it stays visible
+          setTimeout(() => {
+            this.selectionHandler.restoreSelection();
+          }, 100);
         }
       },
       onClose: () => {
         this.miniBarInjector.hide();
+        this.selectionHandler.clearPreservedSelection();
       }
     });
   }

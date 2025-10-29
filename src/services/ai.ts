@@ -370,18 +370,24 @@ export class AIService {
     }
 
     // Build prompt with context if provided
-    // Context contains the ending of previous output for continuation
     let fullPrompt = prompt;
     if (options.context) {
-      // Format context to encourage continuation rather than repetition
-      fullPrompt = `Context from previous output:\n${options.context}\n\nContinue or extend based on this context. New request: ${prompt}`;
+      // Format context to help AI understand surrounding text
+      fullPrompt = `Surrounding text context:\n${options.context}\n\nUser request: ${prompt}\n\nGenerate text that fits naturally with the surrounding context.`;
     }
+
+    // Add critical instructions
+    fullPrompt += `\n\nCRITICAL INSTRUCTIONS:
+- Output ONLY the generated text itself
+- Do NOT include any meta-commentary, explanations, or acknowledgments
+- Do NOT say things like "Here's the text:" or "I will generate..."
+- Start directly with the requested content`;
 
     // Add word count target if specified
     if (options.lengthHint) {
-      fullPrompt += `\n\nIMPORTANT: Generate approximately ${options.lengthHint} words.`;
+      fullPrompt += `\n- Generate approximately ${options.lengthHint} words`;
     } else if (options.length === 'long') {
-      fullPrompt += `\n\nIMPORTANT: Generate a comprehensive, detailed response with no length restrictions.`;
+      fullPrompt += `\n- Generate a comprehensive, detailed response`;
     }
 
     // Merge pinned notes into context

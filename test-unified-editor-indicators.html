@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Editor Indicators - Integration Demo</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1c1f2a;
+            --border: #2a3144;
+            --text: #f4f6fa;
+            --text-muted: #9ca3af;
+            --accent: #6366f1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 40px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 12px;
+            color: var(--accent);
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            margin-bottom: 40px;
+            font-size: 14px;
+        }
+
+        .demo-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .demo-section h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: var(--text);
+        }
+
+        .editor-container {
+            position: relative;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .indicators-area {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            z-index: 100;
+            display: flex;
+            gap: 8px;
+            pointer-events: none;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 16px;
+            padding-top: 60px;
+            /* Make room for indicators */
+            background: var(--bg);
+            border: none;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 15px;
+            line-height: 1.6;
+            resize: vertical;
+            outline: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:active {
+            opacity: 0.8;
+        }
+
+        button.secondary {
+            background: var(--surface);
+            border: 1px solid var(--border);
+        }
+
+        .selection-highlight-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 500;
+            animation: fade-in 0.2s ease-out;
+            user-select: none;
+        }
+
+        .cursor-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: var(--accent);
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            animation: pulse 1.5s ease-in-out infinite;
+            user-select: none;
+        }
+
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        @keyframes slide-right {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            50% {
+                transform: translateX(3px);
+            }
+        }
+
+        @keyframes slide-left {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            50% {
+                transform: translateX(-3px);
+            }
+        }
+
+        .arrow-right {
+            animation: slide-right 1s ease-in-out infinite;
+        }
+
+        .arrow-left {
+            animation: slide-left 1s ease-in-out infinite;
+        }
+
+        .info-box {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 16px;
+        }
+
+        .info-box strong {
+            color: var(--accent);
+        }
+
+        .status {
+            margin-top: 12px;
+            padding: 8px 12px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .status strong {
+            color: var(--text);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Unified Editor Indicators - Integration Demo</h1>
+        <p class="subtitle">See how the indicators work in the actual unified editor</p>
+
+        <!-- Demo 1: Selection Highlight -->
+        <div class="demo-section">
+            <h2>1. Selection Highlight (Automatic)</h2>
+
+            <div class="editor-container">
+                <div class="indicators-area">
+                    <div id="selection-indicator-1" class="selection-highlight-indicator hidden">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 11l3 3L22 4" />
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                        </svg>
+                        <span id="word-count-1">0 words selected</span>
+                    </div>
+                </div>
+
+                <textarea id="editor-1" placeholder="Select text to see the selection highlight...">Dear Sarah,
+
+I wanted to follow up on our discussion from yesterday's meeting regarding the Q4 roadmap. After reviewing the feedback from the team, I believe we should prioritize the following initiatives:
+
+1. Customer dashboard redesign
+2. Mobile app performance improvements
+3. Integration with third-party analytics tools
+
+These align well with our strategic goals and customer feedback.</textarea>
+            </div>
+
+            <div class="info-box">
+                <strong>How it works:</strong> The selection highlight appears automatically when you select text. This
+                is perfect for Rewrite and Summarize operations where users need to see what text will be processed.
+            </div>
+        </div>
+
+        <!-- Demo 2: Cursor Indicator -->
+        <div class="demo-section">
+            <h2>2. Cursor Indicator (Manual Trigger)</h2>
+
+            <div class="editor-container">
+                <div class="indicators-area">
+                    <div id="cursor-indicator-2" class="cursor-indicator hidden">
+                        <span>|</span>
+                        <svg class="arrow-right" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                    </div>
+                </div>
+
+                <textarea id="editor-2"
+                    placeholder="Click to position cursor, then click 'Show Cursor Indicator'...">This is sample text. Place your cursor anywhere in this text to see where generated content will appear.</textarea>
+            </div>
+
+            <div class="controls">
+                <button onclick="showCursorIndicator()">Show Cursor Indicator</button>
+                <button class="secondary" onclick="hideCursorIndicator()">Hide Indicator</button>
+            </div>
+
+            <div class="status">
+                <strong>Cursor Position:</strong> <span id="cursor-pos">0</span> / <span id="text-length">0</span>
+                <br>
+                <strong>Direction:</strong> <span id="direction">forward</span>
+            </div>
+
+            <div class="info-box">
+                <strong>How it works:</strong> Call <code>editorRef.current?.showCursorIndicator()</code> when the
+                Generate button is clicked. The indicator shows where text will be inserted and auto-hides after 3
+                seconds.
+            </div>
+        </div>
+
+        <!-- Demo 3: Both Together -->
+        <div class="demo-section">
+            <h2>3. Complete Integration Example</h2>
+
+            <div class="editor-container">
+                <div class="indicators-area">
+                    <div id="selection-indicator-3" class="selection-highlight-indicator hidden">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 11l3 3L22 4" />
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                        </svg>
+                        <span id="word-count-3">0 words selected</span>
+                    </div>
+
+                    <div id="cursor-indicator-3" class="cursor-indicator hidden">
+                        <svg id="arrow-left-3" class="arrow-left hidden" width="12" height="12" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M19 12H5M12 19l-7-7 7-7" />
+                        </svg>
+                        <span>|</span>
+                        <svg id="arrow-right-3" class="arrow-right" width="12" height="12" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                    </div>
+                </div>
+
+                <textarea id="editor-3"
+                    placeholder="Try selecting text or positioning cursor...">Welcome to Flint! This is a unified editor where you can write, edit, and use AI tools seamlessly.
+
+Try selecting some text to see the selection highlight, or click the Generate button to see the cursor indicator.</textarea>
+            </div>
+
+            <div class="controls">
+                <button onclick="simulateGenerate()">✨ Generate</button>
+                <button onclick="simulateRewrite()">✏️ Rewrite Selection</button>
+                <button onclick="simulateSummarize()">📝 Summarize Selection</button>
+            </div>
+
+            <div class="status">
+                <strong>Active Tool:</strong> <span id="active-tool">None</span>
+                <br>
+                <strong>Status:</strong> <span id="operation-status">Ready</span>
+            </div>
+
+            <div class="info-box">
+                <strong>Complete workflow:</strong> This demonstrates how the indicators work together in the actual
+                app. Select text for Rewrite/Summarize, or position cursor for Generate.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Demo 1: Selection Highlight
+        const editor1 = document.getElementById('editor-1');
+        const selectionIndicator1 = document.getElementById('selection-indicator-1');
+        const wordCount1 = document.getElementById('word-count-1');
+
+        editor1.addEventListener('mouseup', () => updateSelection(editor1, selectionIndicator1, wordCount1));
+        editor1.addEventListener('keyup', () => updateSelection(editor1, selectionIndicator1, wordCount1));
+
+        function updateSelection(editor, indicator, wordCountSpan) {
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+
+            if (start !== end) {
+                const selectedText = editor.value.substring(start, end);
+                const wordCount = selectedText.trim().split(/\s+/).filter(w => w.length > 0).length;
+
+                wordCountSpan.textContent = `${wordCount} ${wordCount === 1 ? 'word' : 'words'} selected`;
+                indicator.classList.remove('hidden');
+            } else {
+                indicator.classList.add('hidden');
+            }
+        }
+
+        // Demo 2: Cursor Indicator
+        const editor2 = document.getElementById('editor-2');
+        const cursorIndicator2 = document.getElementById('cursor-indicator-2');
+        const cursorPosSpan = document.getElementById('cursor-pos');
+        const textLengthSpan = document.getElementById('text-length');
+        const directionSpan = document.getElementById('direction');
+
+        editor2.addEventListener('click', updateCursorInfo);
+        editor2.addEventListener('keyup', updateCursorInfo);
+
+        function updateCursorInfo() {
+            const cursorPos = editor2.selectionStart;
+            const textLength = editor2.value.length;
+            const hasTextAfter = cursorPos < textLength;
+
+            cursorPosSpan.textContent = cursorPos;
+            textLengthSpan.textContent = textLength;
+            directionSpan.textContent = hasTextAfter ? 'bidirectional' : 'forward';
+        }
+
+        function showCursorIndicator() {
+            updateCursorInfo();
+            cursorIndicator2.classList.remove('hidden');
+
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                cursorIndicator2.classList.add('hidden');
+            }, 3000);
+        }
+
+        function hideCursorIndicator() {
+            cursorIndicator2.classList.add('hidden');
+        }
+
+        // Demo 3: Complete Integration
+        const editor3 = document.getElementById('editor-3');
+        const selectionIndicator3 = document.getElementById('selection-indicator-3');
+        const wordCount3 = document.getElementById('word-count-3');
+        const cursorIndicator3 = document.getElementById('cursor-indicator-3');
+        const arrowLeft3 = document.getElementById('arrow-left-3');
+        const arrowRight3 = document.getElementById('arrow-right-3');
+        const activeToolSpan = document.getElementById('active-tool');
+        const operationStatusSpan = document.getElementById('operation-status');
+
+        editor3.addEventListener('mouseup', () => updateEditor3());
+        editor3.addEventListener('keyup', () => updateEditor3());
+
+        function updateEditor3() {
+            const start = editor3.selectionStart;
+            const end = editor3.selectionEnd;
+
+            if (start !== end) {
+                // Show selection highlight
+                const selectedText = editor3.value.substring(start, end);
+                const wordCount = selectedText.trim().split(/\s+/).filter(w => w.length > 0).length;
+
+                wordCount3.textContent = `${wordCount} ${wordCount === 1 ? 'word' : 'words'} selected`;
+                selectionIndicator3.classList.remove('hidden');
+                cursorIndicator3.classList.add('hidden');
+            } else {
+                // Hide selection highlight
+                selectionIndicator3.classList.add('hidden');
+            }
+        }
+
+        function simulateGenerate() {
+            activeToolSpan.textContent = 'Generate';
+            operationStatusSpan.textContent = 'Generating...';
+
+            // Hide selection, show cursor indicator
+            selectionIndicator3.classList.add('hidden');
+
+            const cursorPos = editor3.selectionStart;
+            const hasTextAfter = cursorPos < editor3.value.length;
+
+            if (hasTextAfter) {
+                arrowLeft3.classList.remove('hidden');
+                arrowRight3.classList.remove('hidden');
+            } else {
+                arrowLeft3.classList.add('hidden');
+                arrowRight3.classList.remove('hidden');
+            }
+
+            cursorIndicator3.classList.remove('hidden');
+
+            // Simulate generation
+            setTimeout(() => {
+                operationStatusSpan.textContent = 'Complete!';
+                setTimeout(() => {
+                    cursorIndicator3.classList.add('hidden');
+                    operationStatusSpan.textContent = 'Ready';
+                    activeToolSpan.textContent = 'None';
+                }, 2000);
+            }, 1500);
+        }
+
+        function simulateRewrite() {
+            const start = editor3.selectionStart;
+            const end = editor3.selectionEnd;
+
+            if (start === end) {
+                alert('Please select text first!');
+                return;
+            }
+
+            activeToolSpan.textContent = 'Rewrite';
+            operationStatusSpan.textContent = 'Rewriting...';
+
+            // Selection highlight stays visible
+
+            setTimeout(() => {
+                operationStatusSpan.textContent = 'Complete!';
+                setTimeout(() => {
+                    operationStatusSpan.textContent = 'Ready';
+                    activeToolSpan.textContent = 'None';
+                }, 1500);
+            }, 1500);
+        }
+
+        function simulateSummarize() {
+            const start = editor3.selectionStart;
+            const end = editor3.selectionEnd;
+
+            if (start === end) {
+                alert('Please select text first!');
+                return;
+            }
+
+            activeToolSpan.textContent = 'Summarize';
+            operationStatusSpan.textContent = 'Summarizing...';
+
+            // Selection highlight stays visible
+
+            setTimeout(() => {
+                operationStatusSpan.textContent = 'Complete!';
+                setTimeout(() => {
+                    operationStatusSpan.textContent = 'Ready';
+                    activeToolSpan.textContent = 'None';
+                }, 1500);
+            }, 1500);
+        }
+    </script>
+</body>
+
+</html>

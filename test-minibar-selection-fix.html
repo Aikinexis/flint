@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MiniBar Selection Fix Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0c0e13;
+      color: #f4f6fa;
+      padding: 40px;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #6366f1;
+    }
+    
+    .info {
+      background: #1c1f2a;
+      border: 1px solid #2a3144;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    
+    .info strong {
+      color: #6366f1;
+    }
+    
+    .editor-wrapper {
+      position: relative;
+      background: #14161d;
+      border: 1px solid #2a3144;
+      border-radius: 12px;
+      padding: 16px;
+    }
+    
+    textarea {
+      width: 100%;
+      min-height: 300px;
+      background: transparent;
+      border: none;
+      color: #f4f6fa;
+      font-size: 15px;
+      line-height: 1.6;
+      resize: vertical;
+      outline: none;
+      font-family: inherit;
+    }
+    
+    textarea::selection {
+      background: rgba(99, 102, 241, 0.3);
+    }
+    
+    .minibar {
+      position: fixed;
+      display: none;
+      gap: 8px;
+      background: #1c1f2a;
+      border: 1px solid #2a3144;
+      border-radius: 12px;
+      padding: 6px 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      z-index: 1000;
+    }
+    
+    .minibar button {
+      width: 32px;
+      height: 32px;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: #f4f6fa;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: background 0.2s;
+    }
+    
+    .minibar button:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .status {
+      margin-top: 16px;
+      padding: 12px;
+      background: #1c1f2a;
+      border: 1px solid #2a3144;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    
+    .status strong {
+      color: #6366f1;
+    }
+    
+    .success {
+      color: #10b981;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>MiniBar Selection Fix Test</h1>
+    
+    <div class="info">
+      <strong>Test Instructions:</strong><br>
+      1. Select some text in the textarea below<br>
+      2. A minibar should appear above your selection<br>
+      3. Click "Rewrite" or "Summarize" button<br>
+      4. <strong>The selection should be preserved and replaced!</strong><br>
+      <br>
+      <strong>The Fix:</strong> We now capture the selection range when text is selected and store it in a ref. When you click the minibar buttons, we use the captured range instead of trying to read the current selection (which is lost when the textarea loses focus).
+    </div>
+    
+    <div class="editor-wrapper">
+      <textarea id="editor" placeholder="Select some text to see the minibar...">This is a test document with multiple paragraphs.
+
+You can select any text in this editor and the minibar will appear above your selection.
+
+Try selecting this sentence and clicking the Rewrite button. The text should be replaced with a mock rewritten version.
+
+The key fix is that we capture the selection range BEFORE the textarea loses focus, so when you click the minibar button, we still know what text to replace.</textarea>
+    </div>
+    
+    <div class="minibar" id="minibar">
+      <button id="rewrite-btn" title="Rewrite">✏️</button>
+      <button id="summarize-btn" title="Summarize">📝</button>
+      <button id="close-btn" title="Close">✕</button>
+    </div>
+    
+    <div class="status">
+      <strong>Status:</strong> <span id="status">Ready</span><br>
+      <strong>Captured Range:</strong> <span id="range">None</span><br>
+      <strong>Captured Text:</strong> <span id="text">None</span>
+    </div>
+  </div>
+  
+  <script>
+    const editor = document.getElementById('editor');
+    const minibar = document.getElementById('minibar');
+    const rewriteBtn = document.getElementById('rewrite-btn');
+    const summarizeBtn = document.getElementById('summarize-btn');
+    const closeBtn = document.getElementById('close-btn');
+    const statusEl = document.getElementById('status');
+    const rangeEl = document.getElementById('range');
+    const textEl = document.getElementById('text');
+    
+    // Captured selection - preserved even when textarea loses focus
+    let capturedSelection = { start: 0, end: 0, text: '' };
+    
+    // Show minibar on text selection
+    function updateMinibar() {
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      const selectedText = editor.value.substring(start, end).trim();
+      
+      if (selectedText.length >= 3) {
+        // CRITICAL: Capture the selection NOW, before any focus changes
+        capturedSelection = { start, end, text: selectedText };
+        
+        // Update status display
+        rangeEl.textContent = `${start} - ${end}`;
+        textEl.textContent = selectedText.substring(0, 50) + (selectedText.length > 50 ? '...' : '');
+        
+        // Position minibar above selection
+        const rect = editor.getBoundingClientRect();
+        const lineHeight = parseFloat(getComputedStyle(editor).lineHeight) || 24;
+        
+        // Simple positioning (above textarea)
+        minibar.style.left = `${rect.left + 100}px`;
+        minibar.style.top = `${rect.top - 50}px`;
+        minibar.style.display = 'flex';
+        
+        statusEl.textContent = 'Selection captured ✓';
+        statusEl.className = 'success';
+      } else {
+        minibar.style.display = 'none';
+        statusEl.textContent = 'Ready';
+        statusEl.className = '';
+      }
+    }
+    
+    // Listen for selection changes
+    editor.addEventListener('mouseup', updateMinibar);
+    editor.addEventListener('keyup', updateMinibar);
+    
+    // Prevent minibar from stealing focus
+    minibar.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    
+    // Handle rewrite button
+    rewriteBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Use the CAPTURED selection, not the current selection
+      const { start, end, text } = capturedSelection;
+      
+      statusEl.textContent = 'Rewriting...';
+      
+      // Simulate async operation
+      setTimeout(() => {
+        // Replace text using captured range
+        const before = editor.value.substring(0, start);
+        const after = editor.value.substring(end);
+        const rewritten = `[REWRITTEN: ${text}]`;
+        
+        editor.value = before + rewritten + after;
+        
+        // Update cursor position
+        editor.selectionStart = start;
+        editor.selectionEnd = start + rewritten.length;
+        editor.focus();
+        
+        statusEl.textContent = 'Rewrite complete! ✓';
+        statusEl.className = 'success';
+        minibar.style.display = 'none';
+      }, 500);
+    });
+    
+    // Handle summarize button
+    summarizeBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Use the CAPTURED selection, not the current selection
+      const { start, end, text } = capturedSelection;
+      
+      statusEl.textContent = 'Summarizing...';
+      
+      // Simulate async operation
+      setTimeout(() => {
+        // Replace text using captured range
+        const before = editor.value.substring(0, start);
+        const after = editor.value.substring(end);
+        const summary = `[SUMMARY: ${text.substring(0, 30)}...]`;
+        
+        editor.value = before + summary + after;
+        
+        // Update cursor position
+        editor.selectionStart = start;
+        editor.selectionEnd = start + summary.length;
+        editor.focus();
+        
+        statusEl.textContent = 'Summarize complete! ✓';
+        statusEl.className = 'success';
+        minibar.style.display = 'none';
+      }, 500);
+    });
+    
+    // Handle close button
+    closeBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      minibar.style.display = 'none';
+      statusEl.textContent = 'Ready';
+      statusEl.className = '';
+    });
+  </script>
+</body>
+</html>

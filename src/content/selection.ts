@@ -34,6 +34,21 @@ export interface SelectionHandler {
    * @returns True if selection is in textarea or contenteditable
    */
   isEditableSelection(): boolean;
+
+  /**
+   * Preserve the current selection for later restoration
+   */
+  preserveSelection(): void;
+
+  /**
+   * Restore a previously preserved selection
+   */
+  restoreSelection(): void;
+
+  /**
+   * Clear the preserved selection
+   */
+  clearPreservedSelection(): void;
 }
 
 /**
@@ -41,6 +56,7 @@ export interface SelectionHandler {
  */
 class SelectionHandlerImpl implements SelectionHandler {
   private selectionChangeCallback: ((text: string) => void) | null = null;
+  private preservedRange: Range | null = null;
 
   constructor() {
     try {
@@ -54,6 +70,46 @@ class SelectionHandlerImpl implements SelectionHandler {
     } catch (error) {
       console.error('[Flint Selection] Failed to initialize:', error);
     }
+  }
+
+  /**
+   * Preserve the current selection range for later restoration
+   */
+  public preserveSelection(): void {
+    try {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        this.preservedRange = selection.getRangeAt(0).cloneRange();
+        console.log('[Flint Selection] Selection preserved');
+      }
+    } catch (error) {
+      console.error('[Flint Selection] Error preserving selection:', error);
+    }
+  }
+
+  /**
+   * Restore the previously preserved selection
+   */
+  public restoreSelection(): void {
+    try {
+      if (this.preservedRange) {
+        const selection = window.getSelection();
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(this.preservedRange);
+          console.log('[Flint Selection] Selection restored');
+        }
+      }
+    } catch (error) {
+      console.error('[Flint Selection] Error restoring selection:', error);
+    }
+  }
+
+  /**
+   * Clear the preserved selection
+   */
+  public clearPreservedSelection(): void {
+    this.preservedRange = null;
   }
 
   /**

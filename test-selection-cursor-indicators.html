@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selection & Cursor Indicators Demo</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1c1f2a;
+            --surface-2: #252936;
+            --border: #2a3144;
+            --border-muted: #1f2332;
+            --text: #f4f6fa;
+            --text-muted: #9ca3af;
+            --accent: #6366f1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 40px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 12px;
+            color: var(--accent);
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            margin-bottom: 40px;
+            font-size: 14px;
+        }
+
+        .demo-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .demo-section h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: var(--text);
+        }
+
+        .demo-section p {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            margin-bottom: 16px;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .indicator-demo {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-muted);
+        }
+
+        .cursor-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: var(--accent);
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            animation: pulse 1.5s ease-in-out infinite;
+            user-select: none;
+            width: fit-content;
+        }
+
+        .selection-highlight-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 500;
+            animation: fade-in 0.2s ease-out;
+            user-select: none;
+            width: fit-content;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slide-right {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            50% {
+                transform: translateX(3px);
+            }
+        }
+
+        @keyframes slide-left {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            50% {
+                transform: translateX(-3px);
+            }
+        }
+
+        .arrow-right {
+            animation: slide-right 1s ease-in-out infinite;
+        }
+
+        .arrow-left {
+            animation: slide-left 1s ease-in-out infinite;
+        }
+
+        button {
+            padding: 8px 16px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:active {
+            opacity: 0.8;
+        }
+
+        .info-box {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 16px;
+        }
+
+        .info-box strong {
+            color: var(--accent);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Selection & Cursor Indicators Demo</h1>
+        <p class="subtitle">Visual feedback for text selection and cursor-based generation</p>
+
+        <!-- Selection Highlight Demo -->
+        <div class="demo-section">
+            <h2>1. Selection Highlight (Rewrite/Summarize)</h2>
+            <p>Select text in the textarea below to see the selection indicator:</p>
+
+            <textarea id="selection-demo"
+                placeholder="Select some text in this area to see the selection highlight indicator...">The quick brown fox jumps over the lazy dog. This is a sample text that you can select to see how the selection highlight indicator works. Try selecting different amounts of text to see the word count update.</textarea>
+
+            <div class="indicator-demo">
+                <div id="selection-indicator" style="display: none;">
+                    <div class="selection-highlight-indicator">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 11l3 3L22 4" />
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                        </svg>
+                        <span id="word-count">0 words selected</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <strong>How it works:</strong> When you click "Rewrite" or "Summarize", the selection is preserved and
+                this indicator shows you which text will be processed. The selection remains visible even after clicking
+                the button.
+            </div>
+        </div>
+
+        <!-- Cursor Indicator Demo -->
+        <div class="demo-section">
+            <h2>2. Cursor Indicator (Generate)</h2>
+            <p>Click in the textarea to position the cursor, then click "Show Cursor Indicator":</p>
+
+            <textarea id="cursor-demo"
+                placeholder="Click to position cursor, then click the button below...">This is sample text. Place your cursor anywhere in this text to see where generated content will appear.</textarea>
+
+            <button onclick="showCursorIndicator()">Show Cursor Indicator</button>
+
+            <div class="indicator-demo" style="margin-top: 16px;">
+                <div>
+                    <strong style="color: var(--text); font-size: 13px; display: block; margin-bottom: 8px;">Forward
+                        Direction (text after cursor):</strong>
+                    <div class="cursor-indicator">
+                        <span>|</span>
+                        <svg class="arrow-right" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div>
+                    <strong
+                        style="color: var(--text); font-size: 13px; display: block; margin-bottom: 8px;">Bidirectional
+                        (text on both sides):</strong>
+                    <div class="cursor-indicator">
+                        <svg class="arrow-left" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 12H5M12 19l-7-7 7-7" />
+                        </svg>
+                        <span>|</span>
+                        <svg class="arrow-right" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <strong>How it works:</strong> The Generate tool uses the cursor position to determine where to insert
+                generated text. The indicator shows the direction of generation:
+                <ul style="margin-top: 8px; margin-left: 20px;">
+                    <li><strong>Forward:</strong> Generates text after the cursor (cursor at end or no text after)</li>
+                    <li><strong>Bidirectional:</strong> Uses context from both sides (cursor in middle of text)</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Context Extraction Demo -->
+        <div class="demo-section">
+            <h2>3. Context Extraction</h2>
+            <p>Position cursor and click to see extracted context:</p>
+
+            <textarea id="context-demo"
+                placeholder="Type or paste text here, position cursor, then click the button...">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</textarea>
+
+            <button onclick="extractContext()">Extract Context</button>
+
+            <div id="context-output" style="display: none; margin-top: 16px;">
+                <div
+                    style="background: var(--bg); border: 1px solid var(--border-muted); border-radius: 8px; padding: 16px;">
+                    <div style="margin-bottom: 12px;">
+                        <strong style="color: var(--accent); font-size: 13px;">Before Cursor:</strong>
+                        <div id="before-context"
+                            style="color: var(--text-muted); font-size: 13px; margin-top: 4px; font-family: monospace;">
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <strong style="color: var(--accent); font-size: 13px;">After Cursor:</strong>
+                        <div id="after-context"
+                            style="color: var(--text-muted); font-size: 13px; margin-top: 4px; font-family: monospace;">
+                        </div>
+                    </div>
+                    <div>
+                        <strong style="color: var(--text); font-size: 13px;">Cursor Position:</strong>
+                        <span id="cursor-position"
+                            style="color: var(--text-muted); font-size: 13px; margin-left: 8px;"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <strong>Context Limit:</strong> The system extracts up to 500 characters before and after the cursor.
+                This prevents performance issues and excessive token usage while providing enough context for quality
+                generation.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Selection highlight demo
+        const selectionTextarea = document.getElementById('selection-demo');
+        const selectionIndicator = document.getElementById('selection-indicator');
+        const wordCountSpan = document.getElementById('word-count');
+
+        selectionTextarea.addEventListener('mouseup', updateSelectionIndicator);
+        selectionTextarea.addEventListener('keyup', updateSelectionIndicator);
+
+        function updateSelectionIndicator() {
+            const start = selectionTextarea.selectionStart;
+            const end = selectionTextarea.selectionEnd;
+
+            if (start !== end) {
+                const selectedText = selectionTextarea.value.substring(start, end);
+                const wordCount = selectedText.trim().split(/\s+/).filter(w => w.length > 0).length;
+
+                wordCountSpan.textContent = `${wordCount} ${wordCount === 1 ? 'word' : 'words'} selected`;
+                selectionIndicator.style.display = 'block';
+            } else {
+                selectionIndicator.style.display = 'none';
+            }
+        }
+
+        // Cursor indicator demo
+        function showCursorIndicator() {
+            const textarea = document.getElementById('cursor-demo');
+            const cursorPos = textarea.selectionStart;
+            const text = textarea.value;
+
+            const hasTextBefore = cursorPos > 0;
+            const hasTextAfter = cursorPos < text.length;
+
+            let message = 'Cursor indicator shown! ';
+            if (hasTextBefore && hasTextAfter) {
+                message += 'Bidirectional mode (text on both sides)';
+            } else if (hasTextAfter) {
+                message += 'Forward mode (text after cursor)';
+            } else {
+                message += 'Forward mode (cursor at end)';
+            }
+
+            alert(message);
+        }
+
+        // Context extraction demo
+        function extractContext() {
+            const textarea = document.getElementById('context-demo');
+            const cursorPos = textarea.selectionStart;
+            const text = textarea.value;
+            const maxLength = 500;
+
+            // Extract context before cursor
+            const beforeStart = Math.max(0, cursorPos - maxLength);
+            const before = text.substring(beforeStart, cursorPos);
+
+            // Extract context after cursor
+            const afterEnd = Math.min(text.length, cursorPos + maxLength);
+            const after = text.substring(cursorPos, afterEnd);
+
+            // Display results
+            document.getElementById('before-context').textContent = before || '(none)';
+            document.getElementById('after-context').textContent = after || '(none)';
+            document.getElementById('cursor-position').textContent = `${cursorPos} / ${text.length}`;
+            document.getElementById('context-output').style.display = 'block';
+        }
+    </script>
+</body>
+
+</html>

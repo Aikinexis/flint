@@ -33,13 +33,17 @@ export async function replaceTextInline(
   const inputEvent = new Event('input', { bubbles: true });
   textarea.dispatchEvent(inputEvent);
   
+  // CRITICAL: Restore focus BEFORE setting selection
+  textarea.focus();
+  
   // Set new selection to highlight replaced text
   const newSelectionStart = start;
   const newSelectionEnd = start + newText.length;
   textarea.setSelectionRange(newSelectionStart, newSelectionEnd);
   
-  // Focus the textarea to make selection visible
-  textarea.focus();
+  // Trigger select event to update indicators and captured state
+  const selectEvent = new Event('select', { bubbles: true });
+  textarea.dispatchEvent(selectEvent);
   
   // Add brief highlight animation
   textarea.classList.add('inline-replace-highlight');

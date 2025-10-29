@@ -29,15 +29,35 @@ export const MiniBar: React.FC<Props> = ({
   onBeforeOperation,
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
+  // Store the selection range and text when minibar is shown
+  const capturedSelectionRef = React.useRef<{ start: number; end: number; text: string } | null>(null);
+  
+  // Capture selection when anchor changes
+  React.useEffect(() => {
+    if (anchor && selectionRange) {
+      capturedSelectionRef.current = {
+        start: selectionRange.start,
+        end: selectionRange.end,
+        text: anchor.text,
+      };
+      console.log('[MiniBar] Selection captured:', capturedSelectionRef.current);
+    }
+  }, [anchor, selectionRange]);
   
   if (!anchor) return null;
 
   /**
    * Handle summarize button click with inline replacement
    */
-  const handleSummarize = async () => {
+  const handleSummarize = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Use captured selection instead of current selection
+    const captured = capturedSelectionRef.current;
+    
     // If no textarea ref provided, fall back to old behavior (navigate to tab)
-    if (!textareaRef?.current || !selectionRange) {
+    if (!textareaRef?.current || !captured) {
       onSend('summary', anchor.text);
       return;
     }
@@ -50,18 +70,18 @@ export const MiniBar: React.FC<Props> = ({
       }
 
       // Call AI service to summarize
-      const result = await AIService.summarize(anchor.text, {
+      const result = await AIService.summarize(captured.text, {
         mode: 'bullets',
         readingLevel: 'moderate',
         pinnedNotes,
       });
 
-      // Replace text inline
+      // Replace text inline using captured range
       await replaceTextInline(
         textareaRef.current,
         result,
-        selectionRange.start,
-        selectionRange.end
+        captured.start,
+        captured.end
       );
 
       // Close mini bar after successful replacement
@@ -77,9 +97,15 @@ export const MiniBar: React.FC<Props> = ({
   /**
    * Handle rewrite button click with inline replacement
    */
-  const handleRewrite = async () => {
+  const handleRewrite = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Use captured selection instead of current selection
+    const captured = capturedSelectionRef.current;
+    
     // If no textarea ref provided, fall back to old behavior (navigate to tab)
-    if (!textareaRef?.current || !selectionRange) {
+    if (!textareaRef?.current || !captured) {
       onSend('rewrite', anchor.text);
       return;
     }
@@ -92,17 +118,17 @@ export const MiniBar: React.FC<Props> = ({
       }
 
       // Call AI service to rewrite with default tone
-      const result = await AIService.rewrite(anchor.text, {
+      const result = await AIService.rewrite(captured.text, {
         tone: 'as-is',
         pinnedNotes,
       });
 
-      // Replace text inline
+      // Replace text inline using captured range
       await replaceTextInline(
         textareaRef.current,
         result,
-        selectionRange.start,
-        selectionRange.end
+        captured.start,
+        captured.end
       );
 
       // Close mini bar after successful replacement
@@ -130,10 +156,14 @@ export const MiniBar: React.FC<Props> = ({
         zIndex: 2147483647,
         pointerEvents: 'auto',
       }}
-      onMouseDown={(e) => e.preventDefault()}
+      onMouseDown={(e) => {
+        // Prevent the minibar from stealing focus from the textarea
+        e.preventDefault();
+        e.stopPropagation();
+      }}
     >
       <button
-        onPointerDown={handleSummarize}
+        onMouseDown={handleSummarize}
         disabled={isProcessing}
         aria-label="Summarize"
         style={{
@@ -184,7 +214,7 @@ export const MiniBar: React.FC<Props> = ({
         )}
       </button>
       <button
-        onPointerDown={handleRewrite}
+        onMouseDown={handleRewrite}
         disabled={isProcessing}
         aria-label="Rewrite"
         title="Rewrite"
@@ -232,7 +262,11 @@ export const MiniBar: React.FC<Props> = ({
         )}
       </button>
       <button
-        onPointerDown={onClose}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }}
         aria-label="Close"
         title="Close"
         style={{
