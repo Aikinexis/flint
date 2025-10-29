@@ -875,6 +875,7 @@ function PanelContent() {
           onRestore={handleSnapshotRestore}
           isOpen={state.isHistoryPanelOpen}
           onToggle={handleHistoryPanelToggle}
+          hideToggle={state.activeTab === 'settings' || state.activeTab === 'projects' || state.activeTab === 'home'}
           onSnapshotsChange={async () => {
             // Reload snapshots when they're modified (e.g., liked/unliked)
             if (currentProject) {

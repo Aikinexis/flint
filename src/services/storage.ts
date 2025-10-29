@@ -1060,6 +1060,15 @@ export class StorageService extends StorageServiceBase {
     }
   }
 
+  /**
+   * Clears all snapshots for a specific project (alias for deleteProjectSnapshots)
+   * @param projectId - ID of the project
+   * @returns Promise resolving when clear is complete
+   */
+  static async clearSnapshots(projectId: string): Promise<void> {
+    return this.deleteProjectSnapshots(projectId);
+  }
+
   // ===== Migration Methods =====
 
   /**

@@ -295,6 +295,8 @@ export function ToolControlsContainer({
       return;
     }
 
+    console.log('[ToolControls] customPrompt value:', customPrompt, 'length:', customPrompt.length);
+    
     if (!customPrompt.trim()) {
       onOperationError?.('Please choose a preset from the dropdown (↓) or type rewrite instructions');
       return;

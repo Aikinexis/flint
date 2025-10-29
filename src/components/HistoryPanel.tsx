@@ -19,6 +19,7 @@ export interface HistoryPanelProps {
   isOpen: boolean;
   onToggle: () => void;
   onSnapshotsChange?: () => void; // Callback when snapshots are modified
+  hideToggle?: boolean; // Hide the toggle button (e.g., when on settings/projects/welcome)
 }
 
 type SortOption = 'newest' | 'oldest' | 'type';
@@ -29,6 +30,7 @@ type FilterType = 'generate' | 'rewrite' | 'summarize' | 'manual';
  * Collapsible panel displaying version snapshots with dark background
  */
 export function HistoryPanel({
+  projectId,
   snapshots,
   activeSnapshotId,
   onSnapshotSelect: _onSnapshotSelect,
@@ -36,6 +38,7 @@ export function HistoryPanel({
   isOpen,
   onToggle,
   onSnapshotsChange,
+  hideToggle = false,
 }: HistoryPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<Set<FilterType>>(new Set());
@@ -43,7 +46,9 @@ export function HistoryPanel({
   const [showLikedOnly, setShowLikedOnly] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [selectedSnapshot, setSelectedSnapshot] = useState<Snapshot | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement>(null);
+  const clearMenuRef = useRef<HTMLDivElement>(null);
 
   // Close sort menu when clicking outside
   useEffect(() => {
@@ -51,16 +56,19 @@ export function HistoryPanel({
       if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) {
         setShowSortMenu(false);
       }
+      if (clearMenuRef.current && !clearMenuRef.current.contains(event.target as Node)) {
+        setShowClearConfirm(false);
+      }
     };
 
-    if (showSortMenu) {
+    if (showSortMenu || showClearConfirm) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showSortMenu]);
+  }, [showSortMenu, showClearConfirm]);
 
   // Toggle filter
   const toggleFilter = (type: FilterType) => {
@@ -101,6 +109,17 @@ export function HistoryPanel({
   // Close detail modal
   const handleCloseModal = () => {
     setSelectedSnapshot(null);
+  };
+
+  // Handle clear history
+  const handleClearHistory = async () => {
+    try {
+      await StorageService.clearSnapshots(projectId);
+      setShowClearConfirm(false);
+      onSnapshotsChange?.();
+    } catch (error) {
+      console.error('[HistoryPanel] Failed to clear history:', error);
+    }
   };
 
   // Filter and sort snapshots
@@ -160,31 +179,33 @@ export function HistoryPanel({
       />
 
       {/* Toggle button on sidebar edge */}
-      <button
-        className="history-panel-toggle"
-        onClick={onToggle}
-        aria-label={isOpen ? 'Close history panel' : 'Open history panel'}
-        aria-expanded={isOpen}
-        title={isOpen ? 'Close history' : 'Open history'}
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
+      {!hideToggle && (
+        <button
+          className="history-panel-toggle"
+          onClick={onToggle}
+          aria-label={isOpen ? 'Close history panel' : 'Open history panel'}
+          aria-expanded={isOpen}
+          title={isOpen ? 'Close history' : 'Open history'}
         >
-          {isOpen ? (
-            <polyline points="9 18 15 12 9 6" />
-          ) : (
-            <polyline points="15 18 9 12 15 6" />
-          )}
-        </svg>
-      </button>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            {isOpen ? (
+              <polyline points="9 18 15 12 9 6" />
+            ) : (
+              <polyline points="15 18 9 12 15 6" />
+            )}
+          </svg>
+        </button>
+      )}
 
       {/* History panel container */}
       <div
@@ -326,6 +347,42 @@ export function HistoryPanel({
                     >
                       By Type
                     </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="history-clear-container" ref={clearMenuRef}>
+                <button
+                  className="history-action-btn"
+                  onClick={() => setShowClearConfirm(!showClearConfirm)}
+                  aria-label="Clear history"
+                  aria-expanded={showClearConfirm}
+                  title="Clear history"
+                  disabled={snapshots.length === 0}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                </button>
+
+                {showClearConfirm && (
+                  <div className="history-clear-menu">
+                    <p>Clear all history?</p>
+                    <div className="history-clear-actions">
+                      <button
+                        className="history-clear-cancel"
+                        onClick={() => setShowClearConfirm(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="history-clear-confirm"
+                        onClick={handleClearHistory}
+                      >
+                        Clear
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -670,6 +727,76 @@ export function HistoryPanel({
         .history-sort-menu button.active {
           background: var(--accent);
           color: white;
+        }
+
+        /* Clear menu */
+        .history-clear-container {
+          position: relative;
+        }
+
+        .history-clear-menu {
+          position: absolute;
+          top: calc(100% + 4px);
+          right: 0;
+          min-width: 180px;
+          background: var(--surface-2);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          box-shadow: var(--shadow-soft);
+          padding: 12px;
+          z-index: 10;
+        }
+
+        .history-clear-menu p {
+          margin: 0 0 12px 0;
+          font-size: var(--fs-sm);
+          color: var(--text);
+          font-weight: 500;
+        }
+
+        .history-clear-actions {
+          display: flex;
+          gap: 8px;
+        }
+
+        .history-clear-cancel,
+        .history-clear-confirm {
+          flex: 1;
+          padding: 6px 12px;
+          border: none;
+          border-radius: var(--radius-sm);
+          font-size: var(--fs-sm);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .history-clear-cancel {
+          background: var(--surface-3);
+          color: var(--text);
+        }
+
+        .history-clear-cancel:hover {
+          background: var(--surface-4);
+        }
+
+        .history-clear-confirm {
+          background: #ef4444;
+          color: white;
+        }
+
+        .history-clear-confirm:hover {
+          background: #dc2626;
+        }
+
+        .history-action-btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
+        .history-action-btn:disabled:hover {
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
         }
       `}</style>
     </>

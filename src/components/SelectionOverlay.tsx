@@ -20,22 +20,23 @@ export function SelectionOverlay({
   color = 'var(--accent)' 
 }: SelectionOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const mirrorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!show || !overlayRef.current || !textarea || selectionStart === selectionEnd) {
       if (overlayRef.current) {
         overlayRef.current.innerHTML = '';
       }
+      mirrorRef.current = null;
       return;
     }
-
-    let mirror: HTMLDivElement | null = null;
 
     const updateOverlay = () => {
       if (!overlayRef.current || !textarea) return;
 
       // Create a mirror div that exactly matches the textarea
-      mirror = document.createElement('div');
+      const mirror = document.createElement('div');
+      mirrorRef.current = mirror;
       const computed = window.getComputedStyle(textarea);
       
       // Copy ALL relevant styles
@@ -54,15 +55,28 @@ export function SelectionOverlay({
         }
       });
       
-      // Position mirror exactly over textarea
+      // Position mirror as a scrollable container
       mirror.style.position = 'absolute';
       mirror.style.top = '0';
       mirror.style.left = '0';
       mirror.style.width = `${textarea.clientWidth}px`;
       mirror.style.height = `${textarea.clientHeight}px`;
-      mirror.style.overflow = 'hidden';
+      mirror.style.overflow = 'auto';
       mirror.style.pointerEvents = 'none';
       mirror.style.zIndex = '1';
+      mirror.style.willChange = 'scroll-position'; // Optimize scrolling performance
+      
+      // Hide scrollbars
+      mirror.style.scrollbarWidth = 'none';
+      (mirror.style as any).msOverflowStyle = 'none';
+      
+      // Prevent any scroll event propagation
+      mirror.addEventListener('wheel', (e) => e.stopPropagation(), { passive: true });
+      mirror.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
+      
+      // Create inner content wrapper
+      const content = document.createElement('div');
+      content.style.minHeight = '100%';
       
       // Split text into three parts
       const textBefore = textarea.value.substring(0, selectionStart);
@@ -77,8 +91,8 @@ export function SelectionOverlay({
       const selectedSpan = document.createElement('span');
       selectedSpan.textContent = textSelected;
       selectedSpan.style.color = 'transparent';
-      selectedSpan.style.background = 'rgba(99, 102, 241, 0.15)'; // Accent color with transparency
-      selectedSpan.style.border = '1px solid rgb(99, 102, 241)'; // Thinner border
+      selectedSpan.style.background = 'rgba(99, 102, 241, 0.15)';
+      selectedSpan.style.border = '1px solid rgb(99, 102, 241)';
       selectedSpan.style.borderRadius = '6px';
       selectedSpan.style.boxShadow = '0 0 0 1px rgba(99, 102, 241, 0.3), 0 0 12px rgba(99, 102, 241, 0.4)';
       selectedSpan.style.animation = 'selection-pulse 1.5s ease-in-out infinite';
@@ -87,28 +101,24 @@ export function SelectionOverlay({
       afterSpan.textContent = textAfter;
       afterSpan.style.color = 'transparent';
       
-      mirror.appendChild(beforeSpan);
-      mirror.appendChild(selectedSpan);
-      mirror.appendChild(afterSpan);
+      content.appendChild(beforeSpan);
+      content.appendChild(selectedSpan);
+      content.appendChild(afterSpan);
+      
+      mirror.appendChild(content);
       
       overlayRef.current.innerHTML = '';
       overlayRef.current.appendChild(mirror);
       
-      // Apply scroll offset AFTER appending to DOM
-      // Use requestAnimationFrame to ensure DOM is ready
-      requestAnimationFrame(() => {
-        if (mirror && textarea) {
-          mirror.scrollTop = textarea.scrollTop;
-          mirror.scrollLeft = textarea.scrollLeft;
-        }
-      });
+      // Sync scroll position immediately
+      handleScroll();
     };
 
-    // Update overlay on scroll
+    // Update overlay on scroll by syncing scrollTop
     const handleScroll = () => {
-      if (mirror && textarea) {
-        mirror.scrollTop = textarea.scrollTop;
-        mirror.scrollLeft = textarea.scrollLeft;
+      if (mirrorRef.current && textarea) {
+        mirrorRef.current.scrollTop = textarea.scrollTop;
+        mirrorRef.current.scrollLeft = textarea.scrollLeft;
       }
     };
 
@@ -157,7 +167,7 @@ export function SelectionOverlay({
   );
 }
 
-// Add animation styles
+// Add animation and scrollbar hiding styles
 if (typeof document !== 'undefined' && !document.getElementById('selection-overlay-styles')) {
   const style = document.createElement('style');
   style.id = 'selection-overlay-styles';
@@ -169,6 +179,11 @@ if (typeof document !== 'undefined' && !document.getElementById('selection-overl
       50% {
         opacity: 0.8;
       }
+    }
+    
+    /* Hide scrollbar in mirror divs */
+    div[style*="overflow: scroll"]::-webkit-scrollbar {
+      display: none;
     }
   `;
   document.head.appendChild(style);
