@@ -49,6 +49,7 @@ export interface PromptHistoryItem {
 export interface Project {
   id: string;
   title: string;
+  description?: string; // Optional project description
   content: string;
   createdAt: number;
   updatedAt: number;
@@ -65,6 +66,7 @@ export interface Snapshot {
   actionDescription: string;
   timestamp: number;
   selectionRange?: { start: number; end: number };
+  liked?: boolean; // Added for favoriting snapshots
 }
 
 /**
@@ -864,6 +866,33 @@ export class StorageService extends StorageServiceBase {
     }
   }
 
+  /**
+   * Gets the last used project ID from chrome.storage.local
+   * @returns Promise resolving to project ID or null
+   */
+  static async getLastProjectId(): Promise<string | null> {
+    try {
+      const result = await chrome.storage.local.get('flint.lastProjectId');
+      return result['flint.lastProjectId'] || null;
+    } catch (error) {
+      console.error('[Storage] Failed to get last project ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Sets the last used project ID in chrome.storage.local
+   * @param projectId - Project ID to save
+   * @returns Promise resolving when save is complete
+   */
+  static async setLastProjectId(projectId: string): Promise<void> {
+    try {
+      await chrome.storage.local.set({ 'flint.lastProjectId': projectId });
+    } catch (error) {
+      console.error('[Storage] Failed to set last project ID:', error);
+    }
+  }
+
   // ===== Snapshot Methods =====
 
   /**
@@ -980,6 +1009,35 @@ export class StorageService extends StorageServiceBase {
       return await IndexedDBHelper.get<Snapshot>(SNAPSHOTS_STORE, id);
     } catch (error) {
       console.error('[Storage] Failed to get snapshot:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Updates a snapshot with new data
+   * @param id - Snapshot ID
+   * @param updates - Partial snapshot data to update
+   * @returns Promise resolving to updated snapshot or undefined
+   */
+  static async updateSnapshot(id: string, updates: Partial<Snapshot>): Promise<Snapshot | undefined> {
+    try {
+      const snapshot = await this.getSnapshot(id);
+      if (!snapshot) {
+        console.error('[Storage] Snapshot not found:', id);
+        return undefined;
+      }
+
+      const updatedSnapshot: Snapshot = {
+        ...snapshot,
+        ...updates,
+        id: snapshot.id, // Ensure ID doesn't change
+        projectId: snapshot.projectId, // Ensure projectId doesn't change
+      };
+
+      await IndexedDBHelper.put(SNAPSHOTS_STORE, updatedSnapshot);
+      return updatedSnapshot;
+    } catch (error) {
+      console.error('[Storage] Failed to update snapshot:', error);
       return undefined;
     }
   }

@@ -10,7 +10,7 @@ import type { AIAvailability } from '../services/ai';
 /**
  * Tab types for navigation
  */
-export type Tab = 'home' | 'generate' | 'rewrite' | 'summary' | 'settings';
+export type Tab = 'home' | 'projects' | 'generate' | 'rewrite' | 'summary' | 'settings';
 
 /**
  * Application state interface

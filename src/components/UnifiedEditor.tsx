@@ -1,4 +1,4 @@
-import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
 import { usePanelMiniBar } from '../hooks/usePanelMiniBar';
 import { MiniBar } from './MiniBar';
 
@@ -137,19 +137,16 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(fu
     onSelectionChange({ start, end });
   };
 
-  /**
-   * Restore cursor position when content changes externally
-   * This ensures cursor position is maintained when switching tabs
-   */
-  useEffect(() => {
-    if (!textareaRef.current) return;
+  // Remove the problematic useEffect that was interfering with typing
+  // The cursor position is already tracked by handleSelect and doesn't need restoration
 
-    const { start, end } = selectionRef.current;
-    
-    // Only restore if the textarea is focused or if we have a valid selection
-    if (document.activeElement === textareaRef.current || start !== end) {
-      textareaRef.current.setSelectionRange(start, end);
-    }
+  // Calculate word and character counts
+  const wordCount = useMemo(() => {
+    return content.trim() === '' ? 0 : content.trim().split(/\s+/).length;
+  }, [content]);
+
+  const charCount = useMemo(() => {
+    return content.length;
   }, [content]);
 
   return (
@@ -164,7 +161,6 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(fu
     >
       <textarea
         ref={textareaRef}
-        className="flint-input"
         value={content}
         onChange={handleChange}
         onSelect={handleSelect}
@@ -179,18 +175,49 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(fu
           width: '100%',
           flex: 1,
           resize: 'none',
-          border: '1px solid var(--border)',
+          border: 'none',
           background: 'var(--bg)',
           padding: '16px',
+          paddingBottom: '48px', // Make room for counter at bottom
           fontSize: 'var(--fs-md)',
           lineHeight: '1.6',
           color: 'var(--text)',
-          borderRadius: 'var(--radius-md)',
+          borderRadius: '0',
           cursor: readOnly ? 'default' : 'text',
           fontFamily: 'var(--font-sans)',
           direction: 'ltr',
+          textAlign: 'left',
+          outline: 'none',
         }}
       />
+
+      {/* Word and character counter - positioned at bottom of textarea */}
+      {content.length > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '16px',
+            right: '32px',
+            fontSize: 'var(--fs-xs)',
+            color: 'var(--text-muted)',
+            fontWeight: 500,
+            userSelect: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            pointerEvents: 'none',
+            background: 'var(--bg)',
+            padding: '4px 8px',
+            borderRadius: 'var(--radius-sm)',
+            zIndex: 10,
+          }}
+          aria-label={`${wordCount} ${wordCount === 1 ? 'word' : 'words'}, ${charCount} ${charCount === 1 ? 'character' : 'characters'}`}
+        >
+          <span>{wordCount}w</span>
+          <span style={{ opacity: 0.5 }}>·</span>
+          <span>{charCount}c</span>
+        </div>
+      )}
 
       {/* Mini bar for text selection with inline replacement */}
       <MiniBar

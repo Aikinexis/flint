@@ -11,7 +11,9 @@ import { ToolControlsContainer, ToolType } from '../components/ToolControlsConta
 import { replaceTextInline } from '../utils/inlineReplace';
 import { ProjectManager } from '../components/ProjectManager';
 import { HistoryPanel } from '../components/HistoryPanel';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { StorageService, Project, Snapshot } from '../services/storage';
+import { exportProject, autoFormatText, type ExportFormat } from '../utils/export';
 
 import type { Tab } from '../state/store';
 
@@ -35,7 +37,6 @@ function PanelContent() {
   const summarizeEditorRef = useRef<UnifiedEditorRef>(null);
 
   // Project management state
-  const [isProjectManagerOpen, setIsProjectManagerOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -45,8 +46,31 @@ function PanelContent() {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [activeSnapshotId, setActiveSnapshotId] = useState<string | null>(null);
   
+  // Export menu state
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+  
+  // Project title editing state
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editingTitle, setEditingTitle] = useState('');
+  
   // Debounced auto-save ref
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Auto-snapshot state for manual edits
+  const lastSnapshotContentRef = useRef<string>('');
+  const autoSnapshotTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Initialization flag to prevent multiple runs
+  const isInitializedRef = useRef(false);
+  
+  // Ref to current project for use in timeouts
+  const currentProjectRef = useRef<Project | null>(null);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    currentProjectRef.current = currentProject;
+  }, [currentProject]);
 
   // Navigation order: Projects, Generate, Rewrite, Summary, Settings
   const navigationItems: NavigationItem[] = [
@@ -57,29 +81,17 @@ function PanelContent() {
     { id: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
-  // Load last selected tab from storage on mount
-  useEffect(() => {
-    let mounted = true;
+  // Note: Tab initialization is handled in initializeProjects effect below
+  // to avoid race conditions
 
-    chrome.storage.local.get({ 'flint.lastTab': 'home' }).then((result) => {
-      if (!mounted) return;
-      
-      const tab = result['flint.lastTab'] as Tab;
-      actions.setActiveTab(tab);
-      // Mark initial tab as visited
-      setVisitedTabs(prev => new Set(prev).add(tab));
-    });
-
-    return () => {
-      mounted = false;
-    };
-  }, [actions]);
-
-  // Cleanup auto-save timeout on unmount
+  // Cleanup auto-save and auto-snapshot timeouts on unmount
   useEffect(() => {
     return () => {
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current);
+      }
+      if (autoSnapshotTimeoutRef.current) {
+        clearTimeout(autoSnapshotTimeoutRef.current);
       }
     };
   }, []);
@@ -184,12 +196,6 @@ function PanelContent() {
   }, [actions]);
 
   const handleNavigate = (id: string) => {
-    // Special handling for Projects button - open modal instead of navigating
-    if (id === 'projects') {
-      setIsProjectManagerOpen(true);
-      return;
-    }
-
     const newTab = id as Tab;
     actions.setActiveTab(newTab);
     // Mark tab as visited for lazy mounting
@@ -198,6 +204,11 @@ function PanelContent() {
     window.getSelection()?.removeAllRanges();
     // Save to storage
     chrome.storage.local.set({ 'flint.lastTab': newTab });
+    
+    // Reload projects when navigating to Projects tab to show latest changes
+    if (newTab === 'projects') {
+      loadProjects();
+    }
   };
 
   /**
@@ -228,31 +239,77 @@ function PanelContent() {
   }, []);
 
   /**
-   * Handle unified editor content change with auto-save
+   * Handle unified editor content change with auto-save and auto-snapshot
    */
   const handleEditorContentChange = useCallback((content: string) => {
     setEditorContent(content);
     actions.setCurrentText(content);
     
     // Clear active snapshot when content changes (user is editing)
-    // This indicates we're no longer viewing a specific snapshot
-    if (activeSnapshotId !== null) {
-      setActiveSnapshotId(null);
-    }
+    setActiveSnapshotId(null);
     
     // Debounced auto-save if there's a current project
-    if (currentProject) {
-      // Clear existing timeout
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
-      }
-      
-      // Set new timeout for auto-save (500ms delay)
-      autoSaveTimeoutRef.current = setTimeout(() => {
-        autoSaveProject(currentProject.id, content);
-      }, 500);
+    // Clear existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
     }
-  }, [actions, currentProject, autoSaveProject, activeSnapshotId]);
+    
+    // Set new timeout for auto-save (500ms delay)
+    autoSaveTimeoutRef.current = setTimeout(async () => {
+      // Get current project from ref (stable reference)
+      const projectToSave = currentProjectRef.current;
+      if (projectToSave) {
+        try {
+          setIsSaving(true);
+          console.log('[Panel] Auto-saving content:', content.substring(0, 50) + '...');
+          const updatedProject = await StorageService.updateProject(projectToSave.id, { content });
+          if (updatedProject) {
+            setCurrentProject(updatedProject);
+            console.log('[Panel] Project auto-saved successfully:', projectToSave.id, 'Content length:', content.length);
+          }
+        } catch (error) {
+          console.error('[Panel] Auto-save failed:', error);
+        } finally {
+          setIsSaving(false);
+        }
+      } else {
+        console.warn('[Panel] No current project to save to');
+      }
+    }, 500);
+    
+    // Debounced auto-snapshot for manual edits (3 seconds after typing stops)
+    if (autoSnapshotTimeoutRef.current) {
+      clearTimeout(autoSnapshotTimeoutRef.current);
+    }
+    
+    autoSnapshotTimeoutRef.current = setTimeout(async () => {
+      const projectForSnapshot = currentProjectRef.current;
+      if (projectForSnapshot) {
+        const lastContent = lastSnapshotContentRef.current;
+        if (lastContent) {
+          const contentDiff = Math.abs(content.length - lastContent.length);
+          if (contentDiff >= 50) {
+            try {
+              const snapshot = await StorageService.createSnapshot(
+                projectForSnapshot.id,
+                lastContent,
+                'generate',
+                'Manual edit',
+                undefined
+              );
+              setSnapshots(prev => [snapshot, ...prev]);
+              lastSnapshotContentRef.current = content;
+              console.log('[Panel] Created auto-snapshot for manual edit');
+            } catch (error) {
+              console.error('[Panel] Failed to create auto-snapshot:', error);
+            }
+          }
+        } else {
+          lastSnapshotContentRef.current = content;
+        }
+      }
+    }, 3000);
+  }, [actions]);
 
   /**
    * Handle unified editor selection change
@@ -344,6 +401,9 @@ function PanelContent() {
         // Add snapshot to local state immediately
         setSnapshots(prev => [snapshot, ...prev]);
         
+        // Update last snapshot content ref for auto-snapshot tracking
+        lastSnapshotContentRef.current = editorContent;
+        
         console.log(`[Panel] Created snapshot before ${operationType} operation:`, snapshot.id);
       } catch (error) {
         console.error('[Panel] Failed to create snapshot:', error);
@@ -361,18 +421,28 @@ function PanelContent() {
       editorRef = summarizeEditorRef;
     }
     
-    // Get textarea element
+    // For generate operations, just set the content directly
+    if (operationType === 'generate') {
+      setEditorContent(result);
+      console.log(`[Panel] Generate operation completed, content set`);
+      return;
+    }
+    
+    // For rewrite/summarize, use inline replacement
     const textarea = editorRef?.current?.getTextarea();
     
-    if (textarea) {
+    if (textarea && editorSelection.start !== editorSelection.end) {
       try {
-        // Use inline replacement with current selection range
+        // Use inline replacement for selected text
         await replaceTextInline(
           textarea,
           result,
           editorSelection.start,
           editorSelection.end
         );
+        
+        // Update React state to match textarea value
+        setEditorContent(textarea.value);
         
         console.log(`[Panel] ${operationType} operation completed with inline replacement`);
       } catch (error) {
@@ -381,7 +451,7 @@ function PanelContent() {
         setEditorContent(result);
       }
     } else {
-      // Fallback: just update content if textarea not available
+      // Fallback: just update content if no selection or textarea not available
       setEditorContent(result);
       console.log(`[Panel] ${operationType} operation completed (no inline replacement)`);
     }
@@ -426,7 +496,17 @@ function PanelContent() {
         setCurrentProject(project);
         setEditorContent(project.content);
         actions.setCurrentText(project.content);
-        setIsProjectManagerOpen(false);
+        
+        // Navigate to generate tab after selecting project
+        actions.setActiveTab('generate');
+        setVisitedTabs(prev => new Set(prev).add('generate'));
+        
+        // Initialize last snapshot content for auto-snapshot tracking
+        lastSnapshotContentRef.current = project.content;
+        
+        // Save as last used project
+        await StorageService.setLastProjectId(project.id);
+        
         console.log('[Panel] Loaded project:', project.title);
       }
     } catch (error) {
@@ -451,7 +531,16 @@ function PanelContent() {
       setCurrentProject(newProject);
       setEditorContent('');
       actions.setCurrentText('');
-      setIsProjectManagerOpen(false);
+      
+      // Navigate to generate tab after creating project
+      actions.setActiveTab('generate');
+      setVisitedTabs(prev => new Set(prev).add('generate'));
+      
+      // Initialize last snapshot content for auto-snapshot tracking
+      lastSnapshotContentRef.current = '';
+      
+      // Save as last used project
+      await StorageService.setLastProjectId(newProject.id);
       
       // Reload projects list
       await loadProjects();
@@ -488,11 +577,80 @@ function PanelContent() {
   }, [currentProject, actions, loadProjects]);
 
   /**
-   * Load projects on mount
+   * Load projects and last used project on mount
    */
   useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
+    const initializeProjects = async () => {
+      // Prevent multiple initializations
+      if (isInitializedRef.current) return;
+      isInitializedRef.current = true;
+      
+      await loadProjects();
+      
+      // Try to load the last used project
+      const lastProjectId = await StorageService.getLastProjectId();
+      if (lastProjectId) {
+        try {
+          const project = await StorageService.getProject(lastProjectId);
+          if (project) {
+            setCurrentProject(project);
+            setEditorContent(project.content);
+            actions.setCurrentText(project.content);
+            lastSnapshotContentRef.current = project.content;
+            
+            // Always start on generate tab
+            actions.setActiveTab('generate');
+            setVisitedTabs(prev => new Set(prev).add('generate'));
+            
+            console.log('[Panel] Loaded last used project:', project.title);
+            return;
+          }
+        } catch (error) {
+          console.error('[Panel] Failed to load last project:', error);
+        }
+      }
+      
+      // If no last project or it failed to load, check if any projects exist
+      const allProjects = await StorageService.getProjects();
+      if (allProjects.length === 0) {
+        // No projects exist - auto-create a default project
+        try {
+          const defaultProject = await StorageService.createProject('My First Project', '');
+          setCurrentProject(defaultProject);
+          setEditorContent('');
+          actions.setCurrentText('');
+          lastSnapshotContentRef.current = '';
+          await StorageService.setLastProjectId(defaultProject.id);
+          
+          // Start on generate tab
+          actions.setActiveTab('generate');
+          setVisitedTabs(prev => new Set(prev).add('generate'));
+          
+          console.log('[Panel] Created default project:', defaultProject.id);
+        } catch (error) {
+          console.error('[Panel] Failed to create default project:', error);
+        }
+      } else {
+        // Load the most recent project
+        const mostRecent = allProjects[0];
+        if (mostRecent) {
+          setCurrentProject(mostRecent);
+          setEditorContent(mostRecent.content);
+          actions.setCurrentText(mostRecent.content);
+          lastSnapshotContentRef.current = mostRecent.content;
+          await StorageService.setLastProjectId(mostRecent.id);
+          
+          // Always start on generate tab
+          actions.setActiveTab('generate');
+          setVisitedTabs(prev => new Set(prev).add('generate'));
+          
+          console.log('[Panel] Loaded most recent project:', mostRecent.title);
+        }
+      }
+    };
+    
+    initializeProjects();
+  }, [loadProjects, actions]);
 
   /**
    * Check and run history migration on mount
@@ -546,11 +704,100 @@ function PanelContent() {
   }, [snapshots, actions]);
 
   /**
+   * Handle snapshot restore from detail modal
+   */
+  const handleSnapshotRestore = useCallback((content: string) => {
+    setEditorContent(content);
+    actions.setCurrentText(content);
+    console.log('[Panel] Restored snapshot content to editor');
+  }, [actions]);
+
+  /**
    * Handle history panel toggle
    */
   const handleHistoryPanelToggle = useCallback(() => {
     actions.toggleHistoryPanel();
   }, [actions]);
+
+  /**
+   * Handle export in specified format (with auto-format)
+   */
+  const handleExport = useCallback((format: ExportFormat) => {
+    if (!currentProject) {
+      alert('No project to export. Please create or select a project first.');
+      return;
+    }
+
+    try {
+      // Auto-format content before export
+      const formattedContent = autoFormatText(editorContent);
+      
+      // Create a project snapshot with formatted content for export
+      const projectToExport: Project = {
+        ...currentProject,
+        content: formattedContent,
+      };
+      
+      exportProject(projectToExport, format);
+      setShowExportMenu(false);
+      console.log(`[Panel] Exported project as ${format} (auto-formatted)`);
+    } catch (error) {
+      console.error('[Panel] Export failed:', error);
+      alert('Failed to export project. Please try again.');
+    }
+  }, [currentProject, editorContent]);
+
+  /**
+   * Handle project title edit start
+   */
+  const handleTitleEditStart = useCallback(() => {
+    if (currentProject) {
+      setEditingTitle(currentProject.title);
+      setIsEditingTitle(true);
+    }
+  }, [currentProject]);
+
+  /**
+   * Handle project title save
+   */
+  const handleTitleSave = useCallback(async () => {
+    if (!currentProject || !editingTitle.trim()) {
+      setIsEditingTitle(false);
+      return;
+    }
+
+    try {
+      const updatedProject = await StorageService.updateProject(currentProject.id, {
+        title: editingTitle.trim(),
+      });
+      
+      if (updatedProject) {
+        setCurrentProject(updatedProject);
+        // Reload projects list to update ProjectManager
+        await loadProjects();
+        console.log('[Panel] Project title updated:', editingTitle);
+      }
+    } catch (error) {
+      console.error('[Panel] Failed to update title:', error);
+      alert('Failed to update project title. Please try again.');
+    } finally {
+      setIsEditingTitle(false);
+    }
+  }, [currentProject, editingTitle, loadProjects]);
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    if (!showExportMenu) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showExportMenu]);
 
   return (
     <div className="flint-bg h-screen relative">
@@ -563,8 +810,16 @@ function PanelContent() {
           snapshots={snapshots}
           activeSnapshotId={activeSnapshotId}
           onSnapshotSelect={handleSnapshotSelect}
+          onRestore={handleSnapshotRestore}
           isOpen={state.isHistoryPanelOpen}
           onToggle={handleHistoryPanelToggle}
+          onSnapshotsChange={async () => {
+            // Reload snapshots when they're modified (e.g., liked/unliked)
+            if (currentProject) {
+              const updatedSnapshots = await StorageService.getSnapshots(currentProject.id);
+              setSnapshots(updatedSnapshots);
+            }
+          }}
         />
       )}
 
@@ -632,17 +887,35 @@ function PanelContent() {
         </div>
       )}
 
-      {/* Project Manager Modal */}
-      <ProjectManager
-        projects={projects}
-        onProjectSelect={handleProjectSelect}
-        onProjectCreate={handleProjectCreate}
-        onProjectDelete={handleProjectDelete}
-        isOpen={isProjectManagerOpen}
-        onClose={() => setIsProjectManagerOpen(false)}
-      />
+      <div className={`content-area ${state.activeTab ? 'expanded' : ''}`}>
+        {/* Small loading indicator in top-right during AI operations */}
+        {state.isProcessing && (
+          <div
+            style={{
+              position: 'fixed',
+              top: '16px',
+              right: '88px',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 12px',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-soft)',
+            }}
+          >
+            <LoadingSpinner 
+              size={16} 
+              variant="inline"
+            />
+            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
+              Processing...
+            </span>
+          </div>
+        )}
 
-      <div className={`content-area ${state.activeTab ? 'expanded' : ''} ${state.isHistoryPanelOpen ? 'history-panel-open' : ''}`}>
         <ErrorBoundary
           onError={(error, errorInfo) => {
             // Log error details for debugging
@@ -670,13 +943,199 @@ function PanelContent() {
                 padding: '24px',
               }}
             >
+              {/* Editor Toolbar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                {isEditingTitle ? (
+                  <input
+                    type="text"
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    onBlur={handleTitleSave}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleTitleSave();
+                      } else if (e.key === 'Escape') {
+                        setIsEditingTitle(false);
+                      }
+                    }}
+                    autoFocus
+                    style={{
+                      fontSize: 'var(--fs-lg)',
+                      fontWeight: 600,
+                      color: 'var(--text)',
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '4px 8px',
+                      outline: 'none',
+                      flex: 1,
+                      maxWidth: '400px',
+                    }}
+                  />
+                ) : (
+                  <h2 
+                    onClick={handleTitleEditStart}
+                    style={{ 
+                      fontSize: 'var(--fs-lg)', 
+                      fontWeight: 600, 
+                      color: 'var(--text)', 
+                      margin: 0,
+                      cursor: 'pointer',
+                      padding: '4px 8px',
+                      borderRadius: 'var(--radius-sm)',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-2)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    title="Click to edit project name"
+                  >
+                    {currentProject?.title || 'Untitled Project'}
+                  </h2>
+                )}
+                <div style={{ display: 'flex', gap: '4px', position: 'relative' }}>
+                  {/* Export icon button with dropdown */}
+                  <div ref={exportMenuRef} style={{ position: 'relative' }}>
+                    <button
+                      onClick={() => setShowExportMenu(!showExportMenu)}
+                      disabled={!currentProject}
+                      aria-label="Export project"
+                      aria-expanded={showExportMenu}
+                      title="Export (auto-formats on export)"
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        color: 'var(--text-muted)',
+                        cursor: currentProject ? 'pointer' : 'not-allowed',
+                        opacity: currentProject ? 1 : 0.5,
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (currentProject) {
+                          e.currentTarget.style.background = 'var(--surface-2)';
+                          e.currentTarget.style.color = 'var(--text)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'var(--text-muted)';
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                    </button>
+                    
+                    {showExportMenu && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 4px)',
+                        right: 0,
+                        minWidth: '160px',
+                        background: 'var(--surface-2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-md)',
+                        boxShadow: 'var(--shadow-soft)',
+                        padding: '4px',
+                        zIndex: 100,
+                      }}>
+                        <button
+                          onClick={() => handleExport('txt')}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text)',
+                            fontSize: 'var(--fs-sm)',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            borderRadius: 'var(--radius-sm)',
+                            transition: 'background 0.2s',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-3)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          Plain Text (.txt)
+                        </button>
+                        <button
+                          onClick={() => handleExport('md')}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text)',
+                            fontSize: 'var(--fs-sm)',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            borderRadius: 'var(--radius-sm)',
+                            transition: 'background 0.2s',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-3)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          Markdown (.md)
+                        </button>
+                        <button
+                          onClick={() => handleExport('html')}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text)',
+                            fontSize: 'var(--fs-sm)',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            borderRadius: 'var(--radius-sm)',
+                            transition: 'background 0.2s',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-3)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          HTML (.html)
+                        </button>
+                        <button
+                          onClick={() => handleExport('docx')}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text)',
+                            fontSize: 'var(--fs-sm)',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            borderRadius: 'var(--radius-sm)',
+                            transition: 'background 0.2s',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-3)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          Docs (.doc)
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
               <UnifiedEditor
                 ref={generateEditorRef}
                 content={editorContent}
                 onContentChange={handleEditorContentChange}
                 activeTool="generate"
                 onSelectionChange={handleEditorSelectionChange}
-                placeholder="Generated text will appear here..."
+                placeholder="Let's start writing!"
                 pinnedNotes={state.pinnedNotes.map(note => note.content)}
                 onBeforeMiniBarOperation={handleBeforeMiniBarOperation}
               />
@@ -701,13 +1160,107 @@ function PanelContent() {
                 padding: '24px',
               }}
             >
+              {/* Editor Toolbar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                {isEditingTitle ? (
+                  <input
+                    type="text"
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    onBlur={handleTitleSave}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleTitleSave();
+                      } else if (e.key === 'Escape') {
+                        setIsEditingTitle(false);
+                      }
+                    }}
+                    autoFocus
+                    style={{
+                      fontSize: 'var(--fs-lg)',
+                      fontWeight: 600,
+                      color: 'var(--text)',
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '4px 8px',
+                      outline: 'none',
+                      flex: 1,
+                      maxWidth: '400px',
+                    }}
+                  />
+                ) : (
+                  <h2 
+                    onClick={handleTitleEditStart}
+                    style={{ 
+                      fontSize: 'var(--fs-lg)', 
+                      fontWeight: 600, 
+                      color: 'var(--text)', 
+                      margin: 0,
+                      cursor: 'pointer',
+                      padding: '4px 8px',
+                      borderRadius: 'var(--radius-sm)',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-2)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    title="Click to edit project name"
+                  >
+                    {currentProject?.title || 'Untitled Project'}
+                  </h2>
+                )}
+                <div style={{ display: 'flex', gap: '4px', position: 'relative' }}>
+                  {/* Export icon button */}
+                  <div ref={exportMenuRef} style={{ position: 'relative' }}>
+                    <button
+                      onClick={() => setShowExportMenu(!showExportMenu)}
+                      disabled={!currentProject}
+                      aria-label="Export project"
+                      aria-expanded={showExportMenu}
+                      title="Export (auto-formats on export)"
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        color: 'var(--text-muted)',
+                        cursor: currentProject ? 'pointer' : 'not-allowed',
+                        opacity: currentProject ? 1 : 0.5,
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (currentProject) {
+                          e.currentTarget.style.background = 'var(--surface-2)';
+                          e.currentTarget.style.color = 'var(--text)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'var(--text-muted)';
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
               <UnifiedEditor
                 ref={rewriteEditorRef}
                 content={editorContent}
                 onContentChange={handleEditorContentChange}
                 activeTool="rewrite"
                 onSelectionChange={handleEditorSelectionChange}
-                placeholder="Paste or type text to rewrite..."
+                placeholder="Let's start writing!"
                 pinnedNotes={state.pinnedNotes.map(note => note.content)}
                 onBeforeMiniBarOperation={handleBeforeMiniBarOperation}
               />
@@ -732,13 +1285,107 @@ function PanelContent() {
                 padding: '24px',
               }}
             >
+              {/* Editor Toolbar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                {isEditingTitle ? (
+                  <input
+                    type="text"
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    onBlur={handleTitleSave}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleTitleSave();
+                      } else if (e.key === 'Escape') {
+                        setIsEditingTitle(false);
+                      }
+                    }}
+                    autoFocus
+                    style={{
+                      fontSize: 'var(--fs-lg)',
+                      fontWeight: 600,
+                      color: 'var(--text)',
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '4px 8px',
+                      outline: 'none',
+                      flex: 1,
+                      maxWidth: '400px',
+                    }}
+                  />
+                ) : (
+                  <h2 
+                    onClick={handleTitleEditStart}
+                    style={{ 
+                      fontSize: 'var(--fs-lg)', 
+                      fontWeight: 600, 
+                      color: 'var(--text)', 
+                      margin: 0,
+                      cursor: 'pointer',
+                      padding: '4px 8px',
+                      borderRadius: 'var(--radius-sm)',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-2)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    title="Click to edit project name"
+                  >
+                    {currentProject?.title || 'Untitled Project'}
+                  </h2>
+                )}
+                <div style={{ display: 'flex', gap: '4px', position: 'relative' }}>
+                  {/* Export icon button */}
+                  <div ref={exportMenuRef} style={{ position: 'relative' }}>
+                    <button
+                      onClick={() => setShowExportMenu(!showExportMenu)}
+                      disabled={!currentProject}
+                      aria-label="Export project"
+                      aria-expanded={showExportMenu}
+                      title="Export (auto-formats on export)"
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        color: 'var(--text-muted)',
+                        cursor: currentProject ? 'pointer' : 'not-allowed',
+                        opacity: currentProject ? 1 : 0.5,
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (currentProject) {
+                          e.currentTarget.style.background = 'var(--surface-2)';
+                          e.currentTarget.style.color = 'var(--text)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'var(--text-muted)';
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
               <UnifiedEditor
                 ref={summarizeEditorRef}
                 content={editorContent}
                 onContentChange={handleEditorContentChange}
                 activeTool="summarize"
                 onSelectionChange={handleEditorSelectionChange}
-                placeholder="Paste or type text to summarize..."
+                placeholder="Let's start writing!"
                 pinnedNotes={state.pinnedNotes.map(note => note.content)}
                 onBeforeMiniBarOperation={handleBeforeMiniBarOperation}
               />
@@ -750,6 +1397,20 @@ function PanelContent() {
                 onOperationStart={handleOperationStart}
                 onOperationComplete={handleOperationComplete}
                 onOperationError={handleOperationError}
+              />
+            </div>
+          )}
+          
+          {visitedTabs.has('projects') && (
+            <div style={{ display: state.activeTab === 'projects' ? 'block' : 'none', height: '100%' }}>
+              <ProjectManager
+                projects={projects}
+                onProjectSelect={handleProjectSelect}
+                onProjectCreate={handleProjectCreate}
+                onProjectDelete={handleProjectDelete}
+                onProjectUpdate={loadProjects}
+                isOpen={state.activeTab === 'projects'}
+                onClose={() => actions.setActiveTab('generate')}
               />
             </div>
           )}
