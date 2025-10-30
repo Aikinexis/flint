@@ -1,9 +1,9 @@
 /**
  * Selection Handler Module
- * 
+ *
  * Captures text selections and manages selection state on web pages.
  * Supports both standard text selections and editable field selections.
- * 
+ *
  * @module content/selection
  */
 
@@ -62,10 +62,10 @@ class SelectionHandlerImpl implements SelectionHandler {
     try {
       // Listen for selection changes
       document.addEventListener('selectionchange', this.handleSelectionChange.bind(this));
-      
+
       // Store selection on mouseup
       document.addEventListener('mouseup', this.handleMouseUp.bind(this));
-      
+
       console.log('[Flint Selection] Handler initialized on:', window.location.href);
     } catch (error) {
       console.error('[Flint Selection] Failed to initialize:', error);
@@ -143,22 +143,20 @@ class SelectionHandlerImpl implements SelectionHandler {
     }
   }
 
-
-
   /**
    * Get currently selected text using window.getSelection()
    */
   getSelectedText(): string | null {
     try {
       const selection = window.getSelection();
-      
+
       // Handle empty or null selection
       if (!selection || selection.rangeCount === 0) {
         return null;
       }
 
       const text = selection.toString().trim();
-      
+
       // Return null for empty selections
       return text.length > 0 ? text : null;
     } catch (error) {
@@ -173,7 +171,7 @@ class SelectionHandlerImpl implements SelectionHandler {
   getSelectionRange(): Range | null {
     try {
       const selection = window.getSelection();
-      
+
       // Handle empty or null selection
       if (!selection || selection.rangeCount === 0) {
         return null;
@@ -181,7 +179,7 @@ class SelectionHandlerImpl implements SelectionHandler {
 
       // Get the first range (most common case)
       const range = selection.getRangeAt(0);
-      
+
       // Verify range is not collapsed (has content)
       if (range.collapsed) {
         return null;
@@ -207,22 +205,23 @@ class SelectionHandlerImpl implements SelectionHandler {
   isEditableSelection(): boolean {
     try {
       const selection = window.getSelection();
-      
+
       if (!selection || selection.rangeCount === 0) {
         return false;
       }
 
       // Get the anchor node (start of selection)
       const anchorNode = selection.anchorNode;
-      
+
       if (!anchorNode) {
         return false;
       }
 
       // Get the element containing the selection
-      const element = anchorNode.nodeType === Node.ELEMENT_NODE 
-        ? anchorNode as Element
-        : anchorNode.parentElement;
+      const element =
+        anchorNode.nodeType === Node.ELEMENT_NODE
+          ? (anchorNode as Element)
+          : anchorNode.parentElement;
 
       if (!element) {
         return false;

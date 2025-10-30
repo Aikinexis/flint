@@ -72,7 +72,7 @@ export function ProjectManager({
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
-  
+
   // Export menu state
   const [exportingProjectId, setExportingProjectId] = useState<string | null>(null);
 
@@ -119,7 +119,11 @@ export function ProjectManager({
   };
 
   // Handle export project
-  const handleExportProject = async (project: Project, format: ExportFormat, e: React.MouseEvent) => {
+  const handleExportProject = async (
+    project: Project,
+    format: ExportFormat,
+    e: React.MouseEvent
+  ) => {
     e.stopPropagation();
     try {
       // If exporting the current project, force save first to get latest content
@@ -132,7 +136,7 @@ export function ProjectManager({
           project = updatedProject;
         }
       }
-      
+
       exportProject(project, format);
       setExportingProjectId(null);
       console.log(`[ProjectManager] Exported project ${project.id} as ${format}`);
@@ -158,57 +162,120 @@ export function ProjectManager({
       role="region"
       aria-labelledby="project-manager-title"
     >
-        {/* Header */}
-        <div
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '20px 32px',
+          borderBottom: '1px solid var(--border-muted)',
+          flexShrink: 0,
+        }}
+      >
+        <h2
+          id="project-manager-title"
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '20px 32px',
-            borderBottom: '1px solid var(--border-muted)',
-            flexShrink: 0,
+            fontSize: 'var(--fs-xl)',
+            fontWeight: 600,
+            color: 'var(--text)',
+            margin: 0,
           }}
         >
-          <h2
-            id="project-manager-title"
-            style={{
-              fontSize: 'var(--fs-xl)',
-              fontWeight: 600,
-              color: 'var(--text)',
-              margin: 0,
-            }}
+          Projects
+        </h2>
+        <button
+          onClick={onClose}
+          aria-label="Close project manager"
+          style={{
+            width: '32px',
+            height: '32px',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'transparent',
+            border: 'none',
+            borderRadius: 'var(--radius-sm)',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--surface-2)';
+            e.currentTarget.style.color = 'var(--text)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = 'var(--text-muted)';
+          }}
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
           >
-            Projects
-          </h2>
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Project Grid */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '32px',
+        }}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))',
+            gap: '16px',
+            maxWidth: '1400px',
+            margin: '0 auto',
+          }}
+        >
+          {/* New Project Card */}
           <button
-            onClick={onClose}
-            aria-label="Close project manager"
+            onClick={onProjectCreate}
+            aria-label="Create new project"
             style={{
-              width: '32px',
-              height: '32px',
-              padding: 0,
+              height: '180px',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: 'var(--radius-sm)',
-              color: 'var(--text-muted)',
+              gap: '12px',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
+              border: '2px dashed var(--border)',
+              background: 'transparent',
+              borderRadius: 'var(--radius-md)',
+              padding: '16px',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--surface-2)';
-              e.currentTarget.style.color = 'var(--text)';
+              e.currentTarget.style.borderColor = 'var(--primary)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.color = 'var(--text-muted)';
+              e.currentTarget.style.borderColor = 'var(--border)';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = 'none';
             }}
           >
             <svg
-              width="20"
-              height="20"
+              width="40"
+              height="40"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -216,325 +283,139 @@ export function ProjectManager({
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden="true"
+              style={{ color: 'var(--text-muted)' }}
             >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
+            <span
+              style={{
+                fontSize: 'var(--fs-md)',
+                fontWeight: 500,
+                color: 'var(--text-muted)',
+              }}
+            >
+              New Project
+            </span>
           </button>
-        </div>
 
-        {/* Project Grid */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '32px',
-          }}
-        >
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))',
-              gap: '16px',
-              maxWidth: '1400px',
-              margin: '0 auto',
-            }}
-          >
-            {/* New Project Card */}
-            <button
-              onClick={onProjectCreate}
-              aria-label="Create new project"
+          {/* Existing Project Cards */}
+          {projects.map((project) => (
+            <div
+              key={project.id}
+              className="flint-card"
               style={{
                 height: '180px',
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '12px',
+                padding: '16px',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                border: '2px dashed var(--border)',
-                background: 'transparent',
-                borderRadius: 'var(--radius-md)',
-                padding: '16px',
+                position: 'relative',
               }}
+              onClick={() => onProjectSelect(project.id)}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = 'var(--primary)';
                 e.currentTarget.style.transform = 'translateY(-2px)';
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border)';
+                e.currentTarget.style.borderColor = 'var(--border-muted)';
                 e.currentTarget.style.transform = 'translateY(0)';
                 e.currentTarget.style.boxShadow = 'none';
               }}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open project: ${project.title}`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onProjectSelect(project.id);
+                }
+              }}
             >
-              <svg
-                width="40"
-                height="40"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              <span
+              {/* Project Title */}
+              <h3
                 style={{
-                  fontSize: 'var(--fs-md)',
-                  fontWeight: 500,
-                  color: 'var(--text-muted)',
+                  fontSize: 'var(--fs-lg)',
+                  fontWeight: 600,
+                  color: 'var(--text)',
+                  margin: '0 0 8px 0',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                New Project
-              </span>
-            </button>
+                {project.title || 'Untitled Project'}
+              </h3>
 
-            {/* Existing Project Cards */}
-            {projects.map((project) => (
-              <div
-                key={project.id}
-                className="flint-card"
-                style={{
-                  height: '180px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  padding: '16px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  position: 'relative',
-                }}
-                onClick={() => onProjectSelect(project.id)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--primary)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--border-muted)';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-                role="button"
-                tabIndex={0}
-                aria-label={`Open project: ${project.title}`}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onProjectSelect(project.id);
-                  }
-                }}
-              >
-                {/* Project Title */}
-                <h3
-                  style={{
-                    fontSize: 'var(--fs-lg)',
-                    fontWeight: 600,
-                    color: 'var(--text)',
-                    margin: '0 0 8px 0',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {project.title || 'Untitled Project'}
-                </h3>
-
-                {/* Project Description or Date */}
-                {project.description ? (
-                  <p
-                    style={{
-                      fontSize: 'var(--fs-sm)',
-                      color: 'var(--text-muted)',
-                      margin: '0 0 12px 0',
-                      fontStyle: 'italic',
-                    }}
-                  >
-                    {project.description}
-                  </p>
-                ) : (
-                  <p
-                    style={{
-                      fontSize: 'var(--fs-xs)',
-                      color: 'var(--text-muted)',
-                      margin: '0 0 12px 0',
-                    }}
-                  >
-                    {new Date(project.updatedAt).toLocaleDateString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </p>
-                )}
-
-                {/* Content Preview */}
+              {/* Project Description or Date */}
+              {project.description ? (
                 <p
                   style={{
                     fontSize: 'var(--fs-sm)',
                     color: 'var(--text-muted)',
-                    margin: 0,
-                    flex: 1,
-                    overflow: 'hidden',
-                    display: '-webkit-box',
-                    WebkitLineClamp: project.description ? 3 : 4,
-                    WebkitBoxOrient: 'vertical',
-                    lineHeight: '1.5',
+                    margin: '0 0 12px 0',
+                    fontStyle: 'italic',
                   }}
                 >
-                  {project.content || 'No content yet...'}
+                  {project.description}
                 </p>
-
-                {/* Action buttons */}
-                <div
+              ) : (
+                <p
                   style={{
-                    position: 'absolute',
-                    top: '12px',
-                    right: '12px',
-                    display: 'flex',
-                    gap: '4px',
-                    opacity: 0,
-                    transition: 'opacity 0.2s ease',
+                    fontSize: 'var(--fs-xs)',
+                    color: 'var(--text-muted)',
+                    margin: '0 0 12px 0',
                   }}
-                  className="project-actions"
                 >
-                  {/* Export Button with dropdown */}
-                  <div style={{ position: 'relative' }}>
-                    <button
-                      className="flint-btn ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExportingProjectId(exportingProjectId === project.id ? null : project.id);
-                      }}
-                      aria-label={`Export project: ${project.title}`}
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        padding: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="17 8 12 3 7 8" />
-                        <line x1="12" y1="3" x2="12" y2="15" />
-                      </svg>
-                    </button>
-                    
-                    {exportingProjectId === project.id && (
-                      <div style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 4px)',
-                        right: 0,
-                        minWidth: '140px',
-                        background: 'var(--surface-2)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 'var(--radius-md)',
-                        boxShadow: 'var(--shadow-soft)',
-                        padding: '4px',
-                        zIndex: 10,
-                      }}>
-                        <button
-                          onClick={(e) => handleExportProject(project, 'txt', e)}
-                          style={{
-                            width: '100%',
-                            padding: '6px 10px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text)',
-                            fontSize: 'var(--fs-xs)',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            borderRadius: 'var(--radius-sm)',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-3)'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                        >
-                          Text (.txt)
-                        </button>
-                        <button
-                          onClick={(e) => handleExportProject(project, 'md', e)}
-                          style={{
-                            width: '100%',
-                            padding: '6px 10px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text)',
-                            fontSize: 'var(--fs-xs)',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            borderRadius: 'var(--radius-sm)',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-3)'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                        >
-                          Markdown (.md)
-                        </button>
-                        <button
-                          onClick={(e) => handleExportProject(project, 'html', e)}
-                          style={{
-                            width: '100%',
-                            padding: '6px 10px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text)',
-                            fontSize: 'var(--fs-xs)',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            borderRadius: 'var(--radius-sm)',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-3)'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                        >
-                          HTML (.html)
-                        </button>
-                        <button
-                          onClick={(e) => handleExportProject(project, 'docx', e)}
-                          style={{
-                            width: '100%',
-                            padding: '6px 10px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text)',
-                            fontSize: 'var(--fs-xs)',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            borderRadius: 'var(--radius-sm)',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-3)'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                        >
-                          Docs (.doc)
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Edit Button */}
+                  {new Date(project.updatedAt).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </p>
+              )}
+
+              {/* Content Preview */}
+              <p
+                style={{
+                  fontSize: 'var(--fs-sm)',
+                  color: 'var(--text-muted)',
+                  margin: 0,
+                  flex: 1,
+                  overflow: 'hidden',
+                  display: '-webkit-box',
+                  WebkitLineClamp: project.description ? 3 : 4,
+                  WebkitBoxOrient: 'vertical',
+                  lineHeight: '1.5',
+                }}
+              >
+                {project.content || 'No content yet...'}
+              </p>
+
+              {/* Action buttons */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '12px',
+                  right: '12px',
+                  display: 'flex',
+                  gap: '4px',
+                  opacity: 0,
+                  transition: 'opacity 0.2s ease',
+                }}
+                className="project-actions"
+              >
+                {/* Export Button with dropdown */}
+                <div style={{ position: 'relative' }}>
                   <button
                     className="flint-btn ghost"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleEditProject(project);
+                      setExportingProjectId(exportingProjectId === project.id ? null : project.id);
                     }}
-                    aria-label={`Edit project: ${project.title}`}
+                    aria-label={`Export project: ${project.title}`}
                     style={{
                       width: '32px',
                       height: '32px',
@@ -555,56 +436,189 @@ export function ProjectManager({
                       strokeLinejoin="round"
                       aria-hidden="true"
                     >
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
                     </svg>
                   </button>
 
-                  {/* Delete Button (if callback provided) */}
-                  {onProjectDelete && (
-                    <button
-                      className="flint-btn ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (
-                          confirm(
-                            `Are you sure you want to delete "${project.title || 'Untitled Project'}"? This action cannot be undone.`
-                          )
-                        ) {
-                          onProjectDelete(project.id);
-                        }
-                      }}
-                      aria-label={`Delete project: ${project.title}`}
+                  {exportingProjectId === project.id && (
+                    <div
                       style={{
-                        width: '32px',
-                        height: '32px',
-                        padding: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        position: 'absolute',
+                        top: 'calc(100% + 4px)',
+                        right: 0,
+                        minWidth: '140px',
+                        background: 'var(--surface-2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-md)',
+                        boxShadow: 'var(--shadow-soft)',
+                        padding: '4px',
+                        zIndex: 10,
                       }}
                     >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
+                      <button
+                        onClick={(e) => handleExportProject(project, 'txt', e)}
+                        style={{
+                          width: '100%',
+                          padding: '6px 10px',
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text)',
+                          fontSize: 'var(--fs-xs)',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          borderRadius: 'var(--radius-sm)',
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = 'var(--surface-3)')
+                        }
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                       >
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
-                    </button>
+                        Text (.txt)
+                      </button>
+                      <button
+                        onClick={(e) => handleExportProject(project, 'md', e)}
+                        style={{
+                          width: '100%',
+                          padding: '6px 10px',
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text)',
+                          fontSize: 'var(--fs-xs)',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          borderRadius: 'var(--radius-sm)',
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = 'var(--surface-3)')
+                        }
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        Markdown (.md)
+                      </button>
+                      <button
+                        onClick={(e) => handleExportProject(project, 'html', e)}
+                        style={{
+                          width: '100%',
+                          padding: '6px 10px',
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text)',
+                          fontSize: 'var(--fs-xs)',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          borderRadius: 'var(--radius-sm)',
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = 'var(--surface-3)')
+                        }
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        HTML (.html)
+                      </button>
+                      <button
+                        onClick={(e) => handleExportProject(project, 'docx', e)}
+                        style={{
+                          width: '100%',
+                          padding: '6px 10px',
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text)',
+                          fontSize: 'var(--fs-xs)',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          borderRadius: 'var(--radius-sm)',
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = 'var(--surface-3)')
+                        }
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        Docs (.doc)
+                      </button>
+                    </div>
                   )}
                 </div>
+
+                {/* Edit Button */}
+                <button
+                  className="flint-btn ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditProject(project);
+                  }}
+                  aria-label={`Edit project: ${project.title}`}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                </button>
+
+                {/* Delete Button (if callback provided) */}
+                {onProjectDelete && (
+                  <button
+                    className="flint-btn ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (
+                        confirm(
+                          `Are you sure you want to delete "${project.title || 'Untitled Project'}"? This action cannot be undone.`
+                        )
+                      ) {
+                        onProjectDelete(project.id);
+                      }
+                    }}
+                    aria-label={`Delete project: ${project.title}`}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
+      </div>
 
       {/* Edit Project Modal */}
       {editingProject && (
@@ -697,16 +711,10 @@ export function ProjectManager({
             </div>
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button
-                className="flint-btn ghost"
-                onClick={() => setEditingProject(null)}
-              >
+              <button className="flint-btn ghost" onClick={() => setEditingProject(null)}>
                 Cancel
               </button>
-              <button
-                className="flint-btn primary"
-                onClick={handleSaveEdit}
-              >
+              <button className="flint-btn primary" onClick={handleSaveEdit}>
                 Save Changes
               </button>
             </div>

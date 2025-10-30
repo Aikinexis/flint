@@ -24,11 +24,7 @@ export interface LoadingSpinnerProps {
 /**
  * LoadingSpinner component for visual feedback during async operations
  */
-export function LoadingSpinner({ 
-  size = 24, 
-  message,
-  variant = 'inline'
-}: LoadingSpinnerProps) {
+export function LoadingSpinner({ size = 24, message, variant = 'inline' }: LoadingSpinnerProps) {
   const spinner = (
     <div
       style={{
@@ -51,7 +47,7 @@ export function LoadingSpinner({
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        style={{ 
+        style={{
           animation: 'spin 1s linear infinite',
           color: 'var(--accent)',
         }}

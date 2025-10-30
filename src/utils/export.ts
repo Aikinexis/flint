@@ -56,13 +56,13 @@ export function exportAsText(project: Project): void {
 export function exportAsMarkdown(project: Project): void {
   const filename = sanitizeFilename(project.title || 'Untitled') + '.md';
   let content = `# ${project.title || 'Untitled'}\n\n`;
-  
+
   if (project.description) {
     content += `> ${project.description}\n\n`;
   }
-  
+
   content += project.content;
-  
+
   downloadFile(content, filename, 'text/markdown');
 }
 
@@ -72,14 +72,14 @@ export function exportAsMarkdown(project: Project): void {
  */
 export function exportAsHTML(project: Project): void {
   const filename = sanitizeFilename(project.title || 'Untitled') + '.html';
-  
+
   // Convert line breaks to paragraphs
   const paragraphs = project.content
     .split('\n\n')
-    .filter(p => p.trim())
-    .map(p => `    <p>${p.replace(/\n/g, '<br>')}</p>`)
+    .filter((p) => p.trim())
+    .map((p) => `    <p>${p.replace(/\n/g, '<br>')}</p>`)
     .join('\n');
-  
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -125,7 +125,7 @@ ${paragraphs}
   </div>
 </body>
 </html>`;
-  
+
   downloadFile(html, filename, 'text/html');
 }
 
@@ -136,34 +136,34 @@ ${paragraphs}
  */
 export function exportAsWord(project: Project): void {
   const filename = sanitizeFilename(project.title || 'Untitled') + '.doc';
-  
+
   // Create RTF content (compatible with Word and Google Docs)
   // RTF is simpler than full DOCX but opens in all word processors
   let rtf = '{\\rtf1\\ansi\\ansicpg1252\\deff0\\deflang1033\n';
-  
+
   // Font table
   rtf += '{\\fonttbl{\\f0\\fswiss\\fcharset0 Arial;}{\\f1\\fnil\\fcharset2 Symbol;}}\n';
-  
+
   // Color table (optional, for future use)
   rtf += '{\\colortbl ;\\red0\\green0\\blue0;}\n';
-  
+
   // Title
   rtf += '{\\fs32\\b ' + escapeRTF(project.title || 'Untitled') + '\\b0\\fs24\\par}\n';
   rtf += '\\par\n';
-  
+
   // Description if exists
   if (project.description) {
     rtf += '{\\i ' + escapeRTF(project.description) + '\\i0\\par}\n';
     rtf += '\\par\n';
   }
-  
+
   // Content - process line by line to handle bullets
   const lines = project.content.split('\n');
   let inBulletList = false;
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = (lines[i] || '').trim();
-    
+
     if (!line) {
       // Empty line - end bullet list if active
       if (inBulletList) {
@@ -172,14 +172,14 @@ export function exportAsWord(project: Project): void {
       rtf += '\\par\n';
       continue;
     }
-    
+
     // Check if line is a bullet point (• or - or *)
-    const bulletMatch = line.match(/^[•\-\*]\s+(.+)$/);
-    
+    const bulletMatch = line.match(/^[•\-*]\s+(.+)$/);
+
     if (bulletMatch) {
       const bulletText = bulletMatch[1] || '';
       // RTF bullet list formatting
-      rtf += '{\\pntext\\f1\\\'b7\\tab}{\\*\\pn\\pnlvlblt\\pnf1\\pnindent0{\\pntxtb\\\'b7}}';
+      rtf += "{\\pntext\\f1\\'b7\\tab}{\\*\\pn\\pnlvlblt\\pnf1\\pnindent0{\\pntxtb\\'b7}}";
       rtf += '\\fi-360\\li720 ' + escapeRTF(bulletText) + '\\par\n';
       inBulletList = true;
     } else {
@@ -191,9 +191,9 @@ export function exportAsWord(project: Project): void {
       rtf += escapeRTF(line) + '\\par\n';
     }
   }
-  
+
   rtf += '}';
-  
+
   downloadFile(rtf, filename, 'application/rtf');
 }
 
@@ -203,12 +203,10 @@ export function exportAsWord(project: Project): void {
  * @returns Escaped text
  */
 function escapeRTF(text: string): string {
-  let escaped = text
-    .replace(/\\/g, '\\\\')
-    .replace(/{/g, '\\{')
-    .replace(/}/g, '\\}');
-  
+  let escaped = text.replace(/\\/g, '\\\\').replace(/{/g, '\\{').replace(/}/g, '\\}');
+
   // Handle special characters with Unicode
+  // eslint-disable-next-line no-control-regex
   escaped = escaped.replace(/[^\x00-\x7F]/g, (char) => {
     const code = char.charCodeAt(0);
     if (code === 0x2022) return "\\'b7"; // Bullet point •
@@ -216,12 +214,12 @@ function escapeRTF(text: string): string {
     if (code === 0x2014) return "\\'97"; // Em dash —
     if (code === 0x2018) return "\\'91"; // Left single quote '
     if (code === 0x2019) return "\\'92"; // Right single quote '
-    if (code === 0x201C) return "\\'93"; // Left double quote "
-    if (code === 0x201D) return "\\'94"; // Right double quote "
+    if (code === 0x201c) return "\\'93"; // Left double quote "
+    if (code === 0x201d) return "\\'94"; // Right double quote "
     if (code === 0x2026) return "\\'85"; // Ellipsis …
     return '\\u' + code + '?'; // Generic Unicode escape
   });
-  
+
   return escaped;
 }
 
@@ -236,32 +234,35 @@ function escapeRTF(text: string): string {
  */
 export function autoFormatText(text: string): string {
   let formatted = text;
-  
+
   // Fix multiple spaces (keep intentional double spaces after periods)
   formatted = formatted.replace(/ {3,}/g, ' ');
-  
+
   // Fix multiple line breaks (max 2 consecutive)
   formatted = formatted.replace(/\n{4,}/g, '\n\n\n');
-  
+
   // Add space after punctuation if missing (but not for decimals or abbreviations)
   formatted = formatted.replace(/([.!?])([A-Z])/g, '$1 $2');
-  
+
   // Remove space before punctuation
   formatted = formatted.replace(/ +([.!?,;:])/g, '$1');
-  
+
   // Capitalize first letter of sentences
   formatted = formatted.replace(/(^|[.!?]\s+)([a-z])/g, (_match, p1, p2) => p1 + p2.toUpperCase());
-  
+
   // Fix common quote issues
   formatted = formatted.replace(/\s+"/g, ' "');
   formatted = formatted.replace(/"\s+/g, '" ');
-  
+
   // Trim trailing whitespace from lines
-  formatted = formatted.split('\n').map(line => line.trimEnd()).join('\n');
-  
+  formatted = formatted
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n');
+
   // Trim leading/trailing whitespace from entire text
   formatted = formatted.trim();
-  
+
   return formatted;
 }
 

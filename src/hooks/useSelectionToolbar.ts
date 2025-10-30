@@ -1,12 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  computePosition,
-  autoUpdate,
-  offset,
-  flip,
-  shift,
-  inline,
-} from "@floating-ui/dom";
+import { useEffect, useRef, useState } from 'react';
+import { computePosition, autoUpdate, offset, flip, shift, inline } from '@floating-ui/dom';
 
 type Anchor = { x: number; y: number; text: string };
 
@@ -18,15 +11,13 @@ export function useSelectionToolbar(toolbarEl: React.RefObject<HTMLElement>) {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return null;
     const r = sel.getRangeAt(0);
-    const rects = Array.from(r.getClientRects()).filter(
-      (rc) => rc.width && rc.height
-    );
+    const rects = Array.from(r.getClientRects()).filter((rc) => rc.width && rc.height);
     return rects[rects.length - 1] ?? r.getBoundingClientRect(); // last line of the selection
   }
 
   function showForCurrentSelection() {
     const rect = getSelectionRect();
-    const text = window.getSelection()?.toString().trim() || "";
+    const text = window.getSelection()?.toString().trim() || '';
     if (!rect || !text) {
       setAnchor(null);
       return;
@@ -54,30 +45,26 @@ export function useSelectionToolbar(toolbarEl: React.RefObject<HTMLElement>) {
       },
     };
 
-    el.style.position = "fixed"; // compute relative to viewport to avoid title offsets
-    el.style.pointerEvents = "auto";
-    el.style.zIndex = "2147483647";
+    el.style.position = 'fixed'; // compute relative to viewport to avoid title offsets
+    el.style.pointerEvents = 'auto';
+    el.style.zIndex = '2147483647';
 
     cleanupRef.current?.();
-    cleanupRef.current = autoUpdate(
-      virtualRef as any,
-      el,
-      async () => {
-        const { x, y } = await computePosition(virtualRef as any, el, {
-          placement: "top",
-          strategy: "fixed",
-          middleware: [
-            inline(), // anchor to the actual inline line box
-            offset(8), // 8px above
-            flip(), // keep onscreen
-            shift({ padding: 8 }),
-          ],
-        });
-        el.style.left = `${Math.round(x)}px`;
-        el.style.top = `${Math.round(y)}px`;
-        el.style.display = "flex";
-      }
-    );
+    cleanupRef.current = autoUpdate(virtualRef as any, el, async () => {
+      const { x, y } = await computePosition(virtualRef as any, el, {
+        placement: 'top',
+        strategy: 'fixed',
+        middleware: [
+          inline(), // anchor to the actual inline line box
+          offset(8), // 8px above
+          flip(), // keep onscreen
+          shift({ padding: 8 }),
+        ],
+      });
+      el.style.left = `${Math.round(x)}px`;
+      el.style.top = `${Math.round(y)}px`;
+      el.style.display = 'flex';
+    });
 
     return () => cleanupRef.current?.();
   }, [anchor, toolbarEl]);
@@ -90,13 +77,13 @@ export function useSelectionToolbar(toolbarEl: React.RefObject<HTMLElement>) {
       const s = window.getSelection();
       if (!s || !s.toString().trim()) setAnchor(null);
     };
-    document.addEventListener("mouseup", onUp);
-    document.addEventListener("keyup", onKey);
-    document.addEventListener("selectionchange", onSel);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('keyup', onKey);
+    document.addEventListener('selectionchange', onSel);
     return () => {
-      document.removeEventListener("mouseup", onUp);
-      document.removeEventListener("keyup", onKey);
-      document.removeEventListener("selectionchange", onSel);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('keyup', onKey);
+      document.removeEventListener('selectionchange', onSel);
     };
   }, []);
 
@@ -104,7 +91,7 @@ export function useSelectionToolbar(toolbarEl: React.RefObject<HTMLElement>) {
     anchor,
     clear: () => {
       if (toolbarEl.current) {
-        toolbarEl.current.style.display = "none";
+        toolbarEl.current.style.display = 'none';
       }
       setAnchor(null);
     },

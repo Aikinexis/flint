@@ -64,7 +64,9 @@ export function AIAvailabilityBanner({ availability }: AIAvailabilityBannerProps
         margin: '16px',
         borderRadius: '12px',
         backgroundColor: isUnavailable ? 'rgba(251, 146, 60, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-        border: isUnavailable ? '1px solid rgba(251, 146, 60, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
+        border: isUnavailable
+          ? '1px solid rgba(251, 146, 60, 0.3)'
+          : '1px solid rgba(59, 130, 246, 0.3)',
         color: 'var(--text)',
         fontSize: '13px',
         lineHeight: '1.5',

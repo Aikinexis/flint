@@ -23,7 +23,7 @@ import type { Tab } from '../state/store';
  */
 function PanelContent() {
   const { state, actions } = useAppState();
-  
+
   // Track which panels have been visited to lazy mount them
   const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(new Set(['home']));
 
@@ -31,48 +31,44 @@ function PanelContent() {
   const [editorContent, setEditorContent] = useState('');
   const [editorSelection, setEditorSelection] = useState<SelectionRange>({ start: 0, end: 0 });
   const [isProcessing, setIsProcessing] = useState(false);
-  
+
   // Single unified editor ref shared across all tools
   const unifiedEditorRef = useRef<UnifiedEditorRef>(null);
-  
+
   // Track if content change is from AI or manual input (for future features)
   const isAIGeneratedRef = useRef<boolean>(false);
-  
-
 
   // Project management state
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  
+
   // History panel state
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [activeSnapshotId, setActiveSnapshotId] = useState<string | null>(null);
-  
+
   // Export menu state
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
-  
 
-  
   // Project title editing state
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editingTitle, setEditingTitle] = useState('');
-  
+
   // Debounced auto-save ref
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Auto-snapshot state for manual edits
   const lastSnapshotContentRef = useRef<string>('');
   const autoSnapshotTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Initialization flag to prevent multiple runs
   const isInitializedRef = useRef(false);
-  
+
   // Ref to current project for use in timeouts
   const currentProjectRef = useRef<Project | null>(null);
-  
+
   // Keep ref in sync with state
   useEffect(() => {
     currentProjectRef.current = currentProject;
@@ -110,10 +106,13 @@ function PanelContent() {
     } else {
       document.documentElement.classList.remove('light');
     }
-    
+
     // Apply custom accent hue
     if (state.settings.accentHue !== undefined) {
-      document.documentElement.style.setProperty('--accent-hue', state.settings.accentHue.toString());
+      document.documentElement.style.setProperty(
+        '--accent-hue',
+        state.settings.accentHue.toString()
+      );
     }
   }, [state.settings.theme, state.settings.accentHue]);
 
@@ -143,7 +142,7 @@ function PanelContent() {
 
         case 'OPEN_GENERATE_TAB':
           actions.setActiveTab('generate');
-          setVisitedTabs(prev => new Set(prev).add('generate'));
+          setVisitedTabs((prev) => new Set(prev).add('generate'));
           // Optionally set editor content if text is provided
           if (message.payload?.text) {
             setEditorContent(message.payload.text);
@@ -155,14 +154,14 @@ function PanelContent() {
 
         case 'OPEN_SUMMARY_TAB':
           actions.setActiveTab('summary');
-          setVisitedTabs(prev => new Set(prev).add('summary'));
+          setVisitedTabs((prev) => new Set(prev).add('summary'));
           // Store the selected text for the summary panel to use
           if (message.payload?.text) {
             setEditorContent(message.payload.text);
             actions.setCurrentText(message.payload.text);
-            chrome.storage.local.set({ 
+            chrome.storage.local.set({
               'flint.lastTab': 'summary',
-              'flint.selectedText': message.payload.text 
+              'flint.selectedText': message.payload.text,
             });
           } else {
             chrome.storage.local.set({ 'flint.lastTab': 'summary' });
@@ -172,15 +171,15 @@ function PanelContent() {
 
         case 'OPEN_REWRITE_TAB':
           actions.setActiveTab('rewrite');
-          setVisitedTabs(prev => new Set(prev).add('rewrite'));
+          setVisitedTabs((prev) => new Set(prev).add('rewrite'));
           // Clear any previous rewrite state and set new selected text
           if (message.payload?.text) {
             setEditorContent(message.payload.text);
             actions.setCurrentText(message.payload.text);
             actions.setCurrentResult(''); // Clear previous result
-            chrome.storage.local.set({ 
+            chrome.storage.local.set({
               'flint.lastTab': 'rewrite',
-              'flint.selectedText': message.payload.text 
+              'flint.selectedText': message.payload.text,
             });
           } else {
             chrome.storage.local.set({ 'flint.lastTab': 'rewrite' });
@@ -192,42 +191,60 @@ function PanelContent() {
           // Insert text at cursor position
           if (message.payload?.text && unifiedEditorRef.current) {
             const textToInsert = message.payload.text.trim();
-            console.log('[Panel] INSERT_AND_OPEN_GENERATE - inserting text:', textToInsert.substring(0, 50) + '...');
+            console.log(
+              '[Panel] INSERT_AND_OPEN_GENERATE - inserting text:',
+              textToInsert.substring(0, 50) + '...'
+            );
             unifiedEditorRef.current.insertAtCursor(textToInsert);
           }
           // Open generate tab
           actions.setActiveTab('generate');
-          setVisitedTabs(prev => new Set(prev).add('generate'));
+          setVisitedTabs((prev) => new Set(prev).add('generate'));
           chrome.storage.local.set({ 'flint.lastTab': 'generate' });
-          sendResponse({ success: true, data: { message: 'Inserted text and opened Generate tab' } });
+          sendResponse({
+            success: true,
+            data: { message: 'Inserted text and opened Generate tab' },
+          });
           return true;
 
         case 'INSERT_AND_OPEN_SUMMARY':
           // Insert text at cursor position and select it for summarizing
           if (message.payload?.text && unifiedEditorRef.current) {
             const textToInsert = message.payload.text.trim();
-            console.log('[Panel] INSERT_AND_OPEN_SUMMARY - inserting text:', textToInsert.substring(0, 50) + '...');
+            console.log(
+              '[Panel] INSERT_AND_OPEN_SUMMARY - inserting text:',
+              textToInsert.substring(0, 50) + '...'
+            );
             unifiedEditorRef.current.insertAtCursor(textToInsert, true); // true = select after insert
           }
           // Open summary tab
           actions.setActiveTab('summary');
-          setVisitedTabs(prev => new Set(prev).add('summary'));
+          setVisitedTabs((prev) => new Set(prev).add('summary'));
           chrome.storage.local.set({ 'flint.lastTab': 'summary' });
-          sendResponse({ success: true, data: { message: 'Inserted text and opened Summary tab' } });
+          sendResponse({
+            success: true,
+            data: { message: 'Inserted text and opened Summary tab' },
+          });
           return true;
 
         case 'INSERT_AND_OPEN_REWRITE':
           // Insert text at cursor position and select it for rewriting
           if (message.payload?.text && unifiedEditorRef.current) {
             const textToInsert = message.payload.text.trim();
-            console.log('[Panel] INSERT_AND_OPEN_REWRITE - inserting text:', textToInsert.substring(0, 50) + '...');
+            console.log(
+              '[Panel] INSERT_AND_OPEN_REWRITE - inserting text:',
+              textToInsert.substring(0, 50) + '...'
+            );
             unifiedEditorRef.current.insertAtCursor(textToInsert, true); // true = select after insert
           }
           // Open rewrite tab
           actions.setActiveTab('rewrite');
-          setVisitedTabs(prev => new Set(prev).add('rewrite'));
+          setVisitedTabs((prev) => new Set(prev).add('rewrite'));
           chrome.storage.local.set({ 'flint.lastTab': 'rewrite' });
-          sendResponse({ success: true, data: { message: 'Inserted text and opened Rewrite tab' } });
+          sendResponse({
+            success: true,
+            data: { message: 'Inserted text and opened Rewrite tab' },
+          });
           return true;
 
         default:
@@ -251,12 +268,12 @@ function PanelContent() {
     const newTab = id as Tab;
     actions.setActiveTab(newTab);
     // Mark tab as visited for lazy mounting
-    setVisitedTabs(prev => new Set(prev).add(newTab));
+    setVisitedTabs((prev) => new Set(prev).add(newTab));
     // Clear any text selection when switching tabs
     window.getSelection()?.removeAllRanges();
     // Save to storage
     chrome.storage.local.set({ 'flint.lastTab': newTab });
-    
+
     // Reload projects when navigating to Projects tab to show latest changes
     if (newTab === 'projects') {
       loadProjects();
@@ -270,9 +287,9 @@ function PanelContent() {
     try {
       setIsSaving(true);
       setSaveError(null);
-      
+
       const updatedProject = await StorageService.updateProject(projectId, { content });
-      
+
       if (updatedProject) {
         // Update current project state with new updatedAt timestamp
         setCurrentProject(updatedProject);
@@ -282,7 +299,7 @@ function PanelContent() {
       console.error('[Panel] Auto-save failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to save project';
       setSaveError(errorMessage);
-      
+
       // Clear error after 5 seconds
       setTimeout(() => setSaveError(null), 5000);
     } finally {
@@ -293,79 +310,89 @@ function PanelContent() {
   /**
    * Handle unified editor content change with auto-save, auto-snapshot, and auto-correct
    */
-  const handleEditorContentChange = useCallback((content: string) => {
-    setEditorContent(content);
-    actions.setCurrentText(content);
-    
-    // Clear active snapshot when content changes (user is editing)
-    setActiveSnapshotId(null);
-    
-    // Debounced auto-save if there's a current project
-    // Clear existing timeout
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
-    }
-    
-    // Set new timeout for auto-save (500ms delay)
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      // Get current project from ref (stable reference)
-      const projectToSave = currentProjectRef.current;
-      if (projectToSave) {
-        try {
-          setIsSaving(true);
-          console.log('[Panel] Auto-saving content:', content.substring(0, 50) + '...');
-          const updatedProject = await StorageService.updateProject(projectToSave.id, { content });
-          if (updatedProject) {
-            setCurrentProject(updatedProject);
-            // Also update the projects list so export from project card has latest content
-            setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
-            console.log('[Panel] Project auto-saved successfully:', projectToSave.id, 'Content length:', content.length);
-          }
-        } catch (error) {
-          console.error('[Panel] Auto-save failed:', error);
-        } finally {
-          setIsSaving(false);
-        }
-      } else {
-        console.warn('[Panel] No current project to save to');
+  const handleEditorContentChange = useCallback(
+    (content: string) => {
+      setEditorContent(content);
+      actions.setCurrentText(content);
+
+      // Clear active snapshot when content changes (user is editing)
+      setActiveSnapshotId(null);
+
+      // Debounced auto-save if there's a current project
+      // Clear existing timeout
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
       }
-    }, 500);
-    
-    // Debounced auto-snapshot for manual edits (3 seconds after typing stops)
-    if (autoSnapshotTimeoutRef.current) {
-      clearTimeout(autoSnapshotTimeoutRef.current);
-    }
-    
-    autoSnapshotTimeoutRef.current = setTimeout(async () => {
-      const projectForSnapshot = currentProjectRef.current;
-      if (projectForSnapshot) {
-        const lastContent = lastSnapshotContentRef.current;
-        if (lastContent) {
-          const contentDiff = Math.abs(content.length - lastContent.length);
-          if (contentDiff >= 50) {
-            try {
-              const snapshot = await StorageService.createSnapshot(
-                projectForSnapshot.id,
-                lastContent,
-                'generate',
-                'Manual edit',
-                undefined
+
+      // Set new timeout for auto-save (500ms delay)
+      autoSaveTimeoutRef.current = setTimeout(async () => {
+        // Get current project from ref (stable reference)
+        const projectToSave = currentProjectRef.current;
+        if (projectToSave) {
+          try {
+            setIsSaving(true);
+            console.log('[Panel] Auto-saving content:', content.substring(0, 50) + '...');
+            const updatedProject = await StorageService.updateProject(projectToSave.id, {
+              content,
+            });
+            if (updatedProject) {
+              setCurrentProject(updatedProject);
+              // Also update the projects list so export from project card has latest content
+              setProjects((prev) =>
+                prev.map((p) => (p.id === updatedProject.id ? updatedProject : p))
               );
-              setSnapshots(prev => [snapshot, ...prev]);
-              lastSnapshotContentRef.current = content;
-              console.log('[Panel] Created auto-snapshot for manual edit');
-            } catch (error) {
-              console.error('[Panel] Failed to create auto-snapshot:', error);
+              console.log(
+                '[Panel] Project auto-saved successfully:',
+                projectToSave.id,
+                'Content length:',
+                content.length
+              );
             }
+          } catch (error) {
+            console.error('[Panel] Auto-save failed:', error);
+          } finally {
+            setIsSaving(false);
           }
         } else {
-          lastSnapshotContentRef.current = content;
+          console.warn('[Panel] No current project to save to');
         }
-      }
-    }, 3000);
-    
+      }, 500);
 
-  }, [actions]);
+      // Debounced auto-snapshot for manual edits (3 seconds after typing stops)
+      if (autoSnapshotTimeoutRef.current) {
+        clearTimeout(autoSnapshotTimeoutRef.current);
+      }
+
+      autoSnapshotTimeoutRef.current = setTimeout(async () => {
+        const projectForSnapshot = currentProjectRef.current;
+        if (projectForSnapshot) {
+          const lastContent = lastSnapshotContentRef.current;
+          if (lastContent) {
+            const contentDiff = Math.abs(content.length - lastContent.length);
+            if (contentDiff >= 50) {
+              try {
+                const snapshot = await StorageService.createSnapshot(
+                  projectForSnapshot.id,
+                  lastContent,
+                  'generate',
+                  'Manual edit',
+                  undefined
+                );
+                setSnapshots((prev) => [snapshot, ...prev]);
+                lastSnapshotContentRef.current = content;
+                console.log('[Panel] Created auto-snapshot for manual edit');
+              } catch (error) {
+                console.error('[Panel] Failed to create auto-snapshot:', error);
+              }
+            }
+          } else {
+            lastSnapshotContentRef.current = content;
+          }
+        }
+      }, 3000);
+    },
+    [actions]
+  );
 
   /**
    * Force save current project immediately (for export)
@@ -375,15 +402,17 @@ function PanelContent() {
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
-    
+
     const projectToSave = currentProjectRef.current;
     if (projectToSave) {
       try {
         console.log('[Panel] Force saving project before export');
-        const updatedProject = await StorageService.updateProject(projectToSave.id, { content: editorContent });
+        const updatedProject = await StorageService.updateProject(projectToSave.id, {
+          content: editorContent,
+        });
         if (updatedProject) {
           setCurrentProject(updatedProject);
-          setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
+          setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
           console.log('[Panel] Force save completed');
         }
       } catch (error) {
@@ -404,193 +433,216 @@ function PanelContent() {
   /**
    * Handle operation start from tool controls
    */
-  const handleOperationStart = useCallback((operationType?: ToolType) => {
-    actions.setIsProcessing(true);
-    setIsProcessing(true); // Disable editor during processing
-    
-    // Show appropriate indicator based on operation type
-    const editorRef = unifiedEditorRef;
-    
-    if (editorRef?.current && operationType) {
-      if (operationType === 'generate') {
-        // Show cursor indicator for generate
-        editorRef.current.showCursorIndicator();
-      } else {
-        // Show selection overlay for rewrite/summarize
-        editorRef.current.showSelectionOverlay();
+  const handleOperationStart = useCallback(
+    (operationType?: ToolType) => {
+      actions.setIsProcessing(true);
+      setIsProcessing(true); // Disable editor during processing
+
+      // Show appropriate indicator based on operation type
+      const editorRef = unifiedEditorRef;
+
+      if (editorRef?.current && operationType) {
+        if (operationType === 'generate') {
+          // Show cursor indicator for generate
+          editorRef.current.showCursorIndicator();
+        } else {
+          // Show selection overlay for rewrite/summarize
+          editorRef.current.showSelectionOverlay();
+        }
       }
-    }
-  }, [actions, state.activeTab]);
+    },
+    [actions, state.activeTab]
+  );
 
   /**
    * Handle operation complete from tool controls
    */
-  const handleOperationComplete = useCallback(async (result: string, operationType: ToolType) => {
-    actions.setIsProcessing(false);
-    setIsProcessing(false); // Re-enable editor after processing
-    actions.setCurrentResult(result);
-    
-    // Create snapshot before replacement if we have a current project
-    if (currentProject) {
-      try {
-        // Generate action description based on operation type
-        let actionDescription = '';
-        switch (operationType) {
-          case 'generate':
-            actionDescription = 'Generated new text';
-            break;
-          case 'rewrite':
-            actionDescription = 'Rewrote text';
-            break;
-          case 'summarize':
-            actionDescription = 'Summarized text';
-            break;
-        }
-        
-        // Create snapshot with current content before replacement
-        const snapshot = await StorageService.createSnapshot(
-          currentProject.id,
-          editorContent,
-          operationType,
-          actionDescription,
-          editorSelection
-        );
-        
-        // Add snapshot to local state immediately
-        setSnapshots(prev => [snapshot, ...prev]);
-        
-        // Update last snapshot content ref for auto-snapshot tracking
-        lastSnapshotContentRef.current = editorContent;
-        
-        console.log(`[Panel] Created snapshot before ${operationType} operation:`, snapshot.id);
-      } catch (error) {
-        console.error('[Panel] Failed to create snapshot:', error);
-        // Continue with operation even if snapshot creation fails
-      }
-    }
-    
-    // Get the appropriate editor ref based on active tab
-    const editorRef = unifiedEditorRef;
-    
-    // Get the appropriate textarea and captured selection for all operations
-    const textarea = editorRef?.current?.getTextarea();
-    const capturedSelection = editorRef?.current?.getCapturedSelection();
-    console.log('[Panel] Using captured selection from editor ref:', capturedSelection);
-    
-    // Mark that this content change is from AI (not manual input)
-    isAIGeneratedRef.current = true;
-    
-    // For generate operations, insert at cursor position with streaming effect
-    if (operationType === 'generate') {
-      if (textarea && capturedSelection) {
+  const handleOperationComplete = useCallback(
+    async (result: string, operationType: ToolType) => {
+      actions.setIsProcessing(false);
+      setIsProcessing(false); // Re-enable editor after processing
+      actions.setCurrentResult(result);
+
+      // Create snapshot before replacement if we have a current project
+      if (currentProject) {
         try {
-          // Check if we need to add a space before the generated text
-          // Add space if cursor is right after a non-whitespace character
-          const charBefore = capturedSelection.start > 0 ? editorContent[capturedSelection.start - 1] : '';
-          const firstChar = result[0] || '';
-          const needsSpaceBefore = charBefore && !/\s/.test(charBefore) && firstChar && !/\s/.test(firstChar);
-          
-          // Check if we need to add a space after the generated text
-          const charAfter = capturedSelection.start < editorContent.length ? editorContent[capturedSelection.start] : '';
-          const lastChar = result[result.length - 1] || '';
-          const needsSpaceAfter = charAfter && !/\s/.test(charAfter) && lastChar && !/\s/.test(lastChar);
-          
-          // Add spaces if needed
-          const spacedResult = (needsSpaceBefore ? ' ' : '') + result + (needsSpaceAfter ? ' ' : '');
-          
+          // Generate action description based on operation type
+          let actionDescription = '';
+          switch (operationType) {
+            case 'generate':
+              actionDescription = 'Generated new text';
+              break;
+            case 'rewrite':
+              actionDescription = 'Rewrote text';
+              break;
+            case 'summarize':
+              actionDescription = 'Summarized text';
+              break;
+          }
+
+          // Create snapshot with current content before replacement
+          const snapshot = await StorageService.createSnapshot(
+            currentProject.id,
+            editorContent,
+            operationType,
+            actionDescription,
+            editorSelection
+          );
+
+          // Add snapshot to local state immediately
+          setSnapshots((prev) => [snapshot, ...prev]);
+
+          // Update last snapshot content ref for auto-snapshot tracking
+          lastSnapshotContentRef.current = editorContent;
+
+          console.log(`[Panel] Created snapshot before ${operationType} operation:`, snapshot.id);
+        } catch (error) {
+          console.error('[Panel] Failed to create snapshot:', error);
+          // Continue with operation even if snapshot creation fails
+        }
+      }
+
+      // Get the appropriate editor ref based on active tab
+      const editorRef = unifiedEditorRef;
+
+      // Get the appropriate textarea and captured selection for all operations
+      const textarea = editorRef?.current?.getTextarea();
+      const capturedSelection = editorRef?.current?.getCapturedSelection();
+      console.log('[Panel] Using captured selection from editor ref:', capturedSelection);
+
+      // Mark that this content change is from AI (not manual input)
+      isAIGeneratedRef.current = true;
+
+      // For generate operations, insert at cursor position with streaming effect
+      if (operationType === 'generate') {
+        if (textarea && capturedSelection) {
+          try {
+            // Check if we need to add a space before the generated text
+            // Add space if cursor is right after a non-whitespace character
+            const charBefore =
+              capturedSelection.start > 0 ? editorContent[capturedSelection.start - 1] : '';
+            const firstChar = result[0] || '';
+            const needsSpaceBefore =
+              charBefore && !/\s/.test(charBefore) && firstChar && !/\s/.test(firstChar);
+
+            // Check if we need to add a space after the generated text
+            const charAfter =
+              capturedSelection.start < editorContent.length
+                ? editorContent[capturedSelection.start]
+                : '';
+            const lastChar = result[result.length - 1] || '';
+            const needsSpaceAfter =
+              charAfter && !/\s/.test(charAfter) && lastChar && !/\s/.test(lastChar);
+
+            // Add spaces if needed
+            const spacedResult =
+              (needsSpaceBefore ? ' ' : '') + result + (needsSpaceAfter ? ' ' : '');
+
+            // Use streaming effect to type out the text
+            await simulateStreaming(
+              textarea,
+              spacedResult,
+              capturedSelection.start,
+              capturedSelection.start, // No selection, just insert at cursor
+              (currentText, _currentLength) => {
+                // Update React state as text streams in
+                const beforeCursor = editorContent.substring(0, capturedSelection.start);
+                const afterCursor = editorContent.substring(capturedSelection.start);
+                const newContent = beforeCursor + currentText + afterCursor;
+                setEditorContent(newContent);
+              },
+              () => {
+                // On complete, place cursor at end of inserted text
+                const insertEnd = capturedSelection.start + spacedResult.length;
+                textarea.setSelectionRange(insertEnd, insertEnd);
+                // Reset AI flag after streaming completes
+                isAIGeneratedRef.current = false;
+              }
+            );
+
+            console.log(
+              `[Panel] Generate operation completed with streaming, inserted at position ${capturedSelection.start}`
+            );
+          } catch (error) {
+            console.error('[Panel] Streaming failed:', error);
+            // Fallback: just insert the text
+            const beforeCursor = editorContent.substring(0, capturedSelection.start);
+            const afterCursor = editorContent.substring(capturedSelection.start);
+            const newContent = beforeCursor + result + afterCursor;
+            setEditorContent(newContent);
+          }
+        } else {
+          // Fallback: replace all content if no cursor position
+          setEditorContent(result);
+          console.log(`[Panel] Generate operation completed, content set (no cursor position)`);
+        }
+        return;
+      }
+
+      // For rewrite/summarize, use inline replacement
+
+      if (textarea && capturedSelection && capturedSelection.start !== capturedSelection.end) {
+        try {
+          // Ensure proper spacing around the replacement text
+          const spacedResult = ensureSpacing(
+            editorContent,
+            result,
+            capturedSelection.start,
+            capturedSelection.end
+          );
+
           // Use streaming effect to type out the text
           await simulateStreaming(
             textarea,
             spacedResult,
             capturedSelection.start,
-            capturedSelection.start, // No selection, just insert at cursor
-            (currentText, _currentLength) => {
+            capturedSelection.end,
+            (currentText, currentLength) => {
               // Update React state as text streams in
-              const beforeCursor = editorContent.substring(0, capturedSelection.start);
-              const afterCursor = editorContent.substring(capturedSelection.start);
-              const newContent = beforeCursor + currentText + afterCursor;
+              const beforeSelection = editorContent.substring(0, capturedSelection.start);
+              const afterSelection = editorContent.substring(capturedSelection.end);
+              const newContent = beforeSelection + currentText + afterSelection;
               setEditorContent(newContent);
+
+              // Update overlay to grow with the text
+              const newEnd = capturedSelection.start + currentLength;
+              editorRef?.current?.updateCapturedSelection(capturedSelection.start, newEnd);
             },
             () => {
-              // On complete, place cursor at end of inserted text
-              const insertEnd = capturedSelection.start + spacedResult.length;
-              textarea.setSelectionRange(insertEnd, insertEnd);
-              // Reset AI flag after streaming completes
-              isAIGeneratedRef.current = false;
+              // On complete, select the final text
+              const newEnd = capturedSelection.start + spacedResult.length;
+              textarea.setSelectionRange(capturedSelection.start, newEnd);
             }
           );
-          
-          console.log(`[Panel] Generate operation completed with streaming, inserted at position ${capturedSelection.start}`);
+
+          console.log(`[Panel] ${operationType} operation completed with inline replacement`);
         } catch (error) {
-          console.error('[Panel] Streaming failed:', error);
-          // Fallback: just insert the text
-          const beforeCursor = editorContent.substring(0, capturedSelection.start);
-          const afterCursor = editorContent.substring(capturedSelection.start);
-          const newContent = beforeCursor + result + afterCursor;
-          setEditorContent(newContent);
+          console.error('[Panel] Inline replacement failed:', error);
+          // Fallback: just update content
+          setEditorContent(result);
         }
       } else {
-        // Fallback: replace all content if no cursor position
+        // Fallback: just update content if no selection or textarea not available
         setEditorContent(result);
-        console.log(`[Panel] Generate operation completed, content set (no cursor position)`);
+        console.log(`[Panel] ${operationType} operation completed (no inline replacement)`);
       }
-      return;
-    }
-    
-    // For rewrite/summarize, use inline replacement
-    
-    if (textarea && capturedSelection && capturedSelection.start !== capturedSelection.end) {
-      try {
-        // Ensure proper spacing around the replacement text
-        const spacedResult = ensureSpacing(editorContent, result, capturedSelection.start, capturedSelection.end);
-        
-        // Use streaming effect to type out the text
-        await simulateStreaming(
-          textarea,
-          spacedResult,
-          capturedSelection.start,
-          capturedSelection.end,
-          (currentText, currentLength) => {
-            // Update React state as text streams in
-            const beforeSelection = editorContent.substring(0, capturedSelection.start);
-            const afterSelection = editorContent.substring(capturedSelection.end);
-            const newContent = beforeSelection + currentText + afterSelection;
-            setEditorContent(newContent);
-            
-            // Update overlay to grow with the text
-            const newEnd = capturedSelection.start + currentLength;
-            editorRef?.current?.updateCapturedSelection(capturedSelection.start, newEnd);
-          },
-          () => {
-            // On complete, select the final text
-            const newEnd = capturedSelection.start + spacedResult.length;
-            textarea.setSelectionRange(capturedSelection.start, newEnd);
-          }
-        );
-        
-        console.log(`[Panel] ${operationType} operation completed with inline replacement`);
-      } catch (error) {
-        console.error('[Panel] Inline replacement failed:', error);
-        // Fallback: just update content
-        setEditorContent(result);
-      }
-    } else {
-      // Fallback: just update content if no selection or textarea not available
-      setEditorContent(result);
-      console.log(`[Panel] ${operationType} operation completed (no inline replacement)`);
-    }
-  }, [actions, state.activeTab, editorSelection, currentProject, editorContent]);
+    },
+    [actions, state.activeTab, editorSelection, currentProject, editorContent]
+  );
 
   /**
    * Handle operation error from tool controls
    */
-  const handleOperationError = useCallback((error: string) => {
-    actions.setIsProcessing(false);
-    setIsProcessing(false); // Re-enable editor after error
-    actions.setError(error);
-    alert(error); // Simple error display for now
-    console.error('[Panel] Operation error:', error);
-  }, [actions]);
+  const handleOperationError = useCallback(
+    (error: string) => {
+      actions.setIsProcessing(false);
+      setIsProcessing(false); // Re-enable editor after error
+      actions.setError(error);
+      alert(error); // Simple error display for now
+      console.error('[Panel] Operation error:', error);
+    },
+    [actions]
+  );
 
   /**
    * Load projects from storage
@@ -607,38 +659,41 @@ function PanelContent() {
   /**
    * Handle project selection
    */
-  const handleProjectSelect = useCallback(async (projectId: string) => {
-    try {
-      // Save current project before switching (if there's pending changes)
-      if (currentProject && autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
-        await autoSaveProject(currentProject.id, editorContent);
-      }
+  const handleProjectSelect = useCallback(
+    async (projectId: string) => {
+      try {
+        // Save current project before switching (if there's pending changes)
+        if (currentProject && autoSaveTimeoutRef.current) {
+          clearTimeout(autoSaveTimeoutRef.current);
+          await autoSaveProject(currentProject.id, editorContent);
+        }
 
-      // Load selected project
-      const project = await StorageService.getProject(projectId);
-      if (project) {
-        setCurrentProject(project);
-        setEditorContent(project.content);
-        actions.setCurrentText(project.content);
-        
-        // Navigate to generate tab after selecting project
-        actions.setActiveTab('generate');
-        setVisitedTabs(prev => new Set(prev).add('generate'));
-        
-        // Initialize last snapshot content for auto-snapshot tracking
-        lastSnapshotContentRef.current = project.content;
-        
-        // Save as last used project
-        await StorageService.setLastProjectId(project.id);
-        
-        console.log('[Panel] Loaded project:', project.title);
+        // Load selected project
+        const project = await StorageService.getProject(projectId);
+        if (project) {
+          setCurrentProject(project);
+          setEditorContent(project.content);
+          actions.setCurrentText(project.content);
+
+          // Navigate to generate tab after selecting project
+          actions.setActiveTab('generate');
+          setVisitedTabs((prev) => new Set(prev).add('generate'));
+
+          // Initialize last snapshot content for auto-snapshot tracking
+          lastSnapshotContentRef.current = project.content;
+
+          // Save as last used project
+          await StorageService.setLastProjectId(project.id);
+
+          console.log('[Panel] Loaded project:', project.title);
+        }
+      } catch (error) {
+        console.error('[Panel] Failed to load project:', error);
+        alert('Failed to load project. Please try again.');
       }
-    } catch (error) {
-      console.error('[Panel] Failed to load project:', error);
-      alert('Failed to load project. Please try again.');
-    }
-  }, [currentProject, editorContent, autoSaveProject, actions]);
+    },
+    [currentProject, editorContent, autoSaveProject, actions]
+  );
 
   /**
    * Handle new project creation
@@ -656,20 +711,20 @@ function PanelContent() {
       setCurrentProject(newProject);
       setEditorContent('');
       actions.setCurrentText('');
-      
+
       // Navigate to generate tab after creating project
       actions.setActiveTab('generate');
-      setVisitedTabs(prev => new Set(prev).add('generate'));
-      
+      setVisitedTabs((prev) => new Set(prev).add('generate'));
+
       // Initialize last snapshot content for auto-snapshot tracking
       lastSnapshotContentRef.current = '';
-      
+
       // Save as last used project
       await StorageService.setLastProjectId(newProject.id);
-      
+
       // Reload projects list
       await loadProjects();
-      
+
       console.log('[Panel] Created new project:', newProject.id);
     } catch (error) {
       console.error('[Panel] Failed to create project:', error);
@@ -680,26 +735,29 @@ function PanelContent() {
   /**
    * Handle project deletion
    */
-  const handleProjectDelete = useCallback(async (projectId: string) => {
-    try {
-      await StorageService.deleteProject(projectId);
-      
-      // If deleted project was current, clear editor
-      if (currentProject?.id === projectId) {
-        setCurrentProject(null);
-        setEditorContent('');
-        actions.setCurrentText('');
+  const handleProjectDelete = useCallback(
+    async (projectId: string) => {
+      try {
+        await StorageService.deleteProject(projectId);
+
+        // If deleted project was current, clear editor
+        if (currentProject?.id === projectId) {
+          setCurrentProject(null);
+          setEditorContent('');
+          actions.setCurrentText('');
+        }
+
+        // Reload projects list
+        await loadProjects();
+
+        console.log('[Panel] Deleted project:', projectId);
+      } catch (error) {
+        console.error('[Panel] Failed to delete project:', error);
+        alert('Failed to delete project. Please try again.');
       }
-      
-      // Reload projects list
-      await loadProjects();
-      
-      console.log('[Panel] Deleted project:', projectId);
-    } catch (error) {
-      console.error('[Panel] Failed to delete project:', error);
-      alert('Failed to delete project. Please try again.');
-    }
-  }, [currentProject, actions, loadProjects]);
+    },
+    [currentProject, actions, loadProjects]
+  );
 
   /**
    * Load projects and last used project on mount
@@ -709,9 +767,9 @@ function PanelContent() {
       // Prevent multiple initializations
       if (isInitializedRef.current) return;
       isInitializedRef.current = true;
-      
+
       await loadProjects();
-      
+
       // Try to load the last used project
       const lastProjectId = await StorageService.getLastProjectId();
       if (lastProjectId) {
@@ -722,11 +780,11 @@ function PanelContent() {
             setEditorContent(project.content);
             actions.setCurrentText(project.content);
             lastSnapshotContentRef.current = project.content;
-            
+
             // Always start on generate tab
             actions.setActiveTab('generate');
-            setVisitedTabs(prev => new Set(prev).add('generate'));
-            
+            setVisitedTabs((prev) => new Set(prev).add('generate'));
+
             console.log('[Panel] Loaded last used project:', project.title);
             return;
           }
@@ -734,7 +792,7 @@ function PanelContent() {
           console.error('[Panel] Failed to load last project:', error);
         }
       }
-      
+
       // If no last project or it failed to load, check if any projects exist
       const allProjects = await StorageService.getProjects();
       if (allProjects.length === 0) {
@@ -746,11 +804,11 @@ function PanelContent() {
           actions.setCurrentText('');
           lastSnapshotContentRef.current = '';
           await StorageService.setLastProjectId(defaultProject.id);
-          
+
           // Start on generate tab
           actions.setActiveTab('generate');
-          setVisitedTabs(prev => new Set(prev).add('generate'));
-          
+          setVisitedTabs((prev) => new Set(prev).add('generate'));
+
           console.log('[Panel] Created default project:', defaultProject.id);
         } catch (error) {
           console.error('[Panel] Failed to create default project:', error);
@@ -764,16 +822,16 @@ function PanelContent() {
           actions.setCurrentText(mostRecent.content);
           lastSnapshotContentRef.current = mostRecent.content;
           await StorageService.setLastProjectId(mostRecent.id);
-          
+
           // Always start on generate tab
           actions.setActiveTab('generate');
-          setVisitedTabs(prev => new Set(prev).add('generate'));
-          
+          setVisitedTabs((prev) => new Set(prev).add('generate'));
+
           console.log('[Panel] Loaded most recent project:', mostRecent.title);
         }
       }
     };
-    
+
     initializeProjects();
   }, [loadProjects, actions]);
 
@@ -818,25 +876,31 @@ function PanelContent() {
   /**
    * Handle snapshot selection
    */
-  const handleSnapshotSelect = useCallback((snapshotId: string) => {
-    const snapshot = snapshots.find(s => s.id === snapshotId);
-    if (snapshot) {
-      setEditorContent(snapshot.content);
-      actions.setCurrentText(snapshot.content);
-      setActiveSnapshotId(snapshotId);
-      console.log('[Panel] Loaded snapshot:', snapshotId);
-    }
-  }, [snapshots, actions]);
+  const handleSnapshotSelect = useCallback(
+    (snapshotId: string) => {
+      const snapshot = snapshots.find((s) => s.id === snapshotId);
+      if (snapshot) {
+        setEditorContent(snapshot.content);
+        actions.setCurrentText(snapshot.content);
+        setActiveSnapshotId(snapshotId);
+        console.log('[Panel] Loaded snapshot:', snapshotId);
+      }
+    },
+    [snapshots, actions]
+  );
 
   /**
    * Handle snapshot restore from detail modal
    */
-  const handleSnapshotRestore = useCallback((content: string) => {
-    setEditorContent(content);
-    actions.setCurrentText(content);
-    actions.setIsHistoryPanelOpen(false); // Close history panel to show restored content
-    console.log('[Panel] Restored snapshot content to editor');
-  }, [actions]);
+  const handleSnapshotRestore = useCallback(
+    (content: string) => {
+      setEditorContent(content);
+      actions.setCurrentText(content);
+      actions.setIsHistoryPanelOpen(false); // Close history panel to show restored content
+      console.log('[Panel] Restored snapshot content to editor');
+    },
+    [actions]
+  );
 
   /**
    * Handle history panel toggle
@@ -858,30 +922,33 @@ function PanelContent() {
   /**
    * Handle export in specified format (with auto-format)
    */
-  const handleExport = useCallback((format: ExportFormat) => {
-    if (!currentProject) {
-      alert('No project to export. Please create or select a project first.');
-      return;
-    }
+  const handleExport = useCallback(
+    (format: ExportFormat) => {
+      if (!currentProject) {
+        alert('No project to export. Please create or select a project first.');
+        return;
+      }
 
-    try {
-      // Auto-format content before export
-      const formattedContent = autoFormatText(editorContent);
-      
-      // Create a project snapshot with formatted content for export
-      const projectToExport: Project = {
-        ...currentProject,
-        content: formattedContent,
-      };
-      
-      exportProject(projectToExport, format);
-      setShowExportMenu(false);
-      console.log(`[Panel] Exported project as ${format} (auto-formatted)`);
-    } catch (error) {
-      console.error('[Panel] Export failed:', error);
-      alert('Failed to export project. Please try again.');
-    }
-  }, [currentProject, editorContent]);
+      try {
+        // Auto-format content before export
+        const formattedContent = autoFormatText(editorContent);
+
+        // Create a project snapshot with formatted content for export
+        const projectToExport: Project = {
+          ...currentProject,
+          content: formattedContent,
+        };
+
+        exportProject(projectToExport, format);
+        setShowExportMenu(false);
+        console.log(`[Panel] Exported project as ${format} (auto-formatted)`);
+      } catch (error) {
+        console.error('[Panel] Export failed:', error);
+        alert('Failed to export project. Please try again.');
+      }
+    },
+    [currentProject, editorContent]
+  );
 
   /**
    * Handle project title edit start
@@ -906,7 +973,7 @@ function PanelContent() {
       const updatedProject = await StorageService.updateProject(currentProject.id, {
         title: editingTitle.trim(),
       });
-      
+
       if (updatedProject) {
         setCurrentProject(updatedProject);
         // Reload projects list to update ProjectManager
@@ -935,8 +1002,6 @@ function PanelContent() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showExportMenu]);
 
-
-
   return (
     <div className="flint-bg h-screen relative">
       <Sidebar items={navigationItems} activeItemId={state.activeTab} onNavigate={handleNavigate} />
@@ -951,7 +1016,11 @@ function PanelContent() {
           onRestore={handleSnapshotRestore}
           isOpen={state.isHistoryPanelOpen}
           onToggle={handleHistoryPanelToggle}
-          hideToggle={state.activeTab === 'settings' || state.activeTab === 'projects' || state.activeTab === 'home'}
+          hideToggle={
+            state.activeTab === 'settings' ||
+            state.activeTab === 'projects' ||
+            state.activeTab === 'home'
+          }
           onSnapshotsChange={async () => {
             // Reload snapshots when they're modified (e.g., liked/unliked)
             if (currentProject) {
@@ -1044,19 +1113,30 @@ function PanelContent() {
               <WelcomePanel />
             </div>
           )}
-          
+
           {/* Unified editor workspace - shared across Generate, Rewrite, and Summarize */}
-          {(visitedTabs.has('generate') || visitedTabs.has('rewrite') || visitedTabs.has('summary')) && (
-            <div 
-              style={{ 
-                display: ['generate', 'rewrite', 'summary'].includes(state.activeTab) ? 'flex' : 'none',
+          {(visitedTabs.has('generate') ||
+            visitedTabs.has('rewrite') ||
+            visitedTabs.has('summary')) && (
+            <div
+              style={{
+                display: ['generate', 'rewrite', 'summary'].includes(state.activeTab)
+                  ? 'flex'
+                  : 'none',
                 height: '100%',
                 flexDirection: 'column',
                 padding: '24px',
               }}
             >
               {/* Shared Editor Toolbar */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '12px',
+                }}
+              >
                 {isEditingTitle ? (
                   <input
                     type="text"
@@ -1085,50 +1165,60 @@ function PanelContent() {
                     }}
                   />
                 ) : (
-                  <h2 
+                  <h2
                     onClick={handleTitleEditStart}
-                    style={{ 
-                      fontSize: 'var(--fs-lg)', 
-                      fontWeight: 600, 
-                      color: 'var(--text)', 
+                    style={{
+                      fontSize: 'var(--fs-lg)',
+                      fontWeight: 600,
+                      color: 'var(--text)',
                       margin: 0,
                       cursor: 'pointer',
                       padding: '4px 8px',
                       borderRadius: 'var(--radius-sm)',
                       transition: 'background 0.2s',
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-2)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-2)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                     title="Click to edit project name"
                   >
                     {currentProject?.title || 'Untitled Project'}
                   </h2>
                 )}
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'center', position: 'relative' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '4px',
+                    alignItems: 'center',
+                    position: 'relative',
+                  }}
+                >
                   {/* Processing indicator */}
                   {state.isProcessing && (
                     <div
                       style={{
                         width: '16px',
                         height: '16px',
-                        border: '2px solid rgba(255, 255, 255, 0.3)',
-                        borderTopColor: '#ffffff',
+                        border: '2px solid var(--border)',
+                        borderTopColor: 'var(--text)',
                         borderRadius: '50%',
                         animation: 'spin 0.8s linear infinite',
                       }}
                       aria-label="Processing"
                     />
                   )}
-                  
+
                   {/* Copy button */}
                   <button
                     onClick={() => {
                       if (editorContent) {
-                        navigator.clipboard.writeText(editorContent).then(() => {
-                          console.log('[Panel] Content copied to clipboard');
-                        }).catch((err) => {
-                          console.error('[Panel] Failed to copy:', err);
-                        });
+                        navigator.clipboard
+                          .writeText(editorContent)
+                          .then(() => {
+                            console.log('[Panel] Content copied to clipboard');
+                          })
+                          .catch((err) => {
+                            console.error('[Panel] Failed to copy:', err);
+                          });
                       }
                     }}
                     disabled={!editorContent}
@@ -1160,12 +1250,19 @@ function PanelContent() {
                       e.currentTarget.style.color = 'var(--text-muted)';
                     }}
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                     </svg>
                   </button>
-                  
+
                   {/* Export button */}
                   <div ref={exportMenuRef} style={{ position: 'relative' }}>
                     <button
@@ -1200,26 +1297,35 @@ function PanelContent() {
                         e.currentTarget.style.color = 'var(--text-muted)';
                       }}
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                         <polyline points="17 8 12 3 7 8" />
                         <line x1="12" y1="3" x2="12" y2="15" />
                       </svg>
                     </button>
-                    
+
                     {showExportMenu && (
-                      <div style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 4px)',
-                        right: 0,
-                        minWidth: '160px',
-                        background: 'var(--surface-2)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 'var(--radius-md)',
-                        boxShadow: 'var(--shadow-soft)',
-                        padding: '4px',
-                        zIndex: 100,
-                      }}>
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 4px)',
+                          right: 0,
+                          minWidth: '160px',
+                          background: 'var(--surface-2)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--radius-md)',
+                          boxShadow: 'var(--shadow-soft)',
+                          padding: '4px',
+                          zIndex: 100,
+                        }}
+                      >
                         <button
                           onClick={() => handleExport('txt')}
                           style={{
@@ -1234,8 +1340,10 @@ function PanelContent() {
                             borderRadius: 'var(--radius-sm)',
                             transition: 'background 0.2s',
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-3)'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background = 'var(--surface-3)')
+                          }
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                         >
                           Plain Text (.txt)
                         </button>
@@ -1253,8 +1361,10 @@ function PanelContent() {
                             borderRadius: 'var(--radius-sm)',
                             transition: 'background 0.2s',
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-3)'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background = 'var(--surface-3)')
+                          }
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                         >
                           Markdown (.md)
                         </button>
@@ -1272,8 +1382,10 @@ function PanelContent() {
                             borderRadius: 'var(--radius-sm)',
                             transition: 'background 0.2s',
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-3)'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background = 'var(--surface-3)')
+                          }
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                         >
                           HTML (.html)
                         </button>
@@ -1291,8 +1403,10 @@ function PanelContent() {
                             borderRadius: 'var(--radius-sm)',
                             transition: 'background 0.2s',
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-3)'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background = 'var(--surface-3)')
+                          }
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                         >
                           Docs (.doc)
                         </button>
@@ -1301,7 +1415,7 @@ function PanelContent() {
                   </div>
                 </div>
               </div>
-              
+
               {/* Single Unified Editor - shared across all tools */}
               <UnifiedEditor
                 ref={unifiedEditorRef}
@@ -1312,7 +1426,7 @@ function PanelContent() {
                 placeholder="Let's start writing!"
                 disabled={isProcessing}
               />
-              
+
               {/* Tool-specific controls - only one visible at a time */}
               {state.activeTab === 'generate' && (
                 <ToolControlsContainer
@@ -1326,7 +1440,7 @@ function PanelContent() {
                   onOperationError={handleOperationError}
                 />
               )}
-              
+
               {state.activeTab === 'rewrite' && (
                 <ToolControlsContainer
                   activeTool="rewrite"
@@ -1339,7 +1453,7 @@ function PanelContent() {
                   onOperationError={handleOperationError}
                 />
               )}
-              
+
               {state.activeTab === 'summary' && (
                 <ToolControlsContainer
                   activeTool="summarize"
@@ -1354,11 +1468,13 @@ function PanelContent() {
               )}
             </div>
           )}
-          
+
           {/* Old separate tab divs removed - now using single unified editor above */}
-          
+
           {visitedTabs.has('projects') && (
-            <div style={{ display: state.activeTab === 'projects' ? 'block' : 'none', height: '100%' }}>
+            <div
+              style={{ display: state.activeTab === 'projects' ? 'block' : 'none', height: '100%' }}
+            >
               <ProjectManager
                 projects={projects}
                 onProjectSelect={handleProjectSelect}
@@ -1372,10 +1488,12 @@ function PanelContent() {
               />
             </div>
           )}
-          
+
           {visitedTabs.has('settings') && (
-            <div style={{ display: state.activeTab === 'settings' ? 'block' : 'none', height: '100%' }}>
-              <Settings 
+            <div
+              style={{ display: state.activeTab === 'settings' ? 'block' : 'none', height: '100%' }}
+            >
+              <Settings
                 settings={state.settings}
                 pinnedNotes={state.pinnedNotes}
                 onSettingsChange={actions.setSettings}

@@ -24,8 +24,8 @@ export function VisualDemo() {
         {/* Header */}
         <div className="flint-toolbar mb-6">
           <h1 className="text-xl font-semibold">Flint Design System Demo</h1>
-          <button 
-            className="flint-btn" 
+          <button
+            className="flint-btn"
             onClick={toggleTheme}
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
           >
@@ -47,7 +47,7 @@ export function VisualDemo() {
         {/* Buttons - Gestalt Similarity */}
         <div className="flint-section mb-4">
           <h2 className="flint-section-header">Buttons (similar actions look alike)</h2>
-          
+
           <div className="mb-4">
             <p className="text-text-muted text-sm mb-2">Primary actions - all share same style:</p>
             <div className="flint-action-group">
@@ -58,7 +58,9 @@ export function VisualDemo() {
           </div>
 
           <div className="mb-4">
-            <p className="text-text-muted text-sm mb-2">Secondary actions - all share same style:</p>
+            <p className="text-text-muted text-sm mb-2">
+              Secondary actions - all share same style:
+            </p>
             <div className="flint-action-group">
               <button className="flint-btn">Copy</button>
               <button className="flint-btn">Insert</button>
@@ -67,7 +69,9 @@ export function VisualDemo() {
           </div>
 
           <div className="mb-4">
-            <p className="text-text-muted text-sm mb-2">Cancel/Clear actions - all share same style:</p>
+            <p className="text-text-muted text-sm mb-2">
+              Cancel/Clear actions - all share same style:
+            </p>
             <div className="flint-action-group">
               <button className="flint-btn ghost">Cancel</button>
               <button className="flint-btn ghost">Clear</button>
@@ -168,11 +172,11 @@ export function VisualDemo() {
             <label htmlFor="demo-focus-input" className="sr-only">
               Demo focus input
             </label>
-            <input 
+            <input
               id="demo-focus-input"
-              type="text" 
-              className="flint-input" 
-              placeholder="Input" 
+              type="text"
+              className="flint-input"
+              placeholder="Input"
               style={{ width: '150px' }}
               aria-label="Demo focus input"
             />

@@ -60,7 +60,6 @@ export class SpeechService {
     }
 
     if (this.isRecording) {
-      console.warn('[Speech] Recognition already active');
       return;
     }
 
@@ -86,8 +85,6 @@ export class SpeechService {
 
       // Set up no-speech timeout
       this.startNoSpeechTimeout();
-
-      console.log('[Speech] Recognition started with language:', options.language);
     } catch (error) {
       console.error('[Speech] Failed to start recognition:', error);
       this.handleError('unknown', 'Failed to start speech recognition');
@@ -106,7 +103,6 @@ export class SpeechService {
       this.recognition.stop();
       this.isRecording = false;
       this.clearNoSpeechTimeout();
-      console.log('[Speech] Recognition stopped');
     } catch (error) {
       console.error('[Speech] Failed to stop recognition:', error);
     }
@@ -169,13 +165,11 @@ export class SpeechService {
           if (this.onFinalResultCallback) {
             this.onFinalResultCallback(transcript, confidence);
           }
-          console.log('[Speech] Final result:', transcript, 'Confidence:', confidence);
         } else {
           // Partial result
           if (this.onPartialResultCallback) {
             this.onPartialResultCallback(transcript);
           }
-          console.log('[Speech] Partial result:', transcript);
         }
       }
 
@@ -199,12 +193,11 @@ export class SpeechService {
     this.recognition.onend = () => {
       this.isRecording = false;
       this.clearNoSpeechTimeout();
-      console.log('[Speech] Recognition ended');
     };
 
     // Handle start
     this.recognition.onstart = () => {
-      console.log('[Speech] Recognition started successfully');
+      // Recognition started successfully
     };
   }
 
@@ -271,7 +264,6 @@ export class SpeechService {
     this.clearNoSpeechTimeout();
     this.noSpeechTimeout = window.setTimeout(() => {
       if (this.isRecording) {
-        console.warn('[Speech] No speech detected within timeout period');
         this.stop();
         this.handleError('no-speech', 'No speech detected. Please try again.');
       }
@@ -308,12 +300,10 @@ export class MockSpeechService extends SpeechService {
   private mockTimeout: number | null = null;
 
   /**
-   * Starts mock speech recognition
+   * Starts mock speech recognition - simulates speech input for testing
    * @param _options - Speech recognition options (unused in mock)
    */
   override start(_options: SpeechOptions): void {
-    console.log('[Speech] Using mock speech service');
-
     // Simulate partial results
     const words = this.mockTranscript.split(' ');
     let currentText = '';
@@ -350,7 +340,6 @@ export class MockSpeechService extends SpeechService {
       clearTimeout(this.mockTimeout);
       this.mockTimeout = null;
     }
-    console.log('[Speech] Mock recognition stopped');
   }
 }
 

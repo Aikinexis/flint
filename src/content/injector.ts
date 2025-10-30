@@ -1,9 +1,9 @@
 /**
  * Mini Bar Injector Module
- * 
+ *
  * Injects and manages a mini bar near text selections on web pages.
  * Uses Shadow DOM for style isolation to prevent conflicts with host page styles.
- * 
+ *
  * @module content/injector
  */
 
@@ -85,7 +85,7 @@ class MiniBarInjectorImpl implements MiniBarInjector {
       position: 'fixed',
       inset: '0',
       zIndex: '2147483647',
-      pointerEvents: 'none'
+      pointerEvents: 'none',
     });
 
     // Attach shadow root
@@ -276,7 +276,7 @@ class MiniBarInjectorImpl implements MiniBarInjector {
       left: rect.left,
       right: rect.right,
       width: rect.width,
-      height: rect.height
+      height: rect.height,
     });
 
     // Calculate position with offset above selection
@@ -319,13 +319,13 @@ class MiniBarInjectorImpl implements MiniBarInjector {
     console.log('[Flint Minibar] Applied styles:', {
       left: this.bar.style.left,
       top: this.bar.style.top,
-      position: this.bar.style.position
+      position: this.bar.style.position,
     });
 
     // Delay before showing to avoid jumpiness during selection
     setTimeout(() => {
       if (!this.bar || !this.callbacks) return;
-      
+
       // Trigger animation
       requestAnimationFrame(() => {
         if (this.bar) {
@@ -354,7 +354,7 @@ class MiniBarInjectorImpl implements MiniBarInjector {
       // Fade out animation
       this.bar.style.opacity = '0';
       this.bar.style.transform = 'translate3d(0, 0, 0) scale(0.9)';
-      
+
       // Hide after animation completes
       setTimeout(() => {
         if (this.bar) {
@@ -408,7 +408,7 @@ class MiniBarInjectorImpl implements MiniBarInjector {
         // Recalculate position based on current selection
         const range = selection.getRangeAt(0);
         const rect = range.getBoundingClientRect();
-        
+
         // Check if selection is visible in viewport
         const viewportHeight = window.innerHeight;
         if (rect.bottom < 0 || rect.top > viewportHeight) {
@@ -445,12 +445,12 @@ class MiniBarInjectorImpl implements MiniBarInjector {
           // Set position first while still hidden
           this.bar.style.left = `${Math.round(left)}px`;
           this.bar.style.top = `${Math.round(top)}px`;
-          
+
           // Set initial zoom state (start small) and make visible
           this.bar.style.opacity = '0';
           this.bar.style.transform = 'translate3d(0, 0, 0) scale(0.5)';
           this.bar.style.pointerEvents = 'none';
-          
+
           // Smooth fade-in and zoom after a small delay (with bounce effect)
           setTimeout(() => {
             if (this.bar) {

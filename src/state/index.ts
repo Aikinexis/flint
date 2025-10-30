@@ -38,7 +38,6 @@ export {
   selectTheme,
   selectLanguage,
   selectLocalOnlyMode,
-
   selectPinnedNotes,
   selectAIAvailability,
   selectIsAIAvailable,

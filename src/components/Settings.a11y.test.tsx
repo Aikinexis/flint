@@ -11,19 +11,21 @@ expect.extend(toHaveNoViolations);
 
 // Mock StorageService methods
 const mockGetPinnedNotes = () => Promise.resolve([]);
-const mockSavePinnedNote = () => Promise.resolve({ 
-  id: '1', 
-  title: 'Test', 
-  content: 'Test content', 
-  createdAt: Date.now(), 
-  updatedAt: Date.now() 
-});
+const mockSavePinnedNote = () =>
+  Promise.resolve({
+    id: '1',
+    title: 'Test',
+    content: 'Test content',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  });
 const mockDeletePinnedNote = () => Promise.resolve(undefined);
-const mockGetGenerateSettings = () => Promise.resolve({
-  shortLength: 500,
-  mediumLength: 1500,
-  contextAwarenessEnabled: true,
-});
+const mockGetGenerateSettings = () =>
+  Promise.resolve({
+    shortLength: 500,
+    mediumLength: 1500,
+    contextAwarenessEnabled: true,
+  });
 const mockSaveGenerateSettings = () => Promise.resolve(undefined);
 const mockGetHistory = () => Promise.resolve([]);
 const mockClearHistory = () => Promise.resolve(undefined);
@@ -66,20 +68,21 @@ describe('Settings Comprehensive Accessibility Audit', () => {
     global.chrome = {
       storage: {
         local: {
-          get: () => Promise.resolve({
-            settings: {
-              language: 'en-US',
-              theme: 'dark',
-              localOnlyMode: false,
-              accentHue: 255,
-              shortcuts: {
-                openPanel: 'Ctrl+Shift+F',
-                record: 'Ctrl+Shift+R',
-                summarize: 'Ctrl+Shift+S',
-                rewrite: 'Ctrl+Shift+W',
+          get: () =>
+            Promise.resolve({
+              settings: {
+                language: 'en-US',
+                theme: 'dark',
+                localOnlyMode: false,
+                accentHue: 255,
+                shortcuts: {
+                  openPanel: 'Ctrl+Shift+F',
+                  record: 'Ctrl+Shift+R',
+                  summarize: 'Ctrl+Shift+S',
+                  rewrite: 'Ctrl+Shift+W',
+                },
               },
-            },
-          }),
+            }),
           set: () => Promise.resolve(undefined),
         },
         onChanged: {
@@ -342,9 +345,7 @@ describe('Settings Comprehensive Accessibility Audit', () => {
         </AppProvider>
       );
 
-      const focusableElements = container.querySelectorAll(
-        'button, input, select, textarea'
-      );
+      const focusableElements = container.querySelectorAll('button, input, select, textarea');
 
       focusableElements.forEach((el) => {
         // Elements should be focusable

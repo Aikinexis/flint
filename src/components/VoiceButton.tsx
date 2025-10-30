@@ -9,7 +9,7 @@ export interface VoiceButtonProps {
    * Callback when transcript is complete
    */
   onTranscript: (text: string) => void;
-  
+
   /**
    * Language for speech recognition (e.g., 'en-US')
    */
@@ -25,8 +25,8 @@ export interface VoiceButtonProps {
  * Compact voice recording button for inline use in panels
  * Provides recording controls and real-time transcript feedback
  */
-export function VoiceButton({ 
-  onTranscript, 
+export function VoiceButton({
+  onTranscript,
   language = 'en-US',
   disabled = false,
 }: VoiceButtonProps) {
@@ -87,7 +87,7 @@ export function VoiceButton({
       // Start recording
       setError(null);
       setPartialTranscript('');
-      
+
       try {
         speechServiceRef.current.start({
           language,

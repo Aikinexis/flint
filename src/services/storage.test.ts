@@ -253,9 +253,7 @@ describe('StorageService', () => {
 
       StorageService.onSettingsChange(callback);
 
-      expect(mockStorage.onChanged.addListener).toHaveBeenCalledWith(
-        expect.any(Function)
-      );
+      expect(mockStorage.onChanged.addListener).toHaveBeenCalledWith(expect.any(Function));
     });
 
     it('should call callback when settings change', () => {
@@ -348,9 +346,7 @@ describe('StorageService', () => {
 
       cleanup();
 
-      expect(mockStorage.onChanged.removeListener).toHaveBeenCalledWith(
-        expect.any(Function)
-      );
+      expect(mockStorage.onChanged.removeListener).toHaveBeenCalledWith(expect.any(Function));
     });
 
     it('should not call callback when oldValue or newValue is missing', () => {

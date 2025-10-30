@@ -41,7 +41,7 @@ export function getTextareaCaretPosition(
   caretMarker.id = 'caret-marker';
   caretMarker.textContent = '|'; // Use a visible character for measurement
   mirrorDiv.appendChild(caretMarker);
-  
+
   // Match the textarea's scroll position
   mirrorDiv.scrollTop = textarea.scrollTop;
   mirrorDiv.scrollLeft = textarea.scrollLeft;

@@ -132,8 +132,6 @@ export function VersionCarousel({
   const canGoLeft = currentIndex > 0;
   const canGoRight = currentIndex < versions.length - 1;
 
-
-
   // Calculate word and character counts for current version
   const wordCount = editText.trim() === '' ? 0 : editText.trim().split(/\s+/).length;
   const charCount = editText.length;
@@ -183,7 +181,7 @@ export function VersionCarousel({
     setIsDeleting(true);
     try {
       onDelete(currentVersion.id);
-      
+
       // Navigate to previous version if possible, otherwise next
       if (canGoLeft) {
         onNavigate(currentIndex - 1);
@@ -321,7 +319,10 @@ export function VersionCarousel({
             fontSize: 'var(--fs-md)',
             lineHeight: '1.6',
             color: 'var(--text)',
-            borderRadius: (onEditTitle || currentVersion?.title) && !currentVersion?.isOriginal ? '0 0 var(--radius-md) var(--radius-md)' : 'var(--radius-md)',
+            borderRadius:
+              (onEditTitle || currentVersion?.title) && !currentVersion?.isOriginal
+                ? '0 0 var(--radius-md) var(--radius-md)'
+                : 'var(--radius-md)',
             cursor: readOnly ? 'default' : 'text',
           }}
         />
@@ -623,9 +624,7 @@ export function VersionCarousel({
               <button
                 onClick={handleToggleLike}
                 disabled={isLoading}
-                aria-label={
-                  currentVersion?.isLiked ? 'Unlike version' : 'Like version'
-                }
+                aria-label={currentVersion?.isLiked ? 'Unlike version' : 'Like version'}
                 title={currentVersion?.isLiked ? 'Unlike' : 'Like'}
                 className="icon-btn"
                 style={{

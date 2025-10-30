@@ -10,7 +10,7 @@ export interface VoiceRecorderProps {
    * Callback when transcript is complete and ready to insert
    */
   onTranscriptComplete?: (text: string) => void;
-  
+
   /**
    * Language for speech recognition (e.g., 'en-US')
    */
@@ -21,10 +21,7 @@ export interface VoiceRecorderProps {
  * VoiceRecorder component for voice-to-text capture
  * Provides recording controls, real-time transcript display, and insert functionality
  */
-export function VoiceRecorder({ 
-  onTranscriptComplete, 
-  language = 'en-US' 
-}: VoiceRecorderProps) {
+export function VoiceRecorder({ onTranscriptComplete, language = 'en-US' }: VoiceRecorderProps) {
   // Component state
   const [isRecording, setIsRecording] = useState(false);
   const [partialTranscript, setPartialTranscript] = useState('');
@@ -85,7 +82,7 @@ export function VoiceRecorder({
       // Start recording - SpeechRecognition will request permission automatically
       setError(null);
       setPartialTranscript('');
-      
+
       try {
         speechServiceRef.current.start({
           language,
@@ -120,14 +117,14 @@ export function VoiceRecorder({
       if (result.success) {
         // Show success feedback
         console.log('[VoiceRecorder] Text inserted successfully:', result.data);
-        
+
         // If clipboard fallback was used, show a different message
         if (result.usedClipboard) {
           setError('Text copied to clipboard. Please paste it manually.');
         } else {
           // Clear transcript after successful insertion
           handleClear();
-          
+
           // Optionally call the callback if provided
           if (onTranscriptComplete) {
             onTranscriptComplete(finalTranscript);
@@ -141,7 +138,8 @@ export function VoiceRecorder({
       }
     } catch (error) {
       console.error('[VoiceRecorder] Error inserting text:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to insert text. Please try again.';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to insert text. Please try again.';
       setError(errorMessage);
     }
   };
@@ -190,7 +188,15 @@ export function VoiceRecorder({
       <h2 className="flint-section-header">Generate</h2>
 
       {/* Transcript Area - scrollable, no border */}
-      <div className="flex-1 flex flex-col min-h-0" style={{ marginBottom: '16px', position: 'relative', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+      <div
+        className="flex-1 flex flex-col min-h-0"
+        style={{
+          marginBottom: '16px',
+          position: 'relative',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-md)',
+        }}
+      >
         {/* Clear button - top right, always show when there's any text */}
         {(finalTranscript.trim() || partialTranscript.trim()) && (
           <button
@@ -246,9 +252,9 @@ export function VoiceRecorder({
             </svg>
           </button>
         )}
-        
-        <div 
-          style={{ 
+
+        <div
+          style={{
             width: '100%',
             height: '100%',
             padding: '16px',
@@ -266,11 +272,7 @@ export function VoiceRecorder({
           )}
 
           {/* Final transcript (normal) */}
-          {finalTranscript && (
-            <div style={{ color: 'var(--text)' }}>
-              {finalTranscript}
-            </div>
-          )}
+          {finalTranscript && <div style={{ color: 'var(--text)' }}>{finalTranscript}</div>}
 
           {/* Placeholder when empty */}
           {!partialTranscript && !finalTranscript && !error && (
@@ -294,7 +296,7 @@ export function VoiceRecorder({
           onMouseLeave={(e) => {
             e.currentTarget.removeAttribute('data-hovered');
           }}
-          style={{ 
+          style={{
             width: '100%',
             display: 'flex',
             alignItems: 'center',
@@ -344,8 +346,8 @@ export function VoiceRecorder({
 
       {/* Visual Recording Indicator */}
       {isRecording && (
-        <div 
-          style={{ 
+        <div
+          style={{
             marginBottom: '16px',
             display: 'flex',
             alignItems: 'center',
@@ -358,7 +360,7 @@ export function VoiceRecorder({
           role="status"
           aria-live="polite"
         >
-          <span 
+          <span
             style={{
               width: '8px',
               height: '8px',
@@ -375,33 +377,39 @@ export function VoiceRecorder({
       {/* Confidence Indicator */}
       {confidence !== null && (
         <div style={{ marginBottom: '16px' }}>
-          <div style={{ 
-            fontSize: 'var(--fs-sm)', 
-            color: 'var(--text-muted)', 
-            marginBottom: '4px' 
-          }}>
+          <div
+            style={{
+              fontSize: 'var(--fs-sm)',
+              color: 'var(--text-muted)',
+              marginBottom: '4px',
+            }}
+          >
             Confidence: {Math.round(confidence * 100)}%
           </div>
-          <div style={{ 
-            width: '100%', 
-            height: '4px', 
-            background: 'var(--surface-2)', 
-            borderRadius: '2px',
-            overflow: 'hidden'
-          }}>
-            <div style={{ 
-              width: `${confidence * 100}%`, 
-              height: '100%', 
-              background: 'var(--success)',
-              transition: 'width 0.3s ease'
-            }} />
+          <div
+            style={{
+              width: '100%',
+              height: '4px',
+              background: 'var(--surface-2)',
+              borderRadius: '2px',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${confidence * 100}%`,
+                height: '100%',
+                background: 'var(--success)',
+                transition: 'width 0.3s ease',
+              }}
+            />
           </div>
         </div>
       )}
 
       {/* Error Banner */}
       {error && (
-        <div 
+        <div
           role="alert"
           aria-live="assertive"
           style={{
@@ -413,7 +421,9 @@ export function VoiceRecorder({
             color: '#ef4444',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+          <div
+            style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}
+          >
             <svg
               width="16"
               height="16"

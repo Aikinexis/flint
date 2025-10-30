@@ -36,9 +36,7 @@ describe('RewritePanel Comprehensive Accessibility Audit', () => {
     });
 
     it('should have no violations with initial text', async () => {
-      const { container } = render(
-        <RewritePanel initialText="Sample text to rewrite" />
-      );
+      const { container } = render(<RewritePanel initialText="Sample text to rewrite" />);
       const results = await axe(container);
       expect(results).toHaveNoViolations();
     });

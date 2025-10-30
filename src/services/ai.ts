@@ -34,7 +34,15 @@ export interface SummaryOptions {
  * Rewrite options
  */
 export interface RewriteOptions {
-  preset?: 'clarify' | 'simplify' | 'concise' | 'expand' | 'friendly' | 'formal' | 'poetic' | 'persuasive';
+  preset?:
+    | 'clarify'
+    | 'simplify'
+    | 'concise'
+    | 'expand'
+    | 'friendly'
+    | 'formal'
+    | 'poetic'
+    | 'persuasive';
   customPrompt?: string;
   tone?: 'more-formal' | 'more-casual' | 'as-is';
   pinnedNotes?: string[];
@@ -83,23 +91,29 @@ export class AIService {
       // Try window.ai first (standard location)
       if ('ai' in window && typeof (window as any).ai?.canCreateTextSession === 'function') {
         const status = await (window as any).ai.canCreateTextSession();
-        console.log('[AI] Prompt API (window.ai) status:', status);
         // status is "readily", "after-download", or "no"
-        availability.promptAPI = status === 'readily' ? 'available' : status === 'after-download' ? 'after-download' : 'unavailable';
+        availability.promptAPI =
+          status === 'readily'
+            ? 'available'
+            : status === 'after-download'
+              ? 'after-download'
+              : 'unavailable';
       }
       // Try self.ai as fallback (may be available in extension context)
       else if ('ai' in self && typeof (self as any).ai?.canCreateTextSession === 'function') {
         const status = await (self as any).ai.canCreateTextSession();
-        console.log('[AI] Prompt API (self.ai) status:', status);
-        availability.promptAPI = status === 'readily' ? 'available' : status === 'after-download' ? 'after-download' : 'unavailable';
-      }
-      else {
-        console.log('[AI] Prompt API not available in extension context (this is expected)');
+        availability.promptAPI =
+          status === 'readily'
+            ? 'available'
+            : status === 'after-download'
+              ? 'after-download'
+              : 'unavailable';
+      } else {
         // Prompt API is not available in extension contexts, but Summarizer and Rewriter should work
         availability.promptAPI = 'unavailable';
       }
     } catch (error) {
-      console.warn('[AI] Prompt API check failed:', error);
+      console.error('[AI] Prompt API check failed:', error);
       availability.promptAPI = 'unavailable';
     }
 
@@ -109,10 +123,15 @@ export class AIService {
         // Specify outputLanguage in availability check to avoid warnings
         const status = await (self as any).Summarizer.availability({ outputLanguage: 'en' });
         // status is "available", "downloadable", or "unavailable"
-        availability.summarizerAPI = status === 'available' ? 'available' : status === 'downloadable' ? 'after-download' : 'unavailable';
+        availability.summarizerAPI =
+          status === 'available'
+            ? 'available'
+            : status === 'downloadable'
+              ? 'after-download'
+              : 'unavailable';
       }
     } catch (error) {
-      console.warn('[AI] Summarizer API check failed:', error);
+      console.error('[AI] Summarizer API check failed:', error);
     }
 
     // Check Rewriter API
@@ -121,10 +140,15 @@ export class AIService {
         // Specify outputLanguage in availability check to avoid warnings
         const status = await (self as any).Rewriter.availability({ outputLanguage: 'en' });
         // status is "available", "downloadable", or "unavailable"
-        availability.rewriterAPI = status === 'available' ? 'available' : status === 'downloadable' ? 'after-download' : 'unavailable';
+        availability.rewriterAPI =
+          status === 'available'
+            ? 'available'
+            : status === 'downloadable'
+              ? 'after-download'
+              : 'unavailable';
       }
     } catch (error) {
-      console.warn('[AI] Rewriter API check failed:', error);
+      console.error('[AI] Rewriter API check failed:', error);
     }
 
     // Check Writer API
@@ -133,16 +157,20 @@ export class AIService {
         // Specify outputLanguage in availability check to avoid warnings
         const status = await (self as any).Writer.availability({ outputLanguage: 'en' });
         // status is "available", "downloadable", or "unavailable"
-        availability.writerAPI = status === 'available' ? 'available' : status === 'downloadable' ? 'after-download' : 'unavailable';
+        availability.writerAPI =
+          status === 'available'
+            ? 'available'
+            : status === 'downloadable'
+              ? 'after-download'
+              : 'unavailable';
       }
     } catch (error) {
-      console.warn('[AI] Writer API check failed:', error);
+      console.error('[AI] Writer API check failed:', error);
     }
 
     this.availabilityCache = availability;
     this.cacheTimestamp = now;
 
-    console.log('[AI] Availability check:', availability);
     return availability;
   }
 
@@ -201,7 +229,9 @@ export class AIService {
 
     const availability = await this.checkAvailability();
     if (availability.promptAPI === 'unavailable') {
-      throw new Error('Prompt API is not available. AI features require Chrome 128+ with Gemini Nano enabled.');
+      throw new Error(
+        'Prompt API is not available. AI features require Chrome 128+ with Gemini Nano enabled.'
+      );
     }
 
     try {
@@ -229,7 +259,7 @@ export class AIService {
     this.ensureUserActivation();
 
     const availability = await this.checkAvailability();
-    
+
     // Use mock provider if unavailable
     if (availability.summarizerAPI === 'unavailable') {
       return MockAIProvider.summarize(text, options);
@@ -251,8 +281,9 @@ export class AIService {
         detailed: 'medium',
         complex: 'long',
       };
-      
-      const summaryLength = options.length || lengthFromReadingLevel[options.readingLevel] || 'medium';
+
+      const summaryLength =
+        options.length || lengthFromReadingLevel[options.readingLevel] || 'medium';
 
       // Add word count targets to shared context based on length
       const wordCountGuidance: Record<string, string> = {
@@ -262,9 +293,10 @@ export class AIService {
       };
 
       // Add specific guidance for bullet points to keep them brief
-      const bulletGuidance = options.mode === 'bullets' 
-        ? 'Each bullet point must be extremely brief - just the key point in 3-5 words maximum, like a headline.'
-        : '';
+      const bulletGuidance =
+        options.mode === 'bullets'
+          ? 'Each bullet point must be extremely brief - just the key point in 3-5 words maximum, like a headline.'
+          : '';
 
       // Merge pinned notes, word count guidance, and bullet guidance into shared context
       let sharedContext = '';
@@ -326,7 +358,9 @@ export class AIService {
       try {
         // For custom prompts, use sharedContext to pass the instructions
         const context = options.customPrompt
-          ? (sharedContext ? `${sharedContext}\n\n${options.customPrompt}` : options.customPrompt)
+          ? sharedContext
+            ? `${sharedContext}\n\n${options.customPrompt}`
+            : options.customPrompt
           : sharedContext;
 
         const rewriter = await (self as any).Rewriter.create({
@@ -346,14 +380,14 @@ export class AIService {
 
         return result;
       } catch (error) {
-        console.warn('[AI] Rewriter API failed, falling back to Prompt API:', error);
+        console.error('[AI] Rewriter API failed, falling back to Prompt API:', error);
         // Fall through to Prompt API fallback
       }
     }
 
     // Fallback to Prompt API if Rewriter unavailable or failed
     if (availability.promptAPI === 'available' && options.customPrompt) {
-      const prompt = sharedContext 
+      const prompt = sharedContext
         ? `${sharedContext}\n\n${options.customPrompt}\n\nText to rewrite:\n${text}`
         : `${options.customPrompt}\n\nText to rewrite:\n${text}`;
       return this.prompt(prompt);
@@ -365,8 +399,9 @@ export class AIService {
 
   /**
    * Generates text using the Writer API or Prompt API fallback
+   * Intelligently constructs prompts based on surrounding context to ensure generated text flows naturally
    * @param prompt - The generation prompt
-   * @param options - Generation options
+   * @param options - Generation options including context, length, and pinned notes
    * @returns Promise resolving to generated text
    */
   static async generate(prompt: string, options: GenerateOptions = {}): Promise<string> {
@@ -381,13 +416,13 @@ export class AIService {
 
     // Build context-aware prompt
     let fullPrompt = '';
-    
+
     if (options.context) {
       // Extract text before and after cursor for better context
       const contextLines = options.context.split('\n');
       const beforeContext = contextLines.slice(0, -1).join('\n').slice(-500); // Last 500 chars before
       const afterContext = contextLines.slice(-1).join('\n').slice(0, 500); // First 500 chars after
-      
+
       // Build intelligent prompt based on context
       fullPrompt = `You are a writing assistant. The user is writing a document and needs you to generate text at their cursor position.
 
@@ -456,15 +491,13 @@ CRITICAL INSTRUCTIONS:
 
         return result;
       } catch (error) {
-        console.warn('[AI] Writer API failed, falling back to Prompt API:', error);
+        console.error('[AI] Writer API failed, falling back to Prompt API:', error);
       }
     }
 
     // Fallback to Prompt API
-    const promptWithContext = sharedContext
-      ? `${sharedContext}\n\n${fullPrompt}`
-      : fullPrompt;
-    
+    const promptWithContext = sharedContext ? `${sharedContext}\n\n${fullPrompt}` : fullPrompt;
+
     return this.prompt(promptWithContext);
   }
 
@@ -500,8 +533,6 @@ CRITICAL INSTRUCTIONS:
     }
 
     try {
-      console.log('[AI] Using Prompt API for proofreading...');
-      
       const prompt = `You are a spell checker and grammar corrector. Fix all spelling and grammar errors in the following text.
 
 CRITICAL RULES:
@@ -516,32 +547,31 @@ Text to correct:
 ${text}`;
 
       const corrected = await this.prompt(prompt);
-      
+
       // Clean up the response (remove any extra formatting or quotes)
       let cleanedText = corrected.trim();
-      
+
       // Remove common wrapper phrases if present
       cleanedText = cleanedText
-        .replace(/^(Here's the corrected text:|Corrected text:|Here is the corrected version:)\s*/i, '')
+        .replace(
+          /^(Here's the corrected text:|Corrected text:|Here is the corrected version:)\s*/i,
+          ''
+        )
         .replace(/^["']|["']$/g, '') // Remove surrounding quotes
         .trim();
-      
+
       // Count corrections by comparing differences
       const corrections = cleanedText !== text ? [{ type: 'correction' }] : [];
-      
-      console.log('[AI] Proofreading completed:', {
-        original: text.substring(0, 50),
-        corrected: cleanedText.substring(0, 50),
-        changed: cleanedText !== text
-      });
-      
+
       return {
         corrected: cleanedText,
         corrections,
       };
     } catch (error) {
       console.error('[AI] Prompt API proofreading failed:', error);
-      throw new Error('Proofreading failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      throw new Error(
+        'Proofreading failed: ' + (error instanceof Error ? error.message : 'Unknown error')
+      );
     }
   }
 }
@@ -551,16 +581,14 @@ ${text}`;
  */
 class MockAIProvider {
   /**
-   * Mock summarize implementation
+   * Mock summarize implementation - provides fallback when Chrome AI APIs are unavailable
    * @param text - Text to summarize
    * @param options - Summary options
    * @returns Mock summary
    */
   static summarize(text: string, options: SummaryOptions): string {
-    console.warn('[AI] Using mock provider - AI features require Chrome 128+ with Gemini Nano enabled');
-
     const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
-    
+
     if (options.mode === 'brief') {
       // Return just the first sentence for brief mode
       return sentences[0]?.trim() + '.' || text.slice(0, 100) + '...';
@@ -586,7 +614,9 @@ class MockAIProvider {
    * @returns Mock rewritten text
    */
   static rewrite(text: string, options: RewriteOptions): string {
-    console.warn('[AI] Using mock provider - AI features require Chrome 128+ with Gemini Nano enabled');
+    console.warn(
+      '[AI] Using mock provider - AI features require Chrome 128+ with Gemini Nano enabled'
+    );
 
     // Simple transformations based on preset
     if (options.preset === 'formal') {
@@ -615,17 +645,18 @@ class MockAIProvider {
   }
 
   /**
-   * Mock generate implementation
+   * Mock generate implementation - provides fallback when Chrome AI APIs are unavailable
    * @param prompt - Generation prompt
    * @param options - Generation options
    * @returns Mock generated text
    */
   static generate(prompt: string, options: GenerateOptions): string {
-    console.warn('[AI] Using mock provider - AI features require Chrome 128+ with Gemini Nano enabled');
-
     // If prompt is the default "continue writing" prompt, return helpful message
-    if (prompt.toLowerCase().includes('continue writing') || prompt.toLowerCase().includes('extend this content')) {
-      return 'What should we write about? Try adding a prompt to get started!\n\n(Note: This is a mock response. Enable Chrome\'s built-in AI for real generation.)';
+    if (
+      prompt.toLowerCase().includes('continue writing') ||
+      prompt.toLowerCase().includes('extend this content')
+    ) {
+      return "What should we write about? Try adding a prompt to get started!\n\n(Note: This is a mock response. Enable Chrome's built-in AI for real generation.)";
     }
 
     // Generate simple, prompt-relevant response
@@ -634,15 +665,20 @@ class MockAIProvider {
 
     // Provide minimal, relevant responses based on prompt keywords
     if (promptLower.includes('song') || promptLower.includes('lyrics')) {
-      mockText = 'Verse 1:\nUnder the stars we dance tonight\nHearts beating in the pale moonlight\n\nChorus:\nThis is our moment, this is our time\nTogether we shine, together we climb';
+      mockText =
+        'Verse 1:\nUnder the stars we dance tonight\nHearts beating in the pale moonlight\n\nChorus:\nThis is our moment, this is our time\nTogether we shine, together we climb';
     } else if (promptLower.includes('story') || promptLower.includes('tale')) {
-      mockText = 'Once upon a time, in a land far away, there lived a curious traveler who sought adventure beyond the horizon. Each day brought new discoveries and unexpected friendships.';
+      mockText =
+        'Once upon a time, in a land far away, there lived a curious traveler who sought adventure beyond the horizon. Each day brought new discoveries and unexpected friendships.';
     } else if (promptLower.includes('poem') || promptLower.includes('verse')) {
-      mockText = 'Whispers of wind through autumn trees,\nGolden leaves dance in the breeze,\nNature\'s beauty, wild and free,\nA moment of peace for you and me.';
+      mockText =
+        "Whispers of wind through autumn trees,\nGolden leaves dance in the breeze,\nNature's beauty, wild and free,\nA moment of peace for you and me.";
     } else if (promptLower.includes('email') || promptLower.includes('letter')) {
-      mockText = 'Dear [Recipient],\n\nI hope this message finds you well. I wanted to reach out regarding our recent conversation and share some thoughts on the next steps.\n\nBest regards';
+      mockText =
+        'Dear [Recipient],\n\nI hope this message finds you well. I wanted to reach out regarding our recent conversation and share some thoughts on the next steps.\n\nBest regards';
     } else if (promptLower.includes('list') || promptLower.includes('ideas')) {
-      mockText = '1. Start with a clear goal\n2. Break it into smaller steps\n3. Set realistic timelines\n4. Track your progress\n5. Celebrate small wins';
+      mockText =
+        '1. Start with a clear goal\n2. Break it into smaller steps\n3. Set realistic timelines\n4. Track your progress\n5. Celebrate small wins';
     } else {
       // Generic response for other prompts
       mockText = `Here's a response to your request: "${prompt.slice(0, 40)}${prompt.length > 40 ? '...' : ''}"\n\nThis is a simple demonstration. With Chrome's built-in AI enabled, you would receive more detailed and contextually relevant content.`;
@@ -659,7 +695,8 @@ class MockAIProvider {
       }
     } else if (options.length === 'long') {
       // Extend for long format
-      mockText += '\n\nThis extended section provides additional detail and context. With longer content, you can explore topics more thoroughly and include supporting information that adds depth to the response.';
+      mockText +=
+        '\n\nThis extended section provides additional detail and context. With longer content, you can explore topics more thoroughly and include supporting information that adds depth to the response.';
     }
 
     return mockText;

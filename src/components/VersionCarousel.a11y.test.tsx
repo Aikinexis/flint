@@ -49,11 +49,7 @@ describe('VersionCarousel Accessibility Audit', () => {
   describe('Initial Render States', () => {
     it('should have no violations with single version', async () => {
       const { container } = render(
-        <VersionCarousel
-          versions={[mockVersions[0]]}
-          currentIndex={0}
-          {...mockHandlers}
-        />
+        <VersionCarousel versions={[mockVersions[0]]} currentIndex={0} {...mockHandlers} />
       );
       const results = await axe(container);
       expect(results).toHaveNoViolations();
@@ -61,11 +57,7 @@ describe('VersionCarousel Accessibility Audit', () => {
 
     it('should have no violations with multiple versions', async () => {
       const { container } = render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={0}
-          {...mockHandlers}
-        />
+        <VersionCarousel versions={mockVersions} currentIndex={0} {...mockHandlers} />
       );
       const results = await axe(container);
       expect(results).toHaveNoViolations();
@@ -86,11 +78,7 @@ describe('VersionCarousel Accessibility Audit', () => {
 
     it('should have no violations with liked version', async () => {
       const { container } = render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={2}
-          {...mockHandlers}
-        />
+        <VersionCarousel versions={mockVersions} currentIndex={2} {...mockHandlers} />
       );
       const results = await axe(container);
       expect(results).toHaveNoViolations();
@@ -101,11 +89,7 @@ describe('VersionCarousel Accessibility Audit', () => {
     it('should have no violations after navigation', async () => {
       const user = userEvent.setup();
       const { container } = render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={0}
-          {...mockHandlers}
-        />
+        <VersionCarousel versions={mockVersions} currentIndex={0} {...mockHandlers} />
       );
 
       const nextButton = screen.getByLabelText('Next version');
@@ -118,11 +102,7 @@ describe('VersionCarousel Accessibility Audit', () => {
     it('should have no violations after toggling like', async () => {
       const user = userEvent.setup();
       const { container } = render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={1}
-          {...mockHandlers}
-        />
+        <VersionCarousel versions={mockVersions} currentIndex={1} {...mockHandlers} />
       );
 
       const likeButton = screen.getByLabelText('Like version');
@@ -135,11 +115,7 @@ describe('VersionCarousel Accessibility Audit', () => {
     it('should have no violations after editing text', async () => {
       const user = userEvent.setup();
       const { container } = render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={1}
-          {...mockHandlers}
-        />
+        <VersionCarousel versions={mockVersions} currentIndex={1} {...mockHandlers} />
       );
 
       const textarea = screen.getByLabelText('Text content');
@@ -152,11 +128,7 @@ describe('VersionCarousel Accessibility Audit', () => {
     it('should have no violations after editing title', async () => {
       const user = userEvent.setup();
       const { container } = render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={1}
-          {...mockHandlers}
-        />
+        <VersionCarousel versions={mockVersions} currentIndex={1} {...mockHandlers} />
       );
 
       const titleInput = screen.getByLabelText('Version title');
@@ -171,13 +143,7 @@ describe('VersionCarousel Accessibility Audit', () => {
   describe('Keyboard Navigation', () => {
     it('should support tab navigation through all interactive elements', async () => {
       const user = userEvent.setup();
-      render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={1}
-          {...mockHandlers}
-        />
-      );
+      render(<VersionCarousel versions={mockVersions} currentIndex={1} {...mockHandlers} />);
 
       // Tab through elements
       await user.tab(); // Title input
@@ -204,13 +170,7 @@ describe('VersionCarousel Accessibility Audit', () => {
 
     it('should support keyboard activation for buttons', async () => {
       const user = userEvent.setup();
-      render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={1}
-          {...mockHandlers}
-        />
-      );
+      render(<VersionCarousel versions={mockVersions} currentIndex={1} {...mockHandlers} />);
 
       const likeButton = screen.getByLabelText('Like version');
       likeButton.focus();
@@ -222,13 +182,7 @@ describe('VersionCarousel Accessibility Audit', () => {
 
   describe('ARIA Labels and Roles', () => {
     it('should have proper ARIA labels on all interactive elements', () => {
-      render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={1}
-          {...mockHandlers}
-        />
-      );
+      render(<VersionCarousel versions={mockVersions} currentIndex={1} {...mockHandlers} />);
 
       expect(screen.getByRole('region', { name: 'Version carousel' })).toBeInTheDocument();
       expect(screen.getByLabelText('Version title')).toBeInTheDocument();
@@ -242,34 +196,20 @@ describe('VersionCarousel Accessibility Audit', () => {
 
     it('should update like button aria-label based on state', () => {
       const { rerender } = render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={1}
-          {...mockHandlers}
-        />
+        <VersionCarousel versions={mockVersions} currentIndex={1} {...mockHandlers} />
       );
 
       expect(screen.getByLabelText('Like version')).toBeInTheDocument();
 
       // Rerender with liked version
-      rerender(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={2}
-          {...mockHandlers}
-        />
-      );
+      rerender(<VersionCarousel versions={mockVersions} currentIndex={2} {...mockHandlers} />);
 
       expect(screen.getByLabelText('Unlike version')).toBeInTheDocument();
     });
 
     it('should have aria-hidden on decorative SVG icons', () => {
       const { container } = render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={1}
-          {...mockHandlers}
-        />
+        <VersionCarousel versions={mockVersions} currentIndex={1} {...mockHandlers} />
       );
 
       const svgs = container.querySelectorAll('svg');
@@ -281,13 +221,7 @@ describe('VersionCarousel Accessibility Audit', () => {
 
   describe('Focus Management', () => {
     it('should have visible focus indicators', () => {
-      render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={1}
-          {...mockHandlers}
-        />
-      );
+      render(<VersionCarousel versions={mockVersions} currentIndex={1} {...mockHandlers} />);
 
       const buttons = [
         screen.getByLabelText('Previous version'),
@@ -304,13 +238,7 @@ describe('VersionCarousel Accessibility Audit', () => {
 
     it('should maintain logical tab order', async () => {
       const user = userEvent.setup();
-      render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={1}
-          {...mockHandlers}
-        />
-      );
+      render(<VersionCarousel versions={mockVersions} currentIndex={1} {...mockHandlers} />);
 
       const expectedOrder = [
         'Version title',
@@ -332,23 +260,13 @@ describe('VersionCarousel Accessibility Audit', () => {
   describe('Disabled States', () => {
     it('should properly disable navigation buttons at boundaries', () => {
       const { rerender } = render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={0}
-          {...mockHandlers}
-        />
+        <VersionCarousel versions={mockVersions} currentIndex={0} {...mockHandlers} />
       );
 
       const prevButton = screen.getByLabelText('Previous version');
       expect(prevButton).toBeDisabled();
 
-      rerender(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={2}
-          {...mockHandlers}
-        />
-      );
+      rerender(<VersionCarousel versions={mockVersions} currentIndex={2} {...mockHandlers} />);
 
       const nextButton = screen.getByLabelText('Next version');
       expect(nextButton).toBeDisabled();
@@ -376,25 +294,13 @@ describe('VersionCarousel Accessibility Audit', () => {
 
   describe('Screen Reader Support', () => {
     it('should announce version counter to screen readers', () => {
-      render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={1}
-          {...mockHandlers}
-        />
-      );
+      render(<VersionCarousel versions={mockVersions} currentIndex={1} {...mockHandlers} />);
 
       expect(screen.getByText('2/3')).toBeInTheDocument();
     });
 
     it('should not show navigation controls for single version', () => {
-      render(
-        <VersionCarousel
-          versions={[mockVersions[0]]}
-          currentIndex={0}
-          {...mockHandlers}
-        />
-      );
+      render(<VersionCarousel versions={[mockVersions[0]]} currentIndex={0} {...mockHandlers} />);
 
       expect(screen.queryByLabelText('Previous version')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Next version')).not.toBeInTheDocument();
@@ -405,11 +311,7 @@ describe('VersionCarousel Accessibility Audit', () => {
   describe('Color Contrast', () => {
     it('should render with sufficient color contrast', async () => {
       const { container } = render(
-        <VersionCarousel
-          versions={mockVersions}
-          currentIndex={1}
-          {...mockHandlers}
-        />
+        <VersionCarousel versions={mockVersions} currentIndex={1} {...mockHandlers} />
       );
 
       const results = await axe(container, {

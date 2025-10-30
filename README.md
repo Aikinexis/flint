@@ -4,21 +4,56 @@ Voice-to-text, summarization, and rewriting with local AI for Chrome.
 
 ## Overview
 
-Flint is a Chrome extension that brings voice capture, instant summarization, and targeted rewriting directly into web pages using Chrome's built-in AI APIs. All text processing happens locally on your device.
+Flint is a Chrome extension that provides a unified writing environment with AI-powered text generation, rewriting, and summarization. Built on Chrome's local AI APIs, all text processing happens on your device for complete privacy.
 
 ## Features
 
-- **Voice to Text**: Capture thoughts with speech recognition
-- **Summarize**: Get bullet points, paragraphs, or outlines from selected text
-- **Rewrite**: Transform text with presets (formal, casual, concise, etc.) or custom prompts
-- **Local-First**: All AI processing happens on your device (except speech recognition)
-- **Privacy-Focused**: No external servers, no accounts, no tracking
+### Unified Editor Workflow
+- **Single Persistent Editor**: Work in one document across all AI tools
+- **Inline AI Operations**: Generate, rewrite, and summarize text directly in your editor
+- **Project Management**: Organize multiple writing projects (emails, blog posts, notes)
+- **Version History**: Track changes with automatic snapshots after each AI operation
+- **Context-Aware Generation**: AI understands surrounding text for natural continuity
+
+### AI Capabilities
+- **Generate**: Create text from prompts with context awareness
+- **Rewrite**: Transform text with presets (formal, casual, concise, expand) or custom instructions
+- **Summarize**: Extract key points, create paragraphs, or generate outlines
+- **Proofread**: Fix spelling and grammar errors
+
+### Privacy & Performance
+- **Local-First**: All AI processing happens on your device using Chrome's built-in Gemini Nano
+- **No External Servers**: No accounts, no tracking, no data leaves your browser
+- **Fast & Responsive**: Instant AI operations with no network latency
+
+## Key Features
+
+### 🎯 Unified Editor
+Work in a single persistent editor across all AI tools. No more switching between panels or losing your place.
+
+### 🔄 Inline Operations
+AI results appear directly in your editor - no compare views or extra steps. Select text, apply AI, done.
+
+### 📁 Project Management
+Organize multiple writing projects. Each project maintains its own content and version history.
+
+### 📸 Version Snapshots
+Every AI operation creates an automatic snapshot. Review changes, restore previous versions, or track your writing evolution.
+
+### 🧠 Context-Aware AI
+Generate text that flows naturally with what you've already written. The AI understands surrounding context for better continuity.
+
+### 🎨 Pinned Notes
+Add audience descriptions or style guidelines that influence all AI operations. Perfect for maintaining consistent tone.
+
+### 🔒 Privacy-First
+All AI processing happens locally on your device. No data leaves your browser, no accounts required.
 
 ## Requirements
 
 - Chrome 128 or later
 - Gemini Nano enabled (for AI features)
-- Microphone access (for voice features)
+- ~500 MB disk space for AI model
 
 ## Installation
 
@@ -44,7 +79,47 @@ Flint is a Chrome extension that brings voice capture, instant summarization, an
 4. Open side panel:
    - Click Flint icon in Chrome toolbar
    - Side panel opens on right side
-   - Grant microphone permission when prompted
+   - Start writing in the unified editor
+
+## How to Use
+
+### Basic Workflow
+
+1. **Start Writing**: Type or paste text into the editor
+2. **Select a Tool**: Choose Generate, Rewrite, or Summarize from the sidebar
+3. **Configure Options**: Set tone, length, or provide custom instructions
+4. **Execute**: Click the action button - results appear inline in your editor
+5. **Iterate**: Make multiple changes - each creates a version snapshot
+
+### Generate Text
+- Position cursor where you want new text
+- Enter a prompt or leave empty for continuation
+- AI generates text that flows naturally with surrounding content
+- Generated text appears at cursor position
+
+### Rewrite Text
+- Select text you want to transform
+- Choose a preset (formal, casual, concise, expand) or write custom instructions
+- AI rewrites selected text in place
+- Original text is preserved in version history
+
+### Summarize Text
+- Select text to summarize
+- Choose format: bullets, paragraph, or brief
+- Summary replaces selected text
+- Adjust reading level for your audience
+
+### Project Management
+- Click "Projects" button to view all projects
+- Create new projects for different writing tasks
+- Switch between projects - content auto-saves
+- Each project has its own version history
+
+### Version History
+- Click history toggle (‹/›) to open snapshot panel
+- View all changes made to current project
+- Click any snapshot to restore that version
+- Snapshots show action type and timestamp
 
 ### Development with Watch Mode
 
@@ -70,86 +145,133 @@ This will rebuild automatically when you make changes.
 flint/
 ├── src/
 │   ├── background/       # Service worker
-│   ├── content/          # Content scripts
-│   ├── panel/            # Side panel UI
+│   ├── content/          # Content scripts (for web page integration)
+│   ├── panel/            # Side panel UI entry point
 │   ├── components/       # React components
-│   ├── services/         # AI, speech, storage services
-│   ├── state/            # State management
+│   │   ├── UnifiedEditor.tsx      # Main editor component
+│   │   ├── ToolControlsContainer.tsx  # AI tool controls
+│   │   ├── ProjectManager.tsx     # Project management
+│   │   ├── VersionCarousel.tsx    # Version history panel
+│   │   └── ...                    # Other UI components
+│   ├── services/         # Core services
+│   │   ├── ai.ts         # Chrome AI APIs (Summarizer, Rewriter, Writer)
+│   │   ├── speech.ts     # Voice recognition
+│   │   ├── storage.ts    # IndexedDB for projects & snapshots
+│   │   └── messaging.ts  # Extension messaging
+│   ├── state/            # State management (React Context)
 │   ├── utils/            # Utility functions
 │   └── styles/           # CSS and design tokens
+├── docs/
+│   ├── testing/          # Testing guides and checklists
+│   ├── implementation/   # Feature implementation notes
+│   ├── audits/           # Quality and accessibility audits
+│   └── mockups/          # UI prototypes and demos
+├── tests/
+│   └── manual-tests/     # Manual test HTML files
 ├── public/
 │   └── icons/            # Extension icons
 ├── manifest.json         # Extension manifest
 └── vite.config.ts        # Build configuration
 ```
 
+## Documentation
+
+- **[Testing Guide](docs/testing/)** - Testing procedures and checklists
+- **[Implementation Notes](docs/implementation/)** - Feature development documentation
+- **[Audits](docs/audits/)** - Quality assurance and accessibility reports
+- **[Mockups](docs/mockups/)** - UI prototypes and design demos
+- **[Manual Tests](tests/manual-tests/)** - HTML test files for manual testing
+
 ## Tech Stack
 
-- React 18
-- TypeScript (strict mode)
-- Vite
-- Chrome Extension Manifest V3
-- Chrome Built-in AI APIs (Prompt, Summarizer, Rewriter)
-- Web Speech API
+- **Frontend**: React 18 with TypeScript (strict mode)
+- **Build Tool**: Vite for fast development and optimized production builds
+- **Extension**: Chrome Manifest V3 with side panel API
+- **AI**: Chrome Built-in AI APIs (Summarizer, Rewriter, Writer, Prompt)
+- **Storage**: IndexedDB for projects and version snapshots
+- **State**: React Context for global state management
+- **Styling**: CSS with design tokens for consistent theming
 
-## Built-in AI APIs
+## Architecture
 
-Flint uses Chrome's local AI APIs with capability checks:
+### Unified Editor Workflow
 
-**Prompt API**: Text generation and fallback
+Flint uses a single persistent editor that works across all AI tools:
+
+1. **Editor Component**: Shared textarea with selection tracking and cursor indicators
+2. **Tool Controls**: Context-specific options (Generate, Rewrite, Summarize) below editor
+3. **Inline Operations**: AI results replace text directly in the editor
+4. **Automatic Snapshots**: Each AI operation creates a version snapshot
+5. **Version History**: Collapsible panel shows all snapshots for current project
+
+### Chrome Built-in AI APIs
+
+Flint leverages Chrome's local AI with intelligent fallbacks:
+
+**Writer API**: Context-aware text generation
 ```typescript
-const available = await ai.languageModel.availability();
-if (available !== 'no' && navigator.userActivation.isActive) {
-  const session = await ai.languageModel.create();
-  const result = await session.prompt('Your prompt');
-}
-```
-
-**Summarizer API**: Text summarization with options
-```typescript
-const available = await ai.summarizer.availability();
-if (available !== 'no' && navigator.userActivation.isActive) {
-  const summarizer = await ai.summarizer.create({
-    type: 'key-points',
-    format: 'markdown',
-    length: 'medium'
-  });
-  const summary = await summarizer.summarize(text);
-}
+const writer = await Writer.create({
+  tone: 'neutral',
+  format: 'plain-text',
+  length: 'medium',
+  sharedContext: pinnedNotes.join('\n')
+});
+const result = await writer.write(prompt);
 ```
 
 **Rewriter API**: Text transformation with tone control
 ```typescript
-const available = await ai.rewriter.availability();
-if (available !== 'no' && navigator.userActivation.isActive) {
-  const rewriter = await ai.rewriter.create({
-    tone: 'more-formal',
-    format: 'plain-text'
-  });
-  const result = await rewriter.rewrite(text);
-}
+const rewriter = await Rewriter.create({
+  tone: 'more-formal',
+  format: 'plain-text',
+  length: 'as-is'
+});
+const result = await rewriter.rewrite(selectedText);
 ```
 
-All APIs check availability and user activation before use. Falls back to mock providers when unavailable.
+**Summarizer API**: Text summarization with options
+```typescript
+const summarizer = await Summarizer.create({
+  type: 'key-points',
+  format: 'markdown',
+  length: 'medium'
+});
+const summary = await summarizer.summarize(selectedText);
+```
+
+**Prompt API**: Fallback for custom instructions
+```typescript
+const session = await ai.languageModel.create();
+const result = await session.prompt(customPrompt);
+```
+
+All APIs include:
+- Availability checks before use
+- User activation requirements (click/keypress)
+- Graceful fallbacks to mock providers
+- Timeout protection (30 seconds)
 
 ## Permissions
 
 **Required permissions:**
-- `storage` - Persist settings and history locally
-- `scripting` - Inject content scripts for text manipulation
-- `activeTab` - Access current tab for text insertion
-- `sidePanel` - Display side panel UI
-- `audioCapture` - Microphone access for voice recording
+- `storage` - Persist settings, projects, and version snapshots locally
+- `sidePanel` - Display side panel UI for the unified editor
+- `scripting` - Inject content scripts for web page text manipulation (future feature)
+- `activeTab` - Access current tab for text operations (future feature)
 
-**Host permissions:**
-- `<all_urls>` - Enable content script injection on all sites
+**Optional permissions:**
+- `audioCapture` - Microphone access for voice recording (not yet implemented)
 
-**Content scripts:**
-- Dynamically registered via `chrome.scripting.registerContentScripts`
-- Injected at `document_idle` on all pages
-- Handles text selection and insertion
+**Storage:**
+- IndexedDB for projects and version snapshots (unlimited storage)
+- chrome.storage.local for settings and preferences (limited to 10 MB)
+- All data stored locally - nothing sent to external servers
 
-No external network calls except Web Speech API (server-based recognition).
+**Privacy:**
+- No external network calls for AI operations (all local)
+- No user tracking or analytics
+- No accounts or authentication required
+- Web Speech API may use server-based recognition (optional feature)
 
 ## Troubleshooting
 

@@ -48,8 +48,20 @@ describe('GeneratePanel Comprehensive Accessibility Audit', () => {
 
     it('should have no violations with pinned notes', async () => {
       const pinnedNotes = [
-        { id: '1', title: 'Note 1', content: 'Content 1', createdAt: Date.now(), updatedAt: Date.now() },
-        { id: '2', title: 'Note 2', content: 'Content 2', createdAt: Date.now(), updatedAt: Date.now() },
+        {
+          id: '1',
+          title: 'Note 1',
+          content: 'Content 1',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+        {
+          id: '2',
+          title: 'Note 2',
+          content: 'Content 2',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
       ];
 
       const { container } = render(
@@ -130,7 +142,7 @@ describe('GeneratePanel Comprehensive Accessibility Audit', () => {
 
       const input = screen.getByLabelText('Prompt input');
       await user.type(input, 'Test prompt');
-      
+
       // Verify Enter key is handled (component should not throw)
       await user.keyboard('{Enter}');
     });
@@ -228,7 +240,13 @@ describe('GeneratePanel Comprehensive Accessibility Audit', () => {
   describe('Screen Reader Support', () => {
     it('should have proper live regions for dynamic content', () => {
       const pinnedNotes = [
-        { id: '1', title: 'Note 1', content: 'Content 1', createdAt: Date.now(), updatedAt: Date.now() },
+        {
+          id: '1',
+          title: 'Note 1',
+          content: 'Content 1',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
       ];
 
       render(
@@ -245,6 +263,7 @@ describe('GeneratePanel Comprehensive Accessibility Audit', () => {
 
     it('should announce errors with assertive live region', async () => {
       const user = userEvent.setup();
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { AIService } = require('../services/ai');
       AIService.generate.mockRejectedValueOnce(new Error('Test error'));
 

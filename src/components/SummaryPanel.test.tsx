@@ -19,9 +19,7 @@ describe('SummaryPanel Accessibility', () => {
   });
 
   it('should have no accessibility violations with initial text', async () => {
-    const { container } = render(
-      <SummaryPanel initialText="Sample text to summarize" />
-    );
+    const { container } = render(<SummaryPanel initialText="Sample text to summarize" />);
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
@@ -36,9 +34,7 @@ describe('SummaryPanel Accessibility', () => {
         updatedAt: Date.now(),
       },
     ];
-    const { container } = render(
-      <SummaryPanel pinnedNotes={pinnedNotes} />
-    );
+    const { container } = render(<SummaryPanel pinnedNotes={pinnedNotes} />);
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });

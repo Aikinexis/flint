@@ -1,7 +1,7 @@
 /**
  * Background service worker for Flint Chrome extension
  * Handles extension lifecycle, message routing, and content script registration
- * 
+ *
  * @module background/background
  */
 
@@ -93,14 +93,14 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 /**
  * Register content scripts dynamically using chrome.scripting API
  * This allows content scripts to be injected on-demand
- * 
+ *
  * @throws {Error} If registration fails
  */
 async function registerContentScripts(): Promise<void> {
   try {
     // Check if content script is already registered
     const existingScripts = await chrome.scripting.getRegisteredContentScripts({
-      ids: [CONTENT_SCRIPT_ID]
+      ids: [CONTENT_SCRIPT_ID],
     });
 
     if (existingScripts.length > 0) {
@@ -115,8 +115,8 @@ async function registerContentScripts(): Promise<void> {
         js: ['content.js'],
         matches: ['<all_urls>'],
         runAt: 'document_idle',
-        allFrames: false // Keep false - Google Docs selection works in main frame
-      }
+        allFrames: false, // Keep false - Google Docs selection works in main frame
+      },
     ]);
 
     console.log('[Flint Background] Content script registered successfully');
@@ -138,7 +138,7 @@ async function registerContentScripts(): Promise<void> {
 /**
  * Unregister all content scripts
  * Called during extension updates to clean up old registrations
- * 
+ *
  * Errors are logged but not thrown, as unregistration failures
  * are non-critical (e.g., script may not exist on first install)
  */
@@ -146,17 +146,19 @@ async function unregisterContentScripts(): Promise<void> {
   try {
     // First check if any scripts are registered
     const registered = await chrome.scripting.getRegisteredContentScripts({
-      ids: [CONTENT_SCRIPT_ID]
+      ids: [CONTENT_SCRIPT_ID],
     });
 
     // Only unregister if scripts exist
     if (registered.length > 0) {
       await chrome.scripting.unregisterContentScripts({
-        ids: [CONTENT_SCRIPT_ID]
+        ids: [CONTENT_SCRIPT_ID],
       });
       console.log('[Flint Background] Content scripts unregistered successfully');
     } else {
-      console.log('[Flint Background] No content scripts to unregister (expected on first install)');
+      console.log(
+        '[Flint Background] No content scripts to unregister (expected on first install)'
+      );
     }
   } catch (error) {
     // Silently ignore errors - they're expected on first install
@@ -187,7 +189,7 @@ chrome.runtime.onMessage.addListener(
         console.error('[Flint Background] Error handling message:', error);
         sendResponse({
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
         });
       });
 
@@ -251,7 +253,7 @@ async function handleContentScriptMessage(
     default:
       return {
         success: false,
-        error: `Unknown content script message type: ${type}`
+        error: `Unknown content script message type: ${type}`,
       };
   }
 }
@@ -259,7 +261,7 @@ async function handleContentScriptMessage(
 /**
  * Forward a message to the panel
  * Used when content script needs to communicate with the panel
- * 
+ *
  * @param type - Message type to forward
  * @param payload - Optional message payload
  * @returns Response from the panel or error if panel is not available
@@ -275,19 +277,21 @@ async function forwardMessageToPanel(
     const response = await chrome.runtime.sendMessage({
       type,
       payload,
-      source: 'background-relay' // Changed from 'content-script' to prevent duplicate
+      source: 'background-relay', // Changed from 'content-script' to prevent duplicate
     });
 
-    return response || {
-      success: true,
-      data: { message: 'Message forwarded to panel' }
-    };
+    return (
+      response || {
+        success: true,
+        data: { message: 'Message forwarded to panel' },
+      }
+    );
   } catch (error) {
     // Panel not open - this is expected, just return error silently
     if (error instanceof Error && error.message.includes('Receiving end does not exist')) {
       return {
         success: false,
-        error: 'Panel is not open'
+        error: 'Panel is not open',
       };
     }
 
@@ -295,7 +299,7 @@ async function forwardMessageToPanel(
     console.error('[Flint Background] Failed to forward message to panel:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to communicate with panel'
+      error: error instanceof Error ? error.message : 'Failed to communicate with panel',
     };
   }
 }
@@ -305,10 +309,7 @@ async function forwardMessageToPanel(
  * These are typically commands to manipulate text in the active tab
  * Forwards messages to the content script in the active tab
  */
-async function handlePanelMessage(
-  type: MessageType,
-  payload?: unknown
-): Promise<MessageResponse> {
+async function handlePanelMessage(type: MessageType, payload?: unknown): Promise<MessageResponse> {
   // Handle PANEL_OPENED message - forward to content script with saved position
   if (type === 'PANEL_OPENED') {
     console.log('[Flint Background] ✅ Received PANEL_OPENED from panel');
@@ -318,18 +319,19 @@ async function handlePanelMessage(
 
       if (tabs[0]?.id) {
         // Get saved selection position
-        const { 'flint.lastSelectionPoint': lastSelectionPoint } =
-          await chrome.storage.local.get('flint.lastSelectionPoint');
+        const { 'flint.lastSelectionPoint': lastSelectionPoint } = await chrome.storage.local.get(
+          'flint.lastSelectionPoint'
+        );
 
         await chrome.tabs.sendMessage(tabs[0].id, {
           type: 'PANEL_OPENED',
           source: 'panel',
-          payload: { position: lastSelectionPoint }
+          payload: { position: lastSelectionPoint },
         });
         console.log('[Flint Background] ✅ Sent PANEL_OPENED to content script');
         return {
           success: true,
-          data: { message: 'Panel opened notification sent' }
+          data: { message: 'Panel opened notification sent' },
         };
       }
     } catch (error) {
@@ -346,7 +348,10 @@ async function handlePanelMessage(
     // We just acknowledge the message here
     return {
       success: true,
-      data: { message: 'Shortcuts saved. Note: Chrome shortcuts are managed in chrome://extensions/shortcuts' }
+      data: {
+        message:
+          'Shortcuts saved. Note: Chrome shortcuts are managed in chrome://extensions/shortcuts',
+      },
     };
   }
 
@@ -358,7 +363,7 @@ async function handlePanelMessage(
       console.error('[Flint Background] No active tab found');
       return {
         success: false,
-        error: 'No active tab found. Please make sure you have a tab open.'
+        error: 'No active tab found. Please make sure you have a tab open.',
       };
     }
 
@@ -368,20 +373,21 @@ async function handlePanelMessage(
       console.error('[Flint Background] Active tab has no ID');
       return {
         success: false,
-        error: 'Cannot access tab information. Please try again.'
+        error: 'Cannot access tab information. Please try again.',
       };
     }
 
     // Check if the tab URL is accessible (not chrome:// or other restricted URLs)
-    if (activeTab.url && (
-      activeTab.url.startsWith('chrome://') ||
-      activeTab.url.startsWith('chrome-extension://') ||
-      activeTab.url.startsWith('edge://') ||
-      activeTab.url.startsWith('about:')
-    )) {
+    if (
+      activeTab.url &&
+      (activeTab.url.startsWith('chrome://') ||
+        activeTab.url.startsWith('chrome-extension://') ||
+        activeTab.url.startsWith('edge://') ||
+        activeTab.url.startsWith('about:'))
+    ) {
       return {
         success: false,
-        error: 'Cannot access this page. Flint does not work on browser internal pages.'
+        error: 'Cannot access this page. Flint does not work on browser internal pages.',
       };
     }
 
@@ -391,7 +397,7 @@ async function handlePanelMessage(
     console.error('[Flint Background] Error in handlePanelMessage:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to process panel message'
+      error: error instanceof Error ? error.message : 'Failed to process panel message',
     };
   }
 }
@@ -399,7 +405,7 @@ async function handlePanelMessage(
 /**
  * Forward a message to the content script in a specific tab
  * Handles communication errors and provides user-friendly error messages
- * 
+ *
  * @param tabId - ID of the tab containing the content script
  * @param type - Message type to forward
  * @param payload - Optional message payload
@@ -416,7 +422,7 @@ async function forwardMessageToContentScript(
     // Send message to content script
     const response = await chrome.tabs.sendMessage(tabId, {
       type,
-      payload
+      payload,
     });
 
     console.log('[Flint Background] Received response from content script:', response);
@@ -425,7 +431,7 @@ async function forwardMessageToContentScript(
     if (!response || typeof response !== 'object') {
       return {
         success: true,
-        data: response
+        data: response,
       };
     }
 
@@ -439,7 +445,7 @@ async function forwardMessageToContentScript(
       if (error.message.includes('Receiving end does not exist')) {
         return {
           success: false,
-          error: 'Content script not loaded. Please refresh the page and try again.'
+          error: 'Content script not loaded. Please refresh the page and try again.',
         };
       }
 
@@ -447,7 +453,7 @@ async function forwardMessageToContentScript(
       if (error.message.includes('No tab with id')) {
         return {
           success: false,
-          error: 'Tab is no longer available. Please try again in the current tab.'
+          error: 'Tab is no longer available. Please try again in the current tab.',
         };
       }
 
@@ -455,19 +461,19 @@ async function forwardMessageToContentScript(
       if (error.message.includes('Extension context invalidated')) {
         return {
           success: false,
-          error: 'Extension was reloaded. Please refresh the page and try again.'
+          error: 'Extension was reloaded. Please refresh the page and try again.',
         };
       }
 
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
 
     return {
       success: false,
-      error: 'Failed to communicate with page. Please refresh and try again.'
+      error: 'Failed to communicate with page. Please refresh and try again.',
     };
   }
 }
@@ -487,5 +493,3 @@ chrome.runtime.onStartup.addListener(() => {
 self.addEventListener('beforeunload', () => {
   // Service worker suspending - cleanup if needed
 });
-
-

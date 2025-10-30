@@ -51,7 +51,7 @@ export function Settings({
   // Local state for settings
   const [localSettings, setLocalSettings] = useState<SettingsType | null>(null);
   const [pinnedNotes, setPinnedNotes] = useState<PinnedNote[]>([]);
-  
+
   // Dialog state for pinned notes
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
   const [selectedNote, setSelectedNote] = useState<PinnedNote | null>(null);
@@ -82,7 +82,7 @@ export function Settings({
   // Generate panel settings state
   const [generateSettings, setGenerateSettings] = useState<GenerateSettings | null>(null);
   const [lengthErrors, setLengthErrors] = useState<{ short?: string; medium?: string }>({});
-  
+
   // Local input state to allow temporary empty values
   const [shortLengthInput, setShortLengthInput] = useState<string>('');
   const [mediumLengthInput, setMediumLengthInput] = useState<string>('');
@@ -115,7 +115,7 @@ export function Settings({
         // Load generate settings
         const genSettings = await StorageService.getGenerateSettings();
         setGenerateSettings(genSettings);
-        
+
         // Initialize local input state
         setShortLengthInput(genSettings.shortLength.toString());
         setMediumLengthInput(genSettings.mediumLength.toString());
@@ -161,17 +161,14 @@ export function Settings({
   /**
    * Updates a setting and saves to storage
    */
-  const updateSetting = async <K extends keyof SettingsType>(
-    key: K,
-    value: SettingsType[K]
-  ) => {
+  const updateSetting = async <K extends keyof SettingsType>(key: K, value: SettingsType[K]) => {
     const newSettings = { ...settings, [key]: value };
     setLocalSettings(newSettings);
-    
+
     // Save to chrome.storage
     try {
       await chrome.storage.local.set({ settings: newSettings });
-      
+
       // Notify parent if callback provided
       if (onSettingsChange) {
         onSettingsChange(newSettings);
@@ -216,7 +213,7 @@ export function Settings({
     // Update local input state to allow empty values
     setShortLengthInput(value);
     setLengthErrors((prev) => ({ ...prev, short: '' }));
-    
+
     const numValue = parseInt(value);
     if (!isNaN(numValue)) {
       updateGenerateSettings({ shortLength: numValue });
@@ -231,7 +228,7 @@ export function Settings({
   const clampShortLength = (value: string) => {
     const numValue = parseInt(value);
     const clamped = clampLength(numValue);
-    
+
     setShortLengthInput(clamped.toString());
     setShortCharsInput((clamped * 5).toString());
     setLengthErrors((prev) => ({ ...prev, short: '' }));
@@ -244,7 +241,7 @@ export function Settings({
   const updateShortChars = (value: string) => {
     setShortCharsInput(value);
     setLengthErrors((prev) => ({ ...prev, short: '' }));
-    
+
     const numValue = parseInt(value);
     if (!isNaN(numValue)) {
       // Convert chars to words (approximate: 5 chars per word)
@@ -262,7 +259,7 @@ export function Settings({
     const clampedChars = Math.max(25, Math.min(10000, numValue)); // 5 words min, 2000 words max
     const words = Math.round(clampedChars / 5);
     const clamped = clampLength(words);
-    
+
     setShortLengthInput(clamped.toString());
     setShortCharsInput((clamped * 5).toString());
     setLengthErrors((prev) => ({ ...prev, short: '' }));
@@ -276,7 +273,7 @@ export function Settings({
     // Update local input state to allow empty values
     setMediumLengthInput(value);
     setLengthErrors((prev) => ({ ...prev, medium: '' }));
-    
+
     const numValue = parseInt(value);
     if (!isNaN(numValue)) {
       updateGenerateSettings({ mediumLength: numValue });
@@ -291,7 +288,7 @@ export function Settings({
   const clampMediumLength = (value: string) => {
     const numValue = parseInt(value);
     const clamped = clampLength(numValue);
-    
+
     setMediumLengthInput(clamped.toString());
     setMediumCharsInput((clamped * 5).toString());
     setLengthErrors((prev) => ({ ...prev, medium: '' }));
@@ -304,7 +301,7 @@ export function Settings({
   const updateMediumChars = (value: string) => {
     setMediumCharsInput(value);
     setLengthErrors((prev) => ({ ...prev, medium: '' }));
-    
+
     const numValue = parseInt(value);
     if (!isNaN(numValue)) {
       // Convert chars to words (approximate: 5 chars per word)
@@ -322,7 +319,7 @@ export function Settings({
     const clampedChars = Math.max(25, Math.min(10000, numValue)); // 5 words min, 2000 words max
     const words = Math.round(clampedChars / 5);
     const clamped = clampLength(words);
-    
+
     setMediumLengthInput(clamped.toString());
     setMediumCharsInput((clamped * 5).toString());
     setLengthErrors((prev) => ({ ...prev, medium: '' }));
@@ -375,9 +372,7 @@ export function Settings({
       // Update local state
       if (selectedNote) {
         // Edit existing note
-        setPinnedNotes((prev) =>
-          prev.map((n) => (n.id === savedNote.id ? savedNote : n))
-        );
+        setPinnedNotes((prev) => prev.map((n) => (n.id === savedNote.id ? savedNote : n)));
       } else {
         // Add new note
         setPinnedNotes((prev) => [savedNote, ...prev]);
@@ -445,7 +440,13 @@ export function Settings({
       <AIAvailabilityBanner availability={aiAvailability} />
 
       {/* Theme Section */}
-      <section style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-muted)' }}>
+      <section
+        style={{
+          marginBottom: '24px',
+          paddingBottom: '24px',
+          borderBottom: '1px solid var(--border-muted)',
+        }}
+      >
         <button
           onClick={() => toggleSection('appearance')}
           style={{
@@ -496,189 +497,199 @@ export function Settings({
 
         {expandedSections.appearance && (
           <div id="appearance-content">
-
-        {/* Light mode toggle */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '16px',
-          }}
-        >
-          <div style={{ flex: 1 }}>
-            <label
-              htmlFor="light-mode-toggle"
-              style={{
-                display: 'block',
-                fontSize: 'var(--fs-sm)',
-                color: 'var(--text)',
-                fontWeight: 500,
-                marginBottom: '4px',
-              }}
-            >
-              Light mode
-            </label>
-            <p
-              style={{
-                fontSize: 'var(--fs-xs)',
-                color: 'var(--text-muted)',
-                margin: 0,
-              }}
-            >
-              Switch between dark and light themes
-            </p>
-          </div>
-          <label
-            className="flint-toggle"
-            style={{
-              position: 'relative',
-              display: 'inline-block',
-              width: '48px',
-              height: '28px',
-              flexShrink: 0,
-              marginLeft: '16px',
-            }}
-          >
-            <input
-              id="light-mode-toggle"
-              type="checkbox"
-              checked={settings.theme === 'light'}
-              onChange={(e) => {
-                const newTheme = e.target.checked ? 'light' : 'dark';
-                updateSetting('theme', newTheme);
-                // Apply theme immediately
-                if (newTheme === 'light') {
-                  document.documentElement.classList.add('light');
-                } else {
-                  document.documentElement.classList.remove('light');
-                }
-              }}
-              aria-label="Toggle light mode"
-              style={{
-                opacity: 0,
-                width: 0,
-                height: 0,
-              }}
-            />
-            <span
-              style={{
-                position: 'absolute',
-                cursor: 'pointer',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background:
-                  settings.theme === 'light'
-                    ? 'var(--primary)'
-                    : 'var(--surface-2)',
-                transition: '0.2s',
-                borderRadius: '28px',
-                border: '1px solid var(--border)',
-              }}
-            >
-              <span
-                style={{
-                  position: 'absolute',
-                  content: '""',
-                  height: '20px',
-                  width: '20px',
-                  left: settings.theme === 'light' ? '24px' : '4px',
-                  bottom: '3px',
-                  background: 'white',
-                  transition: '0.2s',
-                  borderRadius: '50%',
-                }}
-              />
-            </span>
-          </label>
-        </div>
-
-        {/* Accent hue slider */}
-        <div style={{ marginBottom: '0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-            <label
-              htmlFor="accent-hue"
-              style={{
-                display: 'block',
-                fontSize: 'var(--fs-sm)',
-                color: 'var(--text)',
-                fontWeight: 500,
-              }}
-            >
-              Accent color
-            </label>
-            <button
-              className="flint-btn ghost"
-              onClick={() => {
-                updateSetting('accentHue', 255);
-                // Apply default hue immediately
-                document.documentElement.style.setProperty('--accent-hue', '255');
-              }}
-              style={{
-                height: '28px',
-                padding: '0 12px',
-                fontSize: 'var(--fs-xs)',
-              }}
-            >
-              Reset to Default
-            </button>
-          </div>
-          <p
-            style={{
-              fontSize: 'var(--fs-xs)',
-              color: 'var(--text-muted)',
-              marginBottom: '12px',
-            }}
-          >
-            Adjust the hue to customize your accent color
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <input
-              id="accent-hue"
-              type="range"
-              min="0"
-              max="360"
-              value={settings.accentHue}
-              onChange={(e) => {
-                const newHue = parseInt(e.target.value);
-                updateSetting('accentHue', newHue);
-                // Apply hue immediately by updating CSS variable
-                document.documentElement.style.setProperty('--accent-hue', newHue.toString());
-              }}
-              aria-label="Select accent hue"
-              style={{
-                flex: 1,
-                height: '8px',
-                borderRadius: '4px',
-                background: 'linear-gradient(to right, oklch(60% 0.12 0), oklch(60% 0.12 30), oklch(60% 0.12 60), oklch(60% 0.12 90), oklch(60% 0.12 120), oklch(60% 0.12 150), oklch(60% 0.12 180), oklch(60% 0.12 210), oklch(60% 0.12 240), oklch(60% 0.12 270), oklch(60% 0.12 300), oklch(60% 0.12 330), oklch(60% 0.12 360))',
-                cursor: 'pointer',
-                appearance: 'none',
-                WebkitAppearance: 'none',
-              }}
-            />
+            {/* Light mode toggle */}
             <div
-              role="img"
               style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border)',
-                background: `oklch(60% 0.12 ${settings.accentHue})`,
-                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '16px',
               }}
-              aria-label="Current accent color preview"
-            />
-          </div>
-        </div>
+            >
+              <div style={{ flex: 1 }}>
+                <label
+                  htmlFor="light-mode-toggle"
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--fs-sm)',
+                    color: 'var(--text)',
+                    fontWeight: 500,
+                    marginBottom: '4px',
+                  }}
+                >
+                  Light mode
+                </label>
+                <p
+                  style={{
+                    fontSize: 'var(--fs-xs)',
+                    color: 'var(--text-muted)',
+                    margin: 0,
+                  }}
+                >
+                  Switch between dark and light themes
+                </p>
+              </div>
+              <label
+                className="flint-toggle"
+                style={{
+                  position: 'relative',
+                  display: 'inline-block',
+                  width: '48px',
+                  height: '28px',
+                  flexShrink: 0,
+                  marginLeft: '16px',
+                }}
+              >
+                <input
+                  id="light-mode-toggle"
+                  type="checkbox"
+                  checked={settings.theme === 'light'}
+                  onChange={(e) => {
+                    const newTheme = e.target.checked ? 'light' : 'dark';
+                    updateSetting('theme', newTheme);
+                    // Apply theme immediately
+                    if (newTheme === 'light') {
+                      document.documentElement.classList.add('light');
+                    } else {
+                      document.documentElement.classList.remove('light');
+                    }
+                  }}
+                  aria-label="Toggle light mode"
+                  style={{
+                    opacity: 0,
+                    width: 0,
+                    height: 0,
+                  }}
+                />
+                <span
+                  style={{
+                    position: 'absolute',
+                    cursor: 'pointer',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: settings.theme === 'light' ? 'var(--primary)' : 'var(--surface-2)',
+                    transition: '0.2s',
+                    borderRadius: '28px',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <span
+                    style={{
+                      position: 'absolute',
+                      content: '""',
+                      height: '20px',
+                      width: '20px',
+                      left: settings.theme === 'light' ? '24px' : '4px',
+                      bottom: '3px',
+                      background: 'white',
+                      transition: '0.2s',
+                      borderRadius: '50%',
+                    }}
+                  />
+                </span>
+              </label>
+            </div>
+
+            {/* Accent hue slider */}
+            <div style={{ marginBottom: '0' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '4px',
+                }}
+              >
+                <label
+                  htmlFor="accent-hue"
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--fs-sm)',
+                    color: 'var(--text)',
+                    fontWeight: 500,
+                  }}
+                >
+                  Accent color
+                </label>
+                <button
+                  className="flint-btn ghost"
+                  onClick={() => {
+                    updateSetting('accentHue', 255);
+                    // Apply default hue immediately
+                    document.documentElement.style.setProperty('--accent-hue', '255');
+                  }}
+                  style={{
+                    height: '28px',
+                    padding: '0 12px',
+                    fontSize: 'var(--fs-xs)',
+                  }}
+                >
+                  Reset to Default
+                </button>
+              </div>
+              <p
+                style={{
+                  fontSize: 'var(--fs-xs)',
+                  color: 'var(--text-muted)',
+                  marginBottom: '12px',
+                }}
+              >
+                Adjust the hue to customize your accent color
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <input
+                  id="accent-hue"
+                  type="range"
+                  min="0"
+                  max="360"
+                  value={settings.accentHue}
+                  onChange={(e) => {
+                    const newHue = parseInt(e.target.value);
+                    updateSetting('accentHue', newHue);
+                    // Apply hue immediately by updating CSS variable
+                    document.documentElement.style.setProperty('--accent-hue', newHue.toString());
+                  }}
+                  aria-label="Select accent hue"
+                  style={{
+                    flex: 1,
+                    height: '8px',
+                    borderRadius: '4px',
+                    background:
+                      'linear-gradient(to right, oklch(60% 0.12 0), oklch(60% 0.12 30), oklch(60% 0.12 60), oklch(60% 0.12 90), oklch(60% 0.12 120), oklch(60% 0.12 150), oklch(60% 0.12 180), oklch(60% 0.12 210), oklch(60% 0.12 240), oklch(60% 0.12 270), oklch(60% 0.12 300), oklch(60% 0.12 330), oklch(60% 0.12 360))',
+                    cursor: 'pointer',
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                  }}
+                />
+                <div
+                  role="img"
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border)',
+                    background: `oklch(60% 0.12 ${settings.accentHue})`,
+                    flexShrink: 0,
+                  }}
+                  aria-label="Current accent color preview"
+                />
+              </div>
+            </div>
           </div>
         )}
       </section>
 
       {/* Generate Panel Settings Section */}
       {generateSettings && (
-        <section style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-muted)' }}>
+        <section
+          style={{
+            marginBottom: '24px',
+            paddingBottom: '24px',
+            borderBottom: '1px solid var(--border-muted)',
+          }}
+        >
           <button
             onClick={() => toggleSection('generatePanel')}
             style={{
@@ -729,272 +740,280 @@ export function Settings({
 
           {expandedSections.generatePanel && (
             <div id="generate-panel-content">
+              {/* Short length inputs */}
+              <div style={{ marginBottom: '16px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--fs-sm)',
+                    color: 'var(--text-muted)',
+                    marginBottom: '8px',
+                    fontWeight: 500,
+                  }}
+                >
+                  Short length
+                </label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      id="short-length"
+                      type="number"
+                      className="flint-input"
+                      min="5"
+                      max="2000"
+                      value={shortLengthInput}
+                      onChange={(e) => updateShortLength(e.target.value)}
+                      onBlur={(e) => clampShortLength(e.target.value)}
+                      placeholder="Words"
+                      aria-label="Short length in words"
+                      aria-invalid={!!lengthErrors.short}
+                      style={{
+                        width: '100%',
+                        borderColor: lengthErrors.short ? '#ef4444' : undefined,
+                      }}
+                    />
+                    <p
+                      style={{
+                        fontSize: 'var(--fs-xs)',
+                        color: 'var(--text-muted)',
+                        marginTop: '4px',
+                        marginBottom: 0,
+                      }}
+                    >
+                      words
+                    </p>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      id="short-chars"
+                      type="number"
+                      className="flint-input"
+                      min="25"
+                      max="10000"
+                      value={shortCharsInput}
+                      onChange={(e) => updateShortChars(e.target.value)}
+                      onBlur={(e) => clampShortChars(e.target.value)}
+                      placeholder="Characters"
+                      aria-label="Short length in characters"
+                      style={{
+                        width: '100%',
+                      }}
+                    />
+                    <p
+                      style={{
+                        fontSize: 'var(--fs-xs)',
+                        color: 'var(--text-muted)',
+                        marginTop: '4px',
+                        marginBottom: 0,
+                      }}
+                    >
+                      chars
+                    </p>
+                  </div>
+                </div>
+                {lengthErrors.short && (
+                  <p
+                    id="error-short-length"
+                    style={{
+                      fontSize: 'var(--fs-xs)',
+                      color: '#ef4444',
+                      marginTop: '4px',
+                      marginBottom: 0,
+                    }}
+                  >
+                    {lengthErrors.short}
+                  </p>
+                )}
+              </div>
 
-          {/* Short length inputs */}
-          <div style={{ marginBottom: '16px' }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: 'var(--fs-sm)',
-                color: 'var(--text-muted)',
-                marginBottom: '8px',
-                fontWeight: 500,
-              }}
-            >
-              Short length
-            </label>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <div style={{ flex: 1 }}>
-                <input
-                  id="short-length"
-                  type="number"
-                  className="flint-input"
-                  min="5"
-                  max="2000"
-                  value={shortLengthInput}
-                  onChange={(e) => updateShortLength(e.target.value)}
-                  onBlur={(e) => clampShortLength(e.target.value)}
-                  placeholder="Words"
-                  aria-label="Short length in words"
-                  aria-invalid={!!lengthErrors.short}
+              {/* Medium length inputs */}
+              <div style={{ marginBottom: '16px' }}>
+                <label
                   style={{
-                    width: '100%',
-                    borderColor: lengthErrors.short ? '#ef4444' : undefined,
-                  }}
-                />
-                <p
-                  style={{
-                    fontSize: 'var(--fs-xs)',
+                    display: 'block',
+                    fontSize: 'var(--fs-sm)',
                     color: 'var(--text-muted)',
-                    marginTop: '4px',
-                    marginBottom: 0,
+                    marginBottom: '8px',
+                    fontWeight: 500,
                   }}
                 >
-                  words
-                </p>
+                  Medium length
+                </label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      id="medium-length"
+                      type="number"
+                      className="flint-input"
+                      min="5"
+                      max="2000"
+                      value={mediumLengthInput}
+                      onChange={(e) => updateMediumLength(e.target.value)}
+                      onBlur={(e) => clampMediumLength(e.target.value)}
+                      placeholder="Words"
+                      aria-label="Medium length in words"
+                      aria-invalid={!!lengthErrors.medium}
+                      style={{
+                        width: '100%',
+                        borderColor: lengthErrors.medium ? '#ef4444' : undefined,
+                      }}
+                    />
+                    <p
+                      style={{
+                        fontSize: 'var(--fs-xs)',
+                        color: 'var(--text-muted)',
+                        marginTop: '4px',
+                        marginBottom: 0,
+                      }}
+                    >
+                      words
+                    </p>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      id="medium-chars"
+                      type="number"
+                      className="flint-input"
+                      min="25"
+                      max="10000"
+                      value={mediumCharsInput}
+                      onChange={(e) => updateMediumChars(e.target.value)}
+                      onBlur={(e) => clampMediumChars(e.target.value)}
+                      placeholder="Characters"
+                      aria-label="Medium length in characters"
+                      style={{
+                        width: '100%',
+                      }}
+                    />
+                    <p
+                      style={{
+                        fontSize: 'var(--fs-xs)',
+                        color: 'var(--text-muted)',
+                        marginTop: '4px',
+                        marginBottom: 0,
+                      }}
+                    >
+                      chars
+                    </p>
+                  </div>
+                </div>
+                {lengthErrors.medium && (
+                  <p
+                    id="error-medium-length"
+                    style={{
+                      fontSize: 'var(--fs-xs)',
+                      color: '#ef4444',
+                      marginTop: '4px',
+                      marginBottom: 0,
+                    }}
+                  >
+                    {lengthErrors.medium}
+                  </p>
+                )}
               </div>
-              <div style={{ flex: 1 }}>
-                <input
-                  id="short-chars"
-                  type="number"
-                  className="flint-input"
-                  min="25"
-                  max="10000"
-                  value={shortCharsInput}
-                  onChange={(e) => updateShortChars(e.target.value)}
-                  onBlur={(e) => clampShortChars(e.target.value)}
-                  placeholder="Characters"
-                  aria-label="Short length in characters"
-                  style={{
-                    width: '100%',
-                  }}
-                />
-                <p
-                  style={{
-                    fontSize: 'var(--fs-xs)',
-                    color: 'var(--text-muted)',
-                    marginTop: '4px',
-                    marginBottom: 0,
-                  }}
-                >
-                  chars
-                </p>
-              </div>
-            </div>
-            {lengthErrors.short && (
-              <p
-                id="error-short-length"
-                style={{
-                  fontSize: 'var(--fs-xs)',
-                  color: '#ef4444',
-                  marginTop: '4px',
-                  marginBottom: 0,
-                }}
-              >
-                {lengthErrors.short}
-              </p>
-            )}
-          </div>
 
-          {/* Medium length inputs */}
-          <div style={{ marginBottom: '16px' }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: 'var(--fs-sm)',
-                color: 'var(--text-muted)',
-                marginBottom: '8px',
-                fontWeight: 500,
-              }}
-            >
-              Medium length
-            </label>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <div style={{ flex: 1 }}>
-                <input
-                  id="medium-length"
-                  type="number"
-                  className="flint-input"
-                  min="5"
-                  max="2000"
-                  value={mediumLengthInput}
-                  onChange={(e) => updateMediumLength(e.target.value)}
-                  onBlur={(e) => clampMediumLength(e.target.value)}
-                  placeholder="Words"
-                  aria-label="Medium length in words"
-                  aria-invalid={!!lengthErrors.medium}
+              {/* Context awareness toggle */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <label
+                    htmlFor="context-awareness-toggle"
+                    style={{
+                      display: 'block',
+                      fontSize: 'var(--fs-sm)',
+                      color: 'var(--text)',
+                      fontWeight: 500,
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Context aware
+                  </label>
+                  <p
+                    style={{
+                      fontSize: 'var(--fs-xs)',
+                      color: 'var(--text-muted)',
+                      margin: 0,
+                    }}
+                  >
+                    When enabled, the AI will reference your last prompt to understand follow-up
+                    requests
+                  </p>
+                </div>
+                <label
+                  className="flint-toggle"
                   style={{
-                    width: '100%',
-                    borderColor: lengthErrors.medium ? '#ef4444' : undefined,
-                  }}
-                />
-                <p
-                  style={{
-                    fontSize: 'var(--fs-xs)',
-                    color: 'var(--text-muted)',
-                    marginTop: '4px',
-                    marginBottom: 0,
+                    position: 'relative',
+                    display: 'inline-block',
+                    width: '48px',
+                    height: '28px',
+                    flexShrink: 0,
+                    marginLeft: '16px',
                   }}
                 >
-                  words
-                </p>
+                  <input
+                    id="context-awareness-toggle"
+                    type="checkbox"
+                    checked={generateSettings.contextAwarenessEnabled}
+                    onChange={(e) =>
+                      updateGenerateSettings({ contextAwarenessEnabled: e.target.checked })
+                    }
+                    aria-label="Toggle context awareness"
+                    style={{
+                      opacity: 0,
+                      width: 0,
+                      height: 0,
+                    }}
+                  />
+                  <span
+                    style={{
+                      position: 'absolute',
+                      cursor: 'pointer',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: generateSettings.contextAwarenessEnabled
+                        ? 'var(--primary)'
+                        : 'var(--surface-2)',
+                      transition: '0.2s',
+                      borderRadius: '28px',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute',
+                        content: '""',
+                        height: '20px',
+                        width: '20px',
+                        left: generateSettings.contextAwarenessEnabled ? '24px' : '4px',
+                        bottom: '3px',
+                        background: 'white',
+                        transition: '0.2s',
+                        borderRadius: '50%',
+                      }}
+                    />
+                  </span>
+                </label>
               </div>
-              <div style={{ flex: 1 }}>
-                <input
-                  id="medium-chars"
-                  type="number"
-                  className="flint-input"
-                  min="25"
-                  max="10000"
-                  value={mediumCharsInput}
-                  onChange={(e) => updateMediumChars(e.target.value)}
-                  onBlur={(e) => clampMediumChars(e.target.value)}
-                  placeholder="Characters"
-                  aria-label="Medium length in characters"
-                  style={{
-                    width: '100%',
-                  }}
-                />
-                <p
-                  style={{
-                    fontSize: 'var(--fs-xs)',
-                    color: 'var(--text-muted)',
-                    marginTop: '4px',
-                    marginBottom: 0,
-                  }}
-                >
-                  chars
-                </p>
-              </div>
-            </div>
-            {lengthErrors.medium && (
-              <p
-                id="error-medium-length"
-                style={{
-                  fontSize: 'var(--fs-xs)',
-                  color: '#ef4444',
-                  marginTop: '4px',
-                  marginBottom: 0,
-                }}
-              >
-                {lengthErrors.medium}
-              </p>
-            )}
-          </div>
-
-          {/* Context awareness toggle */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <label
-                htmlFor="context-awareness-toggle"
-                style={{
-                  display: 'block',
-                  fontSize: 'var(--fs-sm)',
-                  color: 'var(--text)',
-                  fontWeight: 500,
-                  marginBottom: '4px',
-                }}
-              >
-                Context aware
-              </label>
-              <p
-                style={{
-                  fontSize: 'var(--fs-xs)',
-                  color: 'var(--text-muted)',
-                  margin: 0,
-                }}
-              >
-                When enabled, the AI will reference your last prompt to understand follow-up requests
-              </p>
-            </div>
-            <label
-              className="flint-toggle"
-              style={{
-                position: 'relative',
-                display: 'inline-block',
-                width: '48px',
-                height: '28px',
-                flexShrink: 0,
-                marginLeft: '16px',
-              }}
-            >
-              <input
-                id="context-awareness-toggle"
-                type="checkbox"
-                checked={generateSettings.contextAwarenessEnabled}
-                onChange={(e) => updateGenerateSettings({ contextAwarenessEnabled: e.target.checked })}
-                aria-label="Toggle context awareness"
-                style={{
-                  opacity: 0,
-                  width: 0,
-                  height: 0,
-                }}
-              />
-              <span
-                style={{
-                  position: 'absolute',
-                  cursor: 'pointer',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: generateSettings.contextAwarenessEnabled
-                    ? 'var(--primary)'
-                    : 'var(--surface-2)',
-                  transition: '0.2s',
-                  borderRadius: '28px',
-                  border: '1px solid var(--border)',
-                }}
-              >
-                <span
-                  style={{
-                    position: 'absolute',
-                    content: '""',
-                    height: '20px',
-                    width: '20px',
-                    left: generateSettings.contextAwarenessEnabled ? '24px' : '4px',
-                    bottom: '3px',
-                    background: 'white',
-                    transition: '0.2s',
-                    borderRadius: '50%',
-                  }}
-                />
-              </span>
-            </label>
-          </div>
             </div>
           )}
         </section>
       )}
 
       {/* Language Section */}
-      <section style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid var(--border-muted)' }}>
+      <section
+        style={{
+          marginBottom: '24px',
+          paddingBottom: '24px',
+          borderBottom: '1px solid var(--border-muted)',
+        }}
+      >
         <button
           onClick={() => toggleSection('voiceRecognition')}
           style={{
@@ -1045,140 +1064,137 @@ export function Settings({
 
         {expandedSections.voiceRecognition && (
           <div id="voice-recognition-content">
-
-        {/* Language selector */}
-        <div style={{ marginBottom: '16px' }}>
-          <label
-            htmlFor="language-select"
-            style={{
-              display: 'block',
-              fontSize: 'var(--fs-sm)',
-              color: 'var(--text-muted)',
-              marginBottom: '8px',
-              fontWeight: 500,
-            }}
-          >
-            Language
-          </label>
-          <select
-            id="language-select"
-            className="flint-input"
-            value={settings.language}
-            onChange={(e) => updateSetting('language', e.target.value)}
-            aria-label="Select speech recognition language"
-            style={{
-              width: '100%',
-              height: '48px',
-              padding: '12px 40px 12px 16px',
-              cursor: 'pointer',
-              appearance: 'none',
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'right 16px center',
-              backgroundSize: '12px',
-            }}
-          >
-            <option value="en-US">English (US)</option>
-            <option value="en-GB">English (UK)</option>
-            <option value="es-ES">Spanish (Spain)</option>
-            <option value="es-MX">Spanish (Mexico)</option>
-            <option value="fr-FR">French</option>
-            <option value="de-DE">German</option>
-            <option value="it-IT">Italian</option>
-            <option value="pt-BR">Portuguese (Brazil)</option>
-            <option value="ja-JP">Japanese</option>
-            <option value="ko-KR">Korean</option>
-            <option value="zh-CN">Chinese (Simplified)</option>
-            <option value="zh-TW">Chinese (Traditional)</option>
-          </select>
-        </div>
-
-        {/* Local-only mode toggle */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{ flex: 1 }}>
-            <label
-              htmlFor="local-only-toggle"
-              style={{
-                display: 'block',
-                fontSize: 'var(--fs-sm)',
-                color: 'var(--text)',
-                fontWeight: 500,
-                marginBottom: '4px',
-              }}
-            >
-              Local-only mode
-            </label>
-            <p
-              style={{
-                fontSize: 'var(--fs-xs)',
-                color: 'var(--text-muted)',
-                margin: 0,
-              }}
-            >
-              Disable network-dependent features
-            </p>
-          </div>
-          <label
-            className="flint-toggle"
-            style={{
-              position: 'relative',
-              display: 'inline-block',
-              width: '48px',
-              height: '28px',
-              flexShrink: 0,
-              marginLeft: '16px',
-            }}
-          >
-            <input
-              id="local-only-toggle"
-              type="checkbox"
-              checked={settings.localOnlyMode}
-              onChange={(e) => updateSetting('localOnlyMode', e.target.checked)}
-              aria-label="Toggle local-only mode"
-              style={{
-                opacity: 0,
-                width: 0,
-                height: 0,
-              }}
-            />
-            <span
-              style={{
-                position: 'absolute',
-                cursor: 'pointer',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: settings.localOnlyMode
-                  ? 'var(--primary)'
-                  : 'var(--surface-2)',
-                transition: '0.2s',
-                borderRadius: '28px',
-                border: '1px solid var(--border)',
-              }}
-            >
-              <span
+            {/* Language selector */}
+            <div style={{ marginBottom: '16px' }}>
+              <label
+                htmlFor="language-select"
                 style={{
-                  position: 'absolute',
-                  content: '""',
-                  height: '20px',
-                  width: '20px',
-                  left: settings.localOnlyMode ? '24px' : '4px',
-                  bottom: '3px',
-                  background: 'white',
-                  transition: '0.2s',
-                  borderRadius: '50%',
+                  display: 'block',
+                  fontSize: 'var(--fs-sm)',
+                  color: 'var(--text-muted)',
+                  marginBottom: '8px',
+                  fontWeight: 500,
                 }}
-              />
-            </span>
-          </label>
-        </div>
+              >
+                Language
+              </label>
+              <select
+                id="language-select"
+                className="flint-input"
+                value={settings.language}
+                onChange={(e) => updateSetting('language', e.target.value)}
+                aria-label="Select speech recognition language"
+                style={{
+                  width: '100%',
+                  height: '48px',
+                  padding: '12px 40px 12px 16px',
+                  cursor: 'pointer',
+                  appearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 16px center',
+                  backgroundSize: '12px',
+                }}
+              >
+                <option value="en-US">English (US)</option>
+                <option value="en-GB">English (UK)</option>
+                <option value="es-ES">Spanish (Spain)</option>
+                <option value="es-MX">Spanish (Mexico)</option>
+                <option value="fr-FR">French</option>
+                <option value="de-DE">German</option>
+                <option value="it-IT">Italian</option>
+                <option value="pt-BR">Portuguese (Brazil)</option>
+                <option value="ja-JP">Japanese</option>
+                <option value="ko-KR">Korean</option>
+                <option value="zh-CN">Chinese (Simplified)</option>
+                <option value="zh-TW">Chinese (Traditional)</option>
+              </select>
+            </div>
+
+            {/* Local-only mode toggle */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <label
+                  htmlFor="local-only-toggle"
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--fs-sm)',
+                    color: 'var(--text)',
+                    fontWeight: 500,
+                    marginBottom: '4px',
+                  }}
+                >
+                  Local-only mode
+                </label>
+                <p
+                  style={{
+                    fontSize: 'var(--fs-xs)',
+                    color: 'var(--text-muted)',
+                    margin: 0,
+                  }}
+                >
+                  Disable network-dependent features
+                </p>
+              </div>
+              <label
+                className="flint-toggle"
+                style={{
+                  position: 'relative',
+                  display: 'inline-block',
+                  width: '48px',
+                  height: '28px',
+                  flexShrink: 0,
+                  marginLeft: '16px',
+                }}
+              >
+                <input
+                  id="local-only-toggle"
+                  type="checkbox"
+                  checked={settings.localOnlyMode}
+                  onChange={(e) => updateSetting('localOnlyMode', e.target.checked)}
+                  aria-label="Toggle local-only mode"
+                  style={{
+                    opacity: 0,
+                    width: 0,
+                    height: 0,
+                  }}
+                />
+                <span
+                  style={{
+                    position: 'absolute',
+                    cursor: 'pointer',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: settings.localOnlyMode ? 'var(--primary)' : 'var(--surface-2)',
+                    transition: '0.2s',
+                    borderRadius: '28px',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <span
+                    style={{
+                      position: 'absolute',
+                      content: '""',
+                      height: '20px',
+                      width: '20px',
+                      left: settings.localOnlyMode ? '24px' : '4px',
+                      bottom: '3px',
+                      background: 'white',
+                      transition: '0.2s',
+                      borderRadius: '50%',
+                    }}
+                  />
+                </span>
+              </label>
+            </div>
           </div>
         )}
       </section>
@@ -1242,31 +1258,39 @@ export function Settings({
         {expandedSections.shortcuts && (
           <div id="shortcuts-content">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
                 <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>Undo</span>
-                <code style={{ 
-                  padding: '4px 12px', 
-                  background: 'var(--surface)', 
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--border-muted)',
-                  fontSize: 'var(--fs-sm)',
-                  fontFamily: 'monospace',
-                  color: 'var(--text)'
-                }}>
+                <code
+                  style={{
+                    padding: '4px 12px',
+                    background: 'var(--surface)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-muted)',
+                    fontSize: 'var(--fs-sm)',
+                    fontFamily: 'monospace',
+                    color: 'var(--text)',
+                  }}
+                >
                   {navigator.platform.includes('Mac') ? '⌘Z' : 'Ctrl+Z'}
                 </code>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
                 <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>Redo</span>
-                <code style={{ 
-                  padding: '4px 12px', 
-                  background: 'var(--surface)', 
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--border-muted)',
-                  fontSize: 'var(--fs-sm)',
-                  fontFamily: 'monospace',
-                  color: 'var(--text)'
-                }}>
+                <code
+                  style={{
+                    padding: '4px 12px',
+                    background: 'var(--surface)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-muted)',
+                    fontSize: 'var(--fs-sm)',
+                    fontFamily: 'monospace',
+                    color: 'var(--text)',
+                  }}
+                >
                   {navigator.platform.includes('Mac') ? '⌘⇧Z' : 'Ctrl+Y'}
                 </code>
               </div>
@@ -1277,12 +1301,13 @@ export function Settings({
 
       {/* Privacy Notice Section */}
       <section
+        className="privacy-notice-section"
         style={{
           marginBottom: '24px',
           paddingBottom: '24px',
           borderBottom: '1px solid var(--border-muted)',
-          background: 'rgba(251, 191, 36, 0.05)',
-          border: '1px solid rgba(251, 191, 36, 0.2)',
+          background: 'var(--warning-bg)',
+          border: '1px solid var(--warning-border)',
           borderRadius: 'var(--radius-md)',
           padding: '16px',
         }}
@@ -1309,7 +1334,7 @@ export function Settings({
             height="20"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#fbbf24"
+            stroke="var(--warning-text)"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -1326,7 +1351,7 @@ export function Settings({
                 style={{
                   fontSize: 'var(--fs-sm)',
                   fontWeight: 600,
-                  color: '#fbbf24',
+                  color: 'var(--warning-text)',
                   margin: 0,
                 }}
               >
@@ -1337,7 +1362,7 @@ export function Settings({
                 height="16"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#fbbf24"
+                stroke="var(--warning-text)"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -1361,10 +1386,9 @@ export function Settings({
                   lineHeight: '1.5',
                 }}
               >
-                Speech recognition uses the Web Speech API, which may send audio to
-                a network-based service for transcription. All AI text processing
-                (summarization and rewriting) happens locally on your device using
-                Chrome&apos;s built-in AI.
+                Speech recognition uses the Web Speech API, which may send audio to a network-based
+                service for transcription. All AI text processing (summarization and rewriting)
+                happens locally on your device using Chrome&apos;s built-in AI.
               </p>
             )}
           </div>
@@ -1943,7 +1967,9 @@ export function Settings({
                   lineHeight: '1.6',
                 }}
               >
-                Are you sure you want to delete <strong style={{ color: 'var(--text)' }}>&quot;{selectedNote.title}&quot;</strong>? This action cannot be undone.
+                Are you sure you want to delete{' '}
+                <strong style={{ color: 'var(--text)' }}>&quot;{selectedNote.title}&quot;</strong>?
+                This action cannot be undone.
               </p>
             </div>
 

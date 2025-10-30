@@ -80,7 +80,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
    * Retry handler - resets error state to attempt re-render
    */
   handleRetry = () => {
-    console.log('[ErrorBoundary] Retrying render after error');
     this.setState({
       hasError: false,
       error: null,

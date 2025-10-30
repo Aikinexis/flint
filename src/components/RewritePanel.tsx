@@ -37,21 +37,19 @@ export interface RewritePanelProps {
   onMiniBarRewrite?: (text: string) => void;
 }
 
-
-
 /**
  * RewritePanel component for text rewriting with presets and custom prompts
  * Provides preset buttons, custom instruction field, and rewrite functionality
  */
-export function RewritePanel({ 
-  initialText = '', 
+export function RewritePanel({
+  initialText = '',
   pinnedNotes = [],
   onMiniBarSummarize,
   onMiniBarRewrite,
 }: RewritePanelProps) {
   // Get app actions (state no longer needed after history removal)
   const { actions } = useAppState();
-  
+
   // Component state
   const [customPrompt, setCustomPrompt] = useState('');
   const [selectedPreset, setSelectedPreset] = useState<string>('');
@@ -61,8 +59,6 @@ export function RewritePanel({
   const [isRecording, setIsRecording] = useState(false);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
 
-
-  
   // Refs
   const promptInputRef = useRef<HTMLInputElement>(null);
   const speechRecognitionRef = useRef<any>(null);
@@ -91,16 +87,18 @@ export function RewritePanel({
     'Poetic',
     'Persuasive',
   ];
-  
+
   // Version carousel state - initialize with empty version
-  const [versions, setVersions] = useState<Version[]>(() => [{
-    id: `original-${Date.now()}`,
-    text: initialText,
-    label: 'Original',
-    isOriginal: true,
-    isLiked: false,
-    timestamp: Date.now(),
-  }]);
+  const [versions, setVersions] = useState<Version[]>(() => [
+    {
+      id: `original-${Date.now()}`,
+      text: initialText,
+      label: 'Original',
+      isOriginal: true,
+      isLiked: false,
+      timestamp: Date.now(),
+    },
+  ]);
   const [currentVersionIndex, setCurrentVersionIndex] = useState(0);
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
@@ -111,18 +109,20 @@ export function RewritePanel({
     if (initialText && initialText !== lastInitialTextRef.current) {
       lastInitialTextRef.current = initialText;
       // Strip timestamp marker if present (format: text\0timestamp)
-      const cleanText = initialText.includes('\0') 
+      const cleanText = initialText.includes('\0')
         ? initialText.substring(0, initialText.lastIndexOf('\0'))
         : initialText;
       // Replace with version containing new text
-      setVersions([{
-        id: `original-${Date.now()}`,
-        text: cleanText,
-        label: 'Original',
-        isOriginal: true,
-        isLiked: false,
-        timestamp: Date.now(),
-      }]);
+      setVersions([
+        {
+          id: `original-${Date.now()}`,
+          text: cleanText,
+          label: 'Original',
+          isOriginal: true,
+          isLiked: false,
+          timestamp: Date.now(),
+        },
+      ]);
       setCurrentVersionIndex(0);
     }
   }, [initialText]);
@@ -136,14 +136,16 @@ export function RewritePanel({
       if (areaName === 'local' && changes['flint.historyClearedAt']) {
         console.log('[RewritePanel] History cleared, resetting versions');
         // Reset versions to empty original version
-        setVersions([{
-          id: `original-${Date.now()}`,
-          text: '',
-          label: 'Original',
-          isOriginal: true,
-          isLiked: false,
-          timestamp: Date.now(),
-        }]);
+        setVersions([
+          {
+            id: `original-${Date.now()}`,
+            text: '',
+            label: 'Original',
+            isOriginal: true,
+            isLiked: false,
+            timestamp: Date.now(),
+          },
+        ]);
         setCurrentVersionIndex(0);
       }
     };
@@ -171,8 +173,6 @@ export function RewritePanel({
     };
   }, [showPresetMenu]);
 
-
-
   /**
    * Handles custom prompt input change
    */
@@ -180,9 +180,13 @@ export function RewritePanel({
     // If there's a preset and user is typing after it
     if (selectedPreset && value.startsWith(selectedPreset)) {
       const afterPreset = value.slice(selectedPreset.length);
-      
+
       // If user is typing right after preset (no space yet), add " - "
-      if (afterPreset.length > 0 && !afterPreset.startsWith(' ') && !afterPreset.startsWith(' - ')) {
+      if (
+        afterPreset.length > 0 &&
+        !afterPreset.startsWith(' ') &&
+        !afterPreset.startsWith(' - ')
+      ) {
         setCustomPrompt(`${selectedPreset} - ${afterPreset}`);
       } else {
         setCustomPrompt(value);
@@ -201,7 +205,7 @@ export function RewritePanel({
    */
   const handlePresetSelect = (preset: string) => {
     setSelectedPreset(preset);
-    
+
     // If there's already custom text after a preset, replace the preset
     if (customPrompt.includes(' - ')) {
       const customPart = customPrompt.split(' - ').slice(1).join(' - ');
@@ -209,9 +213,9 @@ export function RewritePanel({
     } else {
       setCustomPrompt(preset);
     }
-    
+
     setShowPresetMenu(false);
-    
+
     // Focus input after selection
     setTimeout(() => {
       promptInputRef.current?.focus();
@@ -220,8 +224,6 @@ export function RewritePanel({
       promptInputRef.current?.setSelectionRange(length, length);
     }, 0);
   };
-
-
 
   /**
    * Insert text at cursor position in prompt input
@@ -238,10 +240,7 @@ export function RewritePanel({
     const currentText = customPrompt;
 
     // Insert text at cursor position
-    const newText =
-      currentText.substring(0, start) +
-      insertText +
-      currentText.substring(end);
+    const newText = currentText.substring(0, start) + insertText + currentText.substring(end);
     setCustomPrompt(newText);
 
     // Set cursor position after inserted text
@@ -265,8 +264,7 @@ export function RewritePanel({
     } else {
       // Start recording
       const SpeechRecognition =
-        (window as any).SpeechRecognition ||
-        (window as any).webkitSpeechRecognition;
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
       if (!SpeechRecognition) {
         setError('Speech recognition is not supported in this browser');
@@ -316,7 +314,7 @@ export function RewritePanel({
    */
   const handleRewrite = async () => {
     const currentVersion = versions[currentVersionIndex];
-    
+
     // Validate that we have text and either a preset or custom prompt
     if (!currentVersion || !currentVersion.text.trim()) {
       setError('Please enter text to rewrite');
@@ -336,14 +334,15 @@ export function RewritePanel({
     try {
       // Check AI availability before attempting operation
       const availability = await AIService.checkAvailability();
-      const isUsingMock = availability.rewriterAPI === 'unavailable' && availability.promptAPI === 'unavailable';
-      
+      const isUsingMock =
+        availability.rewriterAPI === 'unavailable' && availability.promptAPI === 'unavailable';
+
       if (isUsingMock) {
         setIsMockProvider(true);
       }
 
       // Prepare pinned notes context
-      const pinnedNotesContent = pinnedNotes.map(note => `${note.title}: ${note.content}`);
+      const pinnedNotesContent = pinnedNotes.map((note) => `${note.title}: ${note.content}`);
 
       // Call AI service with timeout
       const rewritePromise = AIService.rewrite(currentVersion.text, {
@@ -375,33 +374,38 @@ export function RewritePanel({
         historyId: historyItemId,
       };
 
-      setVersions(prev => [...prev, newVersion]);
+      setVersions((prev) => [...prev, newVersion]);
       setCurrentVersionIndex(versions.length); // Navigate to new version
     } catch (err) {
       // Handle specific error types with user-friendly messages
       let errorMessage = 'An unexpected error occurred. Please try again.';
-      
+
       if (err instanceof Error) {
         const message = err.message.toLowerCase();
-        
+
         // User activation required error
         if (message.includes('user activation') || message.includes('click the button again')) {
           errorMessage = 'Please click the button again to continue.';
         }
         // AI unavailable error
-        else if (message.includes('not available') || message.includes('chrome 128') || message.includes('gemini nano')) {
+        else if (
+          message.includes('not available') ||
+          message.includes('chrome 128') ||
+          message.includes('gemini nano')
+        ) {
           errorMessage = 'AI features require Chrome 128 or later with Gemini Nano enabled.';
         }
         // Timeout error
         else if (message.includes('timed out') || message.includes('timeout')) {
-          errorMessage = 'Operation timed out after 60 seconds. Try with shorter text or check your connection.';
+          errorMessage =
+            'Operation timed out after 60 seconds. Try with shorter text or check your connection.';
         }
         // Generic error with original message
         else {
           errorMessage = err.message;
         }
       }
-      
+
       setError(errorMessage);
       console.error('[RewritePanel] Rewrite failed:', err);
     } finally {
@@ -430,7 +434,7 @@ export function RewritePanel({
    * Handles version deletion
    */
   const handleDelete = (id: string) => {
-    setVersions(prev => prev.filter(v => v.id !== id));
+    setVersions((prev) => prev.filter((v) => v.id !== id));
   };
 
   /**
@@ -440,12 +444,10 @@ export function RewritePanel({
     // Find the version to get its history ID
     const version = versions.find((v) => v.id === id);
     console.log('[RewritePanel] Toggle like for version:', id, 'historyId:', version?.historyId);
-    
+
     // Update version state
-    setVersions(prev => prev.map(v => 
-      v.id === id ? { ...v, isLiked: !v.isLiked } : v
-    ));
-    
+    setVersions((prev) => prev.map((v) => (v.id === id ? { ...v, isLiked: !v.isLiked } : v)));
+
     // History update removed - now using snapshots instead
   };
 
@@ -453,18 +455,14 @@ export function RewritePanel({
    * Handles version edit
    */
   const handleEdit = (id: string, newText: string) => {
-    setVersions(prev => prev.map(v => 
-      v.id === id ? { ...v, text: newText } : v
-    ));
+    setVersions((prev) => prev.map((v) => (v.id === id ? { ...v, text: newText } : v)));
   };
 
   /**
    * Handles title edit
    */
   const handleEditTitle = (id: string, newTitle: string) => {
-    setVersions(prev => prev.map(v => 
-      v.id === id ? { ...v, title: newTitle } : v
-    ));
+    setVersions((prev) => prev.map((v) => (v.id === id ? { ...v, title: newTitle } : v)));
   };
 
   /**
@@ -473,14 +471,16 @@ export function RewritePanel({
   const handleClearAll = () => {
     // Reset the ref so the same text can be loaded again from minibar
     lastInitialTextRef.current = '';
-    setVersions([{
-      id: `original-${Date.now()}`,
-      text: '',
-      label: 'Original',
-      isOriginal: true,
-      isLiked: false,
-      timestamp: Date.now(),
-    }]);
+    setVersions([
+      {
+        id: `original-${Date.now()}`,
+        text: '',
+        label: 'Original',
+        isOriginal: true,
+        isLiked: false,
+        timestamp: Date.now(),
+      },
+    ]);
     setCurrentVersionIndex(0);
   };
 
@@ -499,12 +499,23 @@ export function RewritePanel({
     setCharCount(chars);
   };
 
-
-
   return (
-    <div ref={scrollContainerRef} className="flint-section flex flex-col h-full" style={{ position: 'relative', overflow: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <h2 className="flint-section-header" style={{ marginBottom: 0 }}>Rewrite text</h2>
+    <div
+      ref={scrollContainerRef}
+      className="flint-section flex flex-col h-full"
+      style={{ position: 'relative', overflow: 'auto' }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px',
+        }}
+      >
+        <h2 className="flint-section-header" style={{ marginBottom: 0 }}>
+          Rewrite text
+        </h2>
         {versions.length > 0 && (
           <div
             style={{
@@ -666,7 +677,6 @@ export function RewritePanel({
           placeholder="Choose a preset or describe how to rewrite..."
           value={customPrompt}
           onChange={(e) => handleCustomPromptChange(e.target.value)}
-
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && customPrompt.trim()) {
               e.preventDefault();
@@ -781,8 +791,8 @@ export function RewritePanel({
 
       {/* Error message with retry option */}
       {error && (
-        <div 
-          style={{ 
+        <div
+          style={{
             marginTop: '16px',
             padding: '12px 16px',
             borderRadius: 'var(--radius-md)',
@@ -794,7 +804,9 @@ export function RewritePanel({
           role="alert"
           aria-live="assertive"
         >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+          <div
+            style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}
+          >
             <svg
               width="16"
               height="16"
@@ -846,8 +858,8 @@ export function RewritePanel({
 
       {/* Mock provider notice */}
       {isMockProvider && !error && (
-        <div 
-          style={{ 
+        <div
+          style={{
             marginTop: '16px',
             padding: '12px 16px',
             borderRadius: 'var(--radius-md)',
@@ -881,8 +893,8 @@ export function RewritePanel({
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, marginBottom: '4px' }}>Using Mock Provider</div>
             <div style={{ opacity: 0.9 }}>
-              AI features require Chrome 128 or later with Gemini Nano enabled. 
-              The result shown is a demonstration using a mock provider.
+              AI features require Chrome 128 or later with Gemini Nano enabled. The result shown is
+              a demonstration using a mock provider.
             </div>
           </div>
         </div>
@@ -890,8 +902,8 @@ export function RewritePanel({
 
       {/* Pinned notes indicator */}
       {pinnedNotes.length > 0 && (
-        <div 
-          style={{ 
+        <div
+          style={{
             marginTop: '16px',
             padding: '8px 12px',
             borderRadius: 'var(--radius-md)',

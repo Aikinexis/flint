@@ -11,7 +11,8 @@ export interface ActionFeedbackProps {
 export function ActionFeedback({ show, action, position }: ActionFeedbackProps) {
   if (!show) return null;
 
-  const isProcessing = action === 'generating' || action === 'rewriting' || action === 'summarizing';
+  const isProcessing =
+    action === 'generating' || action === 'rewriting' || action === 'summarizing';
   const isComplete = action === 'generated' || action === 'rewritten' || action === 'summarized';
 
   const getIcon = () => {
@@ -30,7 +31,7 @@ export function ActionFeedback({ show, action, position }: ActionFeedbackProps) 
         </svg>
       );
     }
-    
+
     return (
       <svg
         width="16"

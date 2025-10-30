@@ -45,9 +45,9 @@ export interface ToolControlsProps {
   /**
    * Reference to UnifiedEditor for showing indicators and getting captured selection
    */
-  editorRef?: React.RefObject<{ 
-    showCursorIndicator: () => void; 
-    hideCursorIndicator: () => void; 
+  editorRef?: React.RefObject<{
+    showCursorIndicator: () => void;
+    hideCursorIndicator: () => void;
     showSelectionOverlay: () => void;
     hideSelectionOverlay: () => void;
     updateCapturedSelection: (start: number, end: number) => void;
@@ -148,7 +148,7 @@ export function ToolControlsContainer({
       try {
         const history = await StorageService.getPromptHistory(4);
         setPromptHistory(history);
-        
+
         const settings = await StorageService.getGenerateSettings();
         setGenerateSettings(settings);
       } catch (error) {
@@ -165,7 +165,11 @@ export function ToolControlsContainer({
       const textarea = editorRef?.current?.getTextarea();
       if (e.target === textarea) {
         lastFocusedElementRef.current = 'editor';
-      } else if (e.target === promptInputRef.current || e.target === customPromptInputRef.current || e.target === summaryPromptInputRef.current) {
+      } else if (
+        e.target === promptInputRef.current ||
+        e.target === customPromptInputRef.current ||
+        e.target === summaryPromptInputRef.current
+      ) {
         lastFocusedElementRef.current = 'prompt';
       }
     };
@@ -180,19 +184,31 @@ export function ToolControlsContainer({
       if (lengthDropdownRef.current && !lengthDropdownRef.current.contains(event.target as Node)) {
         setShowLengthDropdown(false);
       }
-      if (historyDropdownRef.current && !historyDropdownRef.current.contains(event.target as Node)) {
+      if (
+        historyDropdownRef.current &&
+        !historyDropdownRef.current.contains(event.target as Node)
+      ) {
         setShowHistoryDropdown(false);
       }
       if (presetMenuRef.current && !presetMenuRef.current.contains(event.target as Node)) {
         setShowPresetMenu(false);
       }
-      if (readingLevelDropdownRef.current && !readingLevelDropdownRef.current.contains(event.target as Node)) {
+      if (
+        readingLevelDropdownRef.current &&
+        !readingLevelDropdownRef.current.contains(event.target as Node)
+      ) {
         setShowReadingLevelDropdown(false);
       }
-      if (summaryLengthDropdownRef.current && !summaryLengthDropdownRef.current.contains(event.target as Node)) {
+      if (
+        summaryLengthDropdownRef.current &&
+        !summaryLengthDropdownRef.current.contains(event.target as Node)
+      ) {
         setShowSummaryLengthDropdown(false);
       }
-      if (summaryModeDropdownRef.current && !summaryModeDropdownRef.current.contains(event.target as Node)) {
+      if (
+        summaryModeDropdownRef.current &&
+        !summaryModeDropdownRef.current.contains(event.target as Node)
+      ) {
         setShowSummaryModeDropdown(false);
       }
     };
@@ -206,9 +222,12 @@ export function ToolControlsContainer({
    */
   const getLengthLabel = (length: 'short' | 'medium' | 'long'): string => {
     switch (length) {
-      case 'short': return 'Short';
-      case 'medium': return 'Med';
-      case 'long': return 'Long';
+      case 'short':
+        return 'Short';
+      case 'medium':
+        return 'Med';
+      case 'long':
+        return 'Long';
     }
   };
 
@@ -229,20 +248,16 @@ export function ToolControlsContainer({
    */
   const handleGenerate = async () => {
     // Use default intro prompt ONLY if both prompt and editor are empty
-    const effectivePrompt = prompt.trim() || 
-      (content.trim() ? 'Continue writing and extend this content naturally' : 
-       'Introduce Flint, a Chrome extension for AI-powered writing. Explain how it can help users generate, rewrite, and summarize text using Chrome\'s built-in AI. Keep it friendly and concise.');
+    const effectivePrompt =
+      prompt.trim() ||
+      (content.trim()
+        ? 'Continue writing and extend this content naturally'
+        : "Introduce Flint, a Chrome extension for AI-powered writing. Explain how it can help users generate, rewrite, and summarize text using Chrome's built-in AI. Keep it friendly and concise.");
 
-    // Validate captured selection exists (for cursor position)
+    // Get captured selection for cursor position
     const capturedSelection = editorRef?.current?.getCapturedSelection();
-    if (!capturedSelection) {
-      console.warn('[ToolControls] No captured selection, will default to end of content');
-    } else if (capturedSelection.start < 0 || capturedSelection.start > content.length) {
-      console.warn('[ToolControls] Invalid cursor position, will default to end of content');
-    }
 
     // Show cursor indicator BEFORE starting operation
-    console.log('[ToolControls] Showing cursor indicator, editorRef:', editorRef?.current);
     editorRef?.current?.showCursorIndicator();
 
     setIsProcessing(true);
@@ -255,8 +270,8 @@ export function ToolControlsContainer({
         contextAwarenessEnabled: true,
       };
 
-      const pinnedNotesContent = pinnedNotes.map(note => `${note.title}: ${note.content}`);
-      
+      const pinnedNotesContent = pinnedNotes.map((note) => `${note.title}: ${note.content}`);
+
       let lengthHint: number | undefined;
       if (selectedLength === 'short') lengthHint = settings.shortLength;
       else if (selectedLength === 'medium') lengthHint = settings.mediumLength;
@@ -267,20 +282,17 @@ export function ToolControlsContainer({
       if (capturedSelection && settings.contextAwarenessEnabled && content.trim()) {
         const cursorPos = capturedSelection.start;
         const contextLength = 1000; // Characters to include before/after cursor
-        
+
         // Get text before and after cursor
         const textBefore = content.substring(Math.max(0, cursorPos - contextLength), cursorPos);
-        const textAfter = content.substring(cursorPos, Math.min(content.length, cursorPos + contextLength));
-        
+        const textAfter = content.substring(
+          cursorPos,
+          Math.min(content.length, cursorPos + contextLength)
+        );
+
         // Format as: before\nafter (AI service will split on last newline)
         if (textBefore.trim() || textAfter.trim()) {
           surroundingContext = `${textBefore}\n${textAfter}`;
-          console.log('[ToolControls] Passing context to AI:', {
-            cursorPos,
-            beforeLength: textBefore.length,
-            afterLength: textAfter.length,
-            contextPreview: surroundingContext.substring(0, 100) + '...'
-          });
         }
       }
 
@@ -298,7 +310,7 @@ export function ToolControlsContainer({
         const updatedHistory = await StorageService.getPromptHistory(4);
         setPromptHistory(updatedHistory);
       }
-      
+
       setPrompt('');
       setIsPromptFromHistory(false); // Reset flag
       onOperationComplete?.(result, 'generate');
@@ -313,17 +325,11 @@ export function ToolControlsContainer({
   };
 
   /**
-   * Handles rewrite operation
+   * Handles rewrite operation - rewrites selected text with AI
    */
   const handleRewrite = async () => {
-    console.log('[ToolControls] 🔵 REWRITE BUTTON CLICKED');
-    console.log('[ToolControls] customPrompt:', customPrompt);
-    console.log('[ToolControls] editorRef:', editorRef);
-    console.log('[ToolControls] editorRef.current:', editorRef?.current);
-
-    // CRITICAL: Get captured selection from editor ref (not from prop which is cleared)
+    // Get captured selection from editor ref (not from prop which is cleared)
     const capturedSelection = editorRef?.current?.getCapturedSelection();
-    console.log('[ToolControls] 🔵 CAPTURED SELECTION FROM REF:', capturedSelection);
 
     // Validate captured selection exists
     if (!capturedSelection) {
@@ -332,15 +338,20 @@ export function ToolControlsContainer({
     }
 
     // Validate selection range is within bounds
-    if (capturedSelection.start < 0 || capturedSelection.end > content.length || capturedSelection.start > capturedSelection.end) {
+    if (
+      capturedSelection.start < 0 ||
+      capturedSelection.end > content.length ||
+      capturedSelection.start > capturedSelection.end
+    ) {
       onOperationError?.('Selection is no longer valid. Please select text again.');
       return;
     }
 
     // Get selected text using captured selection
-    const textToRewrite = capturedSelection.start !== capturedSelection.end
-      ? content.substring(capturedSelection.start, capturedSelection.end)
-      : content;
+    const textToRewrite =
+      capturedSelection.start !== capturedSelection.end
+        ? content.substring(capturedSelection.start, capturedSelection.end)
+        : content;
 
     console.log('[ToolControls] Text to rewrite:', textToRewrite.substring(0, 50) + '...');
 
@@ -350,7 +361,7 @@ export function ToolControlsContainer({
     }
 
     console.log('[ToolControls] customPrompt value:', customPrompt, 'length:', customPrompt.length);
-    
+
     // Use "Simplify" as default if prompt is empty
     const effectivePrompt = customPrompt.trim() || 'Simplify';
 
@@ -358,13 +369,12 @@ export function ToolControlsContainer({
     onOperationStart?.('rewrite');
 
     try {
-      const pinnedNotesContent = pinnedNotes.map(note => `${note.title}: ${note.content}`);
-      
+      const pinnedNotesContent = pinnedNotes.map((note) => `${note.title}: ${note.content}`);
+
       // Enhance "Simplify" preset to also make text shorter
-      const enhancedPrompt = effectivePrompt === 'Simplify' 
-        ? 'Simplify and make it shorter'
-        : effectivePrompt;
-      
+      const enhancedPrompt =
+        effectivePrompt === 'Simplify' ? 'Simplify and make it shorter' : effectivePrompt;
+
       console.log('[ToolControls] Calling AIService.rewrite...');
       const result = await AIService.rewrite(textToRewrite, {
         customPrompt: enhancedPrompt,
@@ -397,15 +407,20 @@ export function ToolControlsContainer({
     }
 
     // Validate selection range is within bounds
-    if (capturedSelection.start < 0 || capturedSelection.end > content.length || capturedSelection.start > capturedSelection.end) {
+    if (
+      capturedSelection.start < 0 ||
+      capturedSelection.end > content.length ||
+      capturedSelection.start > capturedSelection.end
+    ) {
       onOperationError?.('Selection is no longer valid. Please select text again.');
       return;
     }
 
     // Get selected text using captured selection
-    const textToSummarize = capturedSelection.start !== capturedSelection.end
-      ? content.substring(capturedSelection.start, capturedSelection.end)
-      : content;
+    const textToSummarize =
+      capturedSelection.start !== capturedSelection.end
+        ? content.substring(capturedSelection.start, capturedSelection.end)
+        : content;
 
     if (!textToSummarize.trim()) {
       onOperationError?.('Please select or enter text to summarize');
@@ -416,8 +431,8 @@ export function ToolControlsContainer({
     onOperationStart?.('summarize');
 
     try {
-      const pinnedNotesContent = pinnedNotes.map(note => `${note.title}: ${note.content}`);
-      
+      const pinnedNotesContent = pinnedNotes.map((note) => `${note.title}: ${note.content}`);
+
       const result = await AIService.summarize(textToSummarize, {
         mode,
         readingLevel,
@@ -427,9 +442,9 @@ export function ToolControlsContainer({
 
       // Format markdown bullets to actual bullet points
       // Handle both * and - markdown bullets, with or without space
-      let formattedResult = result
-        .replace(/^\*\s*/gm, '• ')   // * with any amount of space (including none)
-        .replace(/^-\s*/gm, '• ')    // - with any amount of space (including none)
+      const formattedResult = result
+        .replace(/^\*\s*/gm, '• ') // * with any amount of space (including none)
+        .replace(/^-\s*/gm, '• ') // - with any amount of space (including none)
         .replace(/^•\s*\*/gm, '• '); // Remove * after bullet point
 
       onOperationComplete?.(formattedResult, 'summarize');
@@ -446,8 +461,18 @@ export function ToolControlsContainer({
    * Transcribes into editor if it has focus, otherwise into prompt box
    */
   const handleVoiceToggle = (tool: 'generate' | 'rewrite' | 'summarize') => {
-    const isRecording = tool === 'generate' ? isGenerateRecording : tool === 'rewrite' ? isRewriteRecording : isSummarizeRecording;
-    const setIsRecording = tool === 'generate' ? setIsGenerateRecording : tool === 'rewrite' ? setIsRewriteRecording : setIsSummarizeRecording;
+    const isRecording =
+      tool === 'generate'
+        ? isGenerateRecording
+        : tool === 'rewrite'
+          ? isRewriteRecording
+          : isSummarizeRecording;
+    const setIsRecording =
+      tool === 'generate'
+        ? setIsGenerateRecording
+        : tool === 'rewrite'
+          ? setIsRewriteRecording
+          : setIsSummarizeRecording;
 
     if (isRecording) {
       if (speechRecognitionRef.current) {
@@ -455,7 +480,8 @@ export function ToolControlsContainer({
       }
       setIsRecording(false);
     } else {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SpeechRecognition =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
       if (!SpeechRecognition) {
         onOperationError?.('Speech recognition is not supported in this browser');
@@ -474,20 +500,25 @@ export function ToolControlsContainer({
 
       recognition.onresult = (event: any) => {
         let finalTranscript = '';
-        
+
         // Collect all final results
         for (let i = event.resultIndex; i < event.results.length; i++) {
           if (event.results[i].isFinal) {
             const transcript = event.results[i][0].transcript;
-            
+
             // Detect pause (if more than 1 second since last result, add comma)
             const now = Date.now();
             const timeSinceLast = now - lastResultTime;
-            
-            if (accumulatedTranscript && timeSinceLast > 1000 && !accumulatedTranscript.endsWith(',') && !accumulatedTranscript.endsWith('.')) {
+
+            if (
+              accumulatedTranscript &&
+              timeSinceLast > 1000 &&
+              !accumulatedTranscript.endsWith(',') &&
+              !accumulatedTranscript.endsWith('.')
+            ) {
               accumulatedTranscript += ',';
             }
-            
+
             accumulatedTranscript += (accumulatedTranscript ? ' ' : '') + transcript;
             lastResultTime = now;
             finalTranscript = accumulatedTranscript;
@@ -497,34 +528,40 @@ export function ToolControlsContainer({
         if (finalTranscript) {
           // Check current focus dynamically (allows switching during recording)
           const shouldInsertInEditor = lastFocusedElementRef.current === 'editor';
-          
+
           // Smart formatting helper
-          const formatTranscript = (text: string, existingContent: string, cursorPos: number): string => {
+          const formatTranscript = (
+            text: string,
+            existingContent: string,
+            cursorPos: number
+          ): string => {
             let formatted = text.trim();
-            
+
             if (!formatted) return '';
-            
+
             // Ensure sentence ends with period if it doesn't have punctuation
             if (!/[.!?,;:]$/.test(formatted)) {
               formatted += '.';
             }
-            
+
             // Capitalize first letter
             formatted = formatted.charAt(0).toUpperCase() + formatted.slice(1);
-            
+
             // Capitalize after sentence endings within the text
             formatted = formatted.replace(/([.!?]\s+)([a-z])/g, (_match, punct, letter) => {
               return punct + letter.toUpperCase();
             });
-            
+
             // Check if we need leading space
             const charBeforeCursor = existingContent.charAt(cursorPos - 1);
-            const needsLeadingSpace = charBeforeCursor && charBeforeCursor !== ' ' && charBeforeCursor !== '\n';
-            
+            const needsLeadingSpace =
+              charBeforeCursor && charBeforeCursor !== ' ' && charBeforeCursor !== '\n';
+
             // Check if we need trailing space
             const charAfterCursor = existingContent.charAt(cursorPos);
-            const needsTrailingSpace = charAfterCursor && charAfterCursor !== ' ' && charAfterCursor !== '\n';
-            
+            const needsTrailingSpace =
+              charAfterCursor && charAfterCursor !== ' ' && charAfterCursor !== '\n';
+
             return (needsLeadingSpace ? ' ' : '') + formatted + (needsTrailingSpace ? ' ' : '');
           };
 
@@ -532,11 +569,11 @@ export function ToolControlsContainer({
             // Get selection to check if we should replace or insert
             const textarea = editorRef.current.getTextarea();
             const capturedSelection = editorRef.current.getCapturedSelection();
-            
+
             if (textarea && capturedSelection) {
               // Check if there's a selection to replace
               const hasSelection = capturedSelection.start !== capturedSelection.end;
-              
+
               if (hasSelection) {
                 // Replace selection - just capitalize, no extra formatting
                 let formattedText = finalTranscript.trim();
@@ -555,22 +592,29 @@ export function ToolControlsContainer({
           } else {
             // Insert into prompt box (simpler formatting)
             let formattedText = finalTranscript.trim();
-            
+
             // Capitalize first letter
             if (formattedText.length > 0) {
               formattedText = formattedText.charAt(0).toUpperCase() + formattedText.slice(1);
             }
-            
+
             // Check if there's selected text in the prompt input
-            const promptInput = tool === 'generate' ? promptInputRef.current : tool === 'rewrite' ? customPromptInputRef.current : summaryPromptInputRef.current;
-            
+            const promptInput =
+              tool === 'generate'
+                ? promptInputRef.current
+                : tool === 'rewrite'
+                  ? customPromptInputRef.current
+                  : summaryPromptInputRef.current;
+
             if (promptInput && promptInput.selectionStart !== promptInput.selectionEnd) {
               // Replace selected text in prompt box
               const start = promptInput.selectionStart || 0;
               const end = promptInput.selectionEnd || 0;
-              const currentValue = tool === 'generate' ? prompt : tool === 'rewrite' ? customPrompt : summaryPrompt;
-              const newValue = currentValue.substring(0, start) + formattedText + currentValue.substring(end);
-              
+              const currentValue =
+                tool === 'generate' ? prompt : tool === 'rewrite' ? customPrompt : summaryPrompt;
+              const newValue =
+                currentValue.substring(0, start) + formattedText + currentValue.substring(end);
+
               if (tool === 'generate') {
                 setPrompt(newValue);
               } else if (tool === 'rewrite') {
@@ -578,33 +622,36 @@ export function ToolControlsContainer({
               } else {
                 setSummaryPrompt(newValue);
               }
-              
+
               // Set cursor after inserted text
               setTimeout(() => {
                 if (promptInput) {
-                  promptInput.setSelectionRange(start + formattedText.length, start + formattedText.length);
+                  promptInput.setSelectionRange(
+                    start + formattedText.length,
+                    start + formattedText.length
+                  );
                 }
               }, 0);
             } else {
               // Append to prompt box
               if (tool === 'generate') {
-                setPrompt(prev => {
+                setPrompt((prev) => {
                   const needsSpace = prev.length > 0 && !prev.endsWith(' ');
                   return prev + (needsSpace ? ' ' : '') + formattedText;
                 });
               } else if (tool === 'rewrite') {
-                setCustomPrompt(prev => {
+                setCustomPrompt((prev) => {
                   const needsSpace = prev.length > 0 && !prev.endsWith(' ');
                   return prev + (needsSpace ? ' ' : '') + formattedText;
                 });
               } else {
-                setSummaryPrompt(prev => {
+                setSummaryPrompt((prev) => {
                   const needsSpace = prev.length > 0 && !prev.endsWith(' ');
                   return prev + (needsSpace ? ' ' : '') + formattedText;
                 });
               }
             }
-            
+
             // Reset accumulated transcript after insertion
             accumulatedTranscript = '';
           }
@@ -680,7 +727,14 @@ export function ToolControlsContainer({
               zIndex: 10,
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M3 3v5h5" />
               <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
               <path d="M12 7v5l4 2" />
@@ -742,7 +796,14 @@ export function ToolControlsContainer({
                       flexShrink: 0,
                     }}
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill={item.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill={item.pinned ? 'currentColor' : 'none'}
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <circle cx="12" cy="12" r="10" />
                     </svg>
                   </button>
@@ -794,7 +855,14 @@ export function ToolControlsContainer({
                         flexShrink: 0,
                       }}
                     >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />
                       </svg>
@@ -972,7 +1040,7 @@ export function ToolControlsContainer({
                   fill="currentColor"
                   aria-hidden="true"
                 >
-                  <path d="M 26.6875 12.6602 C 26.9687 12.6602 27.1094 12.4961 27.1797 12.2383 C 27.9062 8.3242 27.8594 8.2305 31.9375 7.4570 C 32.2187 7.4102 32.3828 7.2461 32.3828 6.9648 C 32.3828 6.6836 32.2187 6.5195 31.9375 6.4726 C 27.8828 5.6524 28.0000 5.5586 27.1797 1.6914 C 27.1094 1.4336 26.9687 1.2695 26.6875 1.2695 C 26.4062 1.2695 26.2656 1.4336 26.1953 1.6914 C 25.3750 5.5586 25.5156 5.6524 21.4375 6.4726 C 21.1797 6.5195 20.9922 6.6836 20.9922 6.9648 C 20.9922 7.2461 21.1797 7.4102 21.4375 7.4570 C 25.5156 8.2774 25.4687 8.3242 26.1953 12.2383 C 26.2656 12.4961 26.4062 12.6602 26.6875 12.6602 Z M 15.3438 28.7852 C 15.7891 28.7852 16.0938 28.5039 16.1406 28.0821 C 16.9844 21.8242 17.1953 21.8242 23.6641 20.5821 C 24.0860 20.5117 24.3906 20.2305 24.3906 19.7852 C 24.3906 19.3633 24.0860 19.0586 23.6641 18.9883 C 17.1953 18.0977 16.9609 17.8867 16.1406 11.5117 C 16.0938 11.0899 15.7891 10.7852 15.3438 10.7852 C 14.9219 10.7852 14.6172 11.0899 14.5703 11.5352 C 13.7969 17.8164 13.4687 17.7930 7.0469 18.9883 C 6.6250 19.0821 6.3203 19.3633 6.3203 19.7852 C 6.3203 20.2539 6.6250 20.5117 7.1406 20.5821 C 13.5156 21.6133 13.7969 21.7774 14.5703 28.0352 C 14.6172 28.5039 14.9219 28.7852 15.3438 28.7852 Z M 31.2344 54.7305 C 31.8438 54.7305 32.2891 54.2852 32.4062 53.6524 C 34.0703 40.8086 35.8750 38.8633 48.5781 37.4570 C 49.2344 37.3867 49.6797 36.8945 49.6797 36.2852 C 49.6797 35.6758 49.2344 35.2070 48.5781 35.1133 C 35.8750 33.7070 34.0703 31.7617 32.4062 18.9180 C 32.2891 18.2852 31.8438 17.8633 31.2344 17.8633 C 30.6250 17.8633 30.1797 18.2852 30.0860 18.9180 C 28.4219 31.7617 26.5938 33.7070 13.9140 35.1133 C 13.2344 35.2070 12.7891 35.6758 12.7891 36.2852 C 12.7891 36.8945 13.2344 37.3867 13.9140 37.4570 C 26.5703 39.1211 28.3281 40.8321 30.0860 53.6524 C 30.1797 54.2852 30.6250 54.7305 31.2344 54.7305 Z"/>
+                  <path d="M 26.6875 12.6602 C 26.9687 12.6602 27.1094 12.4961 27.1797 12.2383 C 27.9062 8.3242 27.8594 8.2305 31.9375 7.4570 C 32.2187 7.4102 32.3828 7.2461 32.3828 6.9648 C 32.3828 6.6836 32.2187 6.5195 31.9375 6.4726 C 27.8828 5.6524 28.0000 5.5586 27.1797 1.6914 C 27.1094 1.4336 26.9687 1.2695 26.6875 1.2695 C 26.4062 1.2695 26.2656 1.4336 26.1953 1.6914 C 25.3750 5.5586 25.5156 5.6524 21.4375 6.4726 C 21.1797 6.5195 20.9922 6.6836 20.9922 6.9648 C 20.9922 7.2461 21.1797 7.4102 21.4375 7.4570 C 25.5156 8.2774 25.4687 8.3242 26.1953 12.2383 C 26.2656 12.4961 26.4062 12.6602 26.6875 12.6602 Z M 15.3438 28.7852 C 15.7891 28.7852 16.0938 28.5039 16.1406 28.0821 C 16.9844 21.8242 17.1953 21.8242 23.6641 20.5821 C 24.0860 20.5117 24.3906 20.2305 24.3906 19.7852 C 24.3906 19.3633 24.0860 19.0586 23.6641 18.9883 C 17.1953 18.0977 16.9609 17.8867 16.1406 11.5117 C 16.0938 11.0899 15.7891 10.7852 15.3438 10.7852 C 14.9219 10.7852 14.6172 11.0899 14.5703 11.5352 C 13.7969 17.8164 13.4687 17.7930 7.0469 18.9883 C 6.6250 19.0821 6.3203 19.3633 6.3203 19.7852 C 6.3203 20.2539 6.6250 20.5117 7.1406 20.5821 C 13.5156 21.6133 13.7969 21.7774 14.5703 28.0352 C 14.6172 28.5039 14.9219 28.7852 15.3438 28.7852 Z M 31.2344 54.7305 C 31.8438 54.7305 32.2891 54.2852 32.4062 53.6524 C 34.0703 40.8086 35.8750 38.8633 48.5781 37.4570 C 49.2344 37.3867 49.6797 36.8945 49.6797 36.2852 C 49.6797 35.6758 49.2344 35.2070 48.5781 35.1133 C 35.8750 33.7070 34.0703 31.7617 32.4062 18.9180 C 32.2891 18.2852 31.8438 17.8633 31.2344 17.8633 C 30.6250 17.8633 30.1797 18.2852 30.0860 18.9180 C 28.4219 31.7617 26.5938 33.7070 13.9140 35.1133 C 13.2344 35.2070 12.7891 35.6758 12.7891 36.2852 C 12.7891 36.8945 13.2344 37.3867 13.9140 37.4570 C 26.5703 39.1211 28.3281 40.8321 30.0860 53.6524 C 30.1797 54.2852 30.6250 54.7305 31.2344 54.7305 Z" />
                 </svg>
               )}
             </button>
@@ -1060,8 +1128,12 @@ export function ToolControlsContainer({
                     color: 'var(--text)',
                     textAlign: 'left',
                     cursor: 'pointer',
-                    borderRadius: index === 0 ? 'var(--radius-md) var(--radius-md) 0 0' : 
-                                 index === presets.length - 1 ? '0 0 var(--radius-md) var(--radius-md)' : '0',
+                    borderRadius:
+                      index === 0
+                        ? 'var(--radius-md) var(--radius-md) 0 0'
+                        : index === presets.length - 1
+                          ? '0 0 var(--radius-md) var(--radius-md)'
+                          : '0',
                   }}
                 >
                   {preset}
@@ -1074,7 +1146,7 @@ export function ToolControlsContainer({
             ref={customPromptInputRef}
             type="text"
             className="flint-input"
-            placeholder="Choose a preset or describe how to rewrite..."
+            placeholder="Rewrite"
             value={customPrompt}
             onChange={(e) => setCustomPrompt(e.target.value)}
             onKeyDown={(e) => {
@@ -1192,12 +1264,21 @@ export function ToolControlsContainer({
       {activeTool === 'summarize' && (
         <div>
           {/* Top row: Summary Type and Reading Level dropdowns */}
-          <div style={{ marginBottom: '12px', display: 'flex', gap: '12px', justifyContent: 'flex-start' }}>
+          <div
+            style={{
+              marginBottom: '12px',
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-start',
+            }}
+          >
             {/* Summary Type dropdown */}
             <div style={{ position: 'relative', flex: 1 }}>
               <button
                 className="flint-btn ghost"
-                onClick={() => !isProcessing && setShowSummaryModeDropdown(!showSummaryModeDropdown)}
+                onClick={() =>
+                  !isProcessing && setShowSummaryModeDropdown(!showSummaryModeDropdown)
+                }
                 disabled={isProcessing}
                 aria-label={`Summary type: ${mode}`}
                 aria-expanded={showSummaryModeDropdown}
@@ -1218,11 +1299,18 @@ export function ToolControlsContainer({
                 }}
               >
                 <span>{mode}</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
               </button>
-              
+
               {showSummaryModeDropdown && (
                 <div
                   ref={summaryModeDropdownRef}
@@ -1256,8 +1344,12 @@ export function ToolControlsContainer({
                         cursor: 'pointer',
                         fontSize: 'var(--fs-sm)',
                         textTransform: 'capitalize',
-                        borderRadius: index === 0 ? 'var(--radius-md) var(--radius-md) 0 0' : 
-                                     index === arr.length - 1 ? '0 0 var(--radius-md) var(--radius-md)' : '0',
+                        borderRadius:
+                          index === 0
+                            ? 'var(--radius-md) var(--radius-md) 0 0'
+                            : index === arr.length - 1
+                              ? '0 0 var(--radius-md) var(--radius-md)'
+                              : '0',
                       }}
                     >
                       {modeOption}
@@ -1271,7 +1363,9 @@ export function ToolControlsContainer({
             <div style={{ position: 'relative', flex: 1 }}>
               <button
                 className="flint-btn ghost"
-                onClick={() => !isProcessing && setShowReadingLevelDropdown(!showReadingLevelDropdown)}
+                onClick={() =>
+                  !isProcessing && setShowReadingLevelDropdown(!showReadingLevelDropdown)
+                }
                 disabled={isProcessing}
                 aria-label={`Reading level: ${readingLevel}`}
                 aria-expanded={showReadingLevelDropdown}
@@ -1292,11 +1386,18 @@ export function ToolControlsContainer({
                 }}
               >
                 <span>{readingLevel}</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
               </button>
-              
+
               {showReadingLevelDropdown && (
                 <div
                   ref={readingLevelDropdownRef}
@@ -1313,30 +1414,36 @@ export function ToolControlsContainer({
                     zIndex: 10000,
                   }}
                 >
-                  {(['simple', 'moderate', 'detailed', 'complex'] as ReadingLevel[]).map((level, index, arr) => (
-                    <button
-                      key={level}
-                      onClick={() => {
-                        setReadingLevel(level);
-                        setShowReadingLevelDropdown(false);
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: 'none',
-                        background: readingLevel === level ? 'var(--surface-2)' : 'transparent',
-                        color: 'var(--text)',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        fontSize: 'var(--fs-sm)',
-                        textTransform: 'capitalize',
-                        borderRadius: index === 0 ? 'var(--radius-md) var(--radius-md) 0 0' : 
-                                     index === arr.length - 1 ? '0 0 var(--radius-md) var(--radius-md)' : '0',
-                      }}
-                    >
-                      {level}
-                    </button>
-                  ))}
+                  {(['simple', 'moderate', 'detailed', 'complex'] as ReadingLevel[]).map(
+                    (level, index, arr) => (
+                      <button
+                        key={level}
+                        onClick={() => {
+                          setReadingLevel(level);
+                          setShowReadingLevelDropdown(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: 'none',
+                          background: readingLevel === level ? 'var(--surface-2)' : 'transparent',
+                          color: 'var(--text)',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          fontSize: 'var(--fs-sm)',
+                          textTransform: 'capitalize',
+                          borderRadius:
+                            index === 0
+                              ? 'var(--radius-md) var(--radius-md) 0 0'
+                              : index === arr.length - 1
+                                ? '0 0 var(--radius-md) var(--radius-md)'
+                                : '0',
+                        }}
+                      >
+                        {level}
+                      </button>
+                    )
+                  )}
                 </div>
               )}
             </div>
@@ -1364,7 +1471,7 @@ export function ToolControlsContainer({
                 padding: '0 180px 0 12px',
               }}
             />
-            
+
             {/* Inline buttons */}
             <div
               style={{
@@ -1379,7 +1486,9 @@ export function ToolControlsContainer({
               {/* Length dropdown */}
               <button
                 className="flint-btn ghost"
-                onClick={() => !isProcessing && setShowSummaryLengthDropdown(!showSummaryLengthDropdown)}
+                onClick={() =>
+                  !isProcessing && setShowSummaryLengthDropdown(!showSummaryLengthDropdown)
+                }
                 disabled={isProcessing}
                 aria-label={`Length: ${summaryLength}`}
                 aria-expanded={showSummaryLengthDropdown}
@@ -1403,7 +1512,7 @@ export function ToolControlsContainer({
               >
                 {summaryLength}
               </button>
-              
+
               {showSummaryLengthDropdown && (
                 <div
                   ref={summaryLengthDropdownRef}
@@ -1437,8 +1546,12 @@ export function ToolControlsContainer({
                         cursor: 'pointer',
                         fontSize: 'var(--fs-sm)',
                         textTransform: 'capitalize',
-                        borderRadius: index === 0 ? 'var(--radius-md) var(--radius-md) 0 0' : 
-                                     index === arr.length - 1 ? '0 0 var(--radius-md) var(--radius-md)' : '0',
+                        borderRadius:
+                          index === 0
+                            ? 'var(--radius-md) var(--radius-md) 0 0'
+                            : index === arr.length - 1
+                              ? '0 0 var(--radius-md) var(--radius-md)'
+                              : '0',
                       }}
                     >
                       {length}
@@ -1549,7 +1662,14 @@ export function ToolControlsContainer({
             gap: '6px',
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M12 17V3" />
             <path d="m6 11 6 6 6-6" />
             <path d="M19 21H5" />

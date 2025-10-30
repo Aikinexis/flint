@@ -281,9 +281,7 @@ export function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         pinnedNotes: state.pinnedNotes.map((note) =>
-          note.id === id
-            ? { ...note, ...updates, updatedAt: Date.now() }
-            : note
+          note.id === id ? { ...note, ...updates, updatedAt: Date.now() } : note
         ),
       };
     }

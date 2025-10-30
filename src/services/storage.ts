@@ -582,8 +582,6 @@ export class StorageService extends StorageServiceBase {
           for (let i = 0; i < toDelete && i < sorted.length; i++) {
             await IndexedDBHelper.delete(HISTORY_STORE, sorted[i]!.id);
           }
-
-          console.warn(`[Storage] Cleaned up ${toDelete} old history items due to storage limit`);
         }
       }
     } catch (error) {
@@ -624,21 +622,20 @@ export class StorageService extends StorageServiceBase {
     try {
       // Get current items before adding new one
       const allItems = await IndexedDBHelper.getAll<PromptHistoryItem>(PROMPT_HISTORY_STORE);
-      
+
       // Check if we need to make room (max 4 items in recent history)
       // If all 4 slots are pinned, don't save the new prompt
       const pinnedCount = allItems.filter((item) => item.pinned).length;
       if (allItems.length >= 4 && pinnedCount >= 4) {
-        console.log('[Storage] All 4 slots are pinned, not saving new prompt');
         return;
       }
-      
+
       // If we have 4 items and at least one is unpinned, delete the oldest unpinned
       if (allItems.length >= 4) {
         const unpinnedItems = allItems
           .filter((item) => !item.pinned)
           .sort((a, b) => a.timestamp - b.timestamp);
-        
+
         if (unpinnedItems.length > 0) {
           await IndexedDBHelper.delete(PROMPT_HISTORY_STORE, unpinnedItems[0]!.id);
         }
@@ -667,7 +664,6 @@ export class StorageService extends StorageServiceBase {
     try {
       const item = await IndexedDBHelper.get<PromptHistoryItem>(PROMPT_HISTORY_STORE, id);
       if (!item) {
-        console.warn('[Storage] Prompt history item not found:', id);
         return;
       }
 
@@ -705,18 +701,12 @@ export class StorageService extends StorageServiceBase {
     try {
       const items = await IndexedDBHelper.getAll<PromptHistoryItem>(PROMPT_HISTORY_STORE);
       const cutoffTime = Date.now() - THIRTY_DAYS_MS;
-      
+
       // Only delete unpinned items older than 30 days
-      const oldUnpinnedItems = items.filter(
-        (item) => !item.pinned && item.timestamp < cutoffTime
-      );
+      const oldUnpinnedItems = items.filter((item) => !item.pinned && item.timestamp < cutoffTime);
 
       for (const item of oldUnpinnedItems) {
         await IndexedDBHelper.delete(PROMPT_HISTORY_STORE, item.id);
-      }
-
-      if (oldUnpinnedItems.length > 0) {
-        console.log(`[Storage] Cleaned up ${oldUnpinnedItems.length} old prompts`);
       }
 
       return oldUnpinnedItems.length;
@@ -838,7 +828,6 @@ export class StorageService extends StorageServiceBase {
     try {
       const existingProject = await IndexedDBHelper.get<Project>(PROJECTS_STORE, id);
       if (!existingProject) {
-        console.warn('[Storage] Project not found for update:', id);
         return undefined;
       }
 
@@ -976,10 +965,13 @@ export class StorageService extends StorageServiceBase {
    * @param limit - Maximum number of snapshots to keep (default: 50)
    * @returns Promise resolving to number of snapshots deleted
    */
-  static async deleteOldSnapshots(projectId: string, limit: number = MAX_SNAPSHOTS_PER_PROJECT): Promise<number> {
+  static async deleteOldSnapshots(
+    projectId: string,
+    limit: number = MAX_SNAPSHOTS_PER_PROJECT
+  ): Promise<number> {
     try {
       const snapshots = await this.getSnapshots(projectId);
-      
+
       // If we're under the limit, no need to delete anything
       if (snapshots.length <= limit) {
         return 0;
@@ -987,13 +979,9 @@ export class StorageService extends StorageServiceBase {
 
       // Delete the oldest snapshots (those beyond the limit)
       const snapshotsToDelete = snapshots.slice(limit);
-      
+
       for (const snapshot of snapshotsToDelete) {
         await IndexedDBHelper.delete(SNAPSHOTS_STORE, snapshot.id);
-      }
-
-      if (snapshotsToDelete.length > 0) {
-        console.log(`[Storage] Deleted ${snapshotsToDelete.length} old snapshots for project ${projectId}`);
       }
 
       return snapshotsToDelete.length;
@@ -1023,7 +1011,10 @@ export class StorageService extends StorageServiceBase {
    * @param updates - Partial snapshot data to update
    * @returns Promise resolving to updated snapshot or undefined
    */
-  static async updateSnapshot(id: string, updates: Partial<Snapshot>): Promise<Snapshot | undefined> {
+  static async updateSnapshot(
+    id: string,
+    updates: Partial<Snapshot>
+  ): Promise<Snapshot | undefined> {
     try {
       const snapshot = await this.getSnapshot(id);
       if (!snapshot) {
@@ -1057,7 +1048,6 @@ export class StorageService extends StorageServiceBase {
       for (const snapshot of snapshots) {
         await IndexedDBHelper.delete(SNAPSHOTS_STORE, snapshot.id);
       }
-      console.log(`[Storage] Deleted all snapshots for project ${projectId}`);
     } catch (error) {
       console.error('[Storage] Failed to delete project snapshots:', error);
       throw error;
@@ -1090,21 +1080,17 @@ export class StorageService extends StorageServiceBase {
       // Check if migration has already been completed
       const settings = await this.getSettings();
       if (settings.historyMigrated) {
-        console.log('[Storage] History migration already completed');
         return { success: true, migratedCount: 0 };
       }
 
       // Get all existing history items
       const historyItems = await this.getHistory();
-      
+
       if (historyItems.length === 0) {
-        console.log('[Storage] No history items to migrate');
         // Mark migration as complete even if there's nothing to migrate
         await this.updateSettings({ historyMigrated: true });
         return { success: true, migratedCount: 0 };
       }
-
-      console.log(`[Storage] Starting migration of ${historyItems.length} history items`);
 
       // Create a default project for migrated history
       const defaultProject = await this.createProject(
@@ -1112,15 +1098,13 @@ export class StorageService extends StorageServiceBase {
         'This project contains your previous history items converted to snapshots.'
       );
 
-      console.log(`[Storage] Created default project: ${defaultProject.id}`);
-
       // Convert each history item to a snapshot
       let migratedCount = 0;
       for (const item of historyItems) {
         try {
           // Generate action description based on history item metadata
           let actionDescription = '';
-          
+
           switch (item.type) {
             case 'generate':
               actionDescription = 'Generated text';
@@ -1160,8 +1144,6 @@ export class StorageService extends StorageServiceBase {
         }
       }
 
-      console.log(`[Storage] Successfully migrated ${migratedCount} history items`);
-
       // Mark migration as complete
       await this.updateSettings({ historyMigrated: true });
 
@@ -1188,25 +1170,16 @@ export class StorageService extends StorageServiceBase {
   static async checkAndMigrateHistory(): Promise<void> {
     try {
       const settings = await this.getSettings();
-      
+
       // Skip if already migrated
       if (settings.historyMigrated) {
         return;
       }
 
-      console.log('[Storage] Checking for history migration...');
-      const result = await this.migrateHistoryToSnapshots();
-      
-      if (result.success && result.migratedCount > 0) {
-        console.log(
-          `[Storage] Migration complete: ${result.migratedCount} items migrated to project ${result.projectId}`
-        );
-      }
+      await this.migrateHistoryToSnapshots();
     } catch (error) {
       console.error('[Storage] Failed to check and migrate history:', error);
       // Don't throw - allow app to continue even if migration fails
     }
   }
 }
-
-

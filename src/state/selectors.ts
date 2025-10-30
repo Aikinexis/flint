@@ -98,7 +98,6 @@ export const selectLocalOnlyMode = (state: AppState) => state.settings.localOnly
  * @returns Keyboard shortcuts configuration
  */
 
-
 /**
  * Selects all pinned notes
  * @param state - Application state
@@ -181,9 +180,7 @@ export const selectPinnedNotesContext = memoize((state: AppState): string => {
     return '';
   }
 
-  return state.pinnedNotes
-    .map((note) => `${note.title}:\n${note.content}`)
-    .join('\n\n');
+  return state.pinnedNotes.map((note) => `${note.title}:\n${note.content}`).join('\n\n');
 });
 
 /**

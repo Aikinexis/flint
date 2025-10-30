@@ -1,9 +1,9 @@
 /**
  * Caret Handler Module
- * 
+ *
  * Manages caret position detection and text insertion/replacement
  * in editable fields (textarea and contenteditable elements).
- * 
+ *
  * @module content/caret
  */
 
@@ -98,19 +98,21 @@ class CaretHandlerImpl implements CaretHandler {
       }
 
       // Handle textarea and input elements
-      if (activeElement instanceof HTMLTextAreaElement || 
-          activeElement instanceof HTMLInputElement) {
+      if (
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLInputElement
+      ) {
         const offset = activeElement.selectionStart ?? 0;
         return {
           element: activeElement,
-          offset: offset
+          offset: offset,
         };
       }
 
       // Handle contenteditable elements
       if (this.isContentEditable(activeElement)) {
         const selection = window.getSelection();
-        
+
         if (!selection || selection.rangeCount === 0) {
           return null;
         }
@@ -120,7 +122,7 @@ class CaretHandlerImpl implements CaretHandler {
 
         return {
           element: activeElement,
-          offset: offset
+          offset: offset,
         };
       }
 
@@ -144,8 +146,10 @@ class CaretHandlerImpl implements CaretHandler {
       }
 
       // Handle textarea and input elements
-      if (activeElement instanceof HTMLTextAreaElement || 
-          activeElement instanceof HTMLInputElement) {
+      if (
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLInputElement
+      ) {
         const fullText = activeElement.value;
         const cursorPosition = activeElement.selectionStart ?? 0;
 
@@ -161,7 +165,7 @@ class CaretHandlerImpl implements CaretHandler {
           before,
           after,
           fullText,
-          cursorPosition
+          cursorPosition,
         };
       }
 
@@ -169,13 +173,17 @@ class CaretHandlerImpl implements CaretHandler {
       if (this.isContentEditable(activeElement)) {
         const fullText = activeElement.textContent || '';
         const selection = window.getSelection();
-        
+
         if (!selection || selection.rangeCount === 0) {
           return null;
         }
 
         const range = selection.getRangeAt(0);
-        const cursorPosition = this.getTextOffsetInElement(activeElement, range.startContainer, range.startOffset);
+        const cursorPosition = this.getTextOffsetInElement(
+          activeElement,
+          range.startContainer,
+          range.startOffset
+        );
 
         // Get text before cursor (limited by maxContextLength)
         const beforeStart = Math.max(0, cursorPosition - maxContextLength);
@@ -189,7 +197,7 @@ class CaretHandlerImpl implements CaretHandler {
           before,
           after,
           fullText,
-          cursorPosition
+          cursorPosition,
         };
       }
 
@@ -228,8 +236,10 @@ class CaretHandlerImpl implements CaretHandler {
       }
 
       // Handle textarea and input elements
-      if (activeElement instanceof HTMLTextAreaElement || 
-          activeElement instanceof HTMLInputElement) {
+      if (
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLInputElement
+      ) {
         const success = this.insertInTextarea(activeElement, text);
         if (success) {
           return { success: true, usedClipboard: false };
@@ -244,16 +254,24 @@ class CaretHandlerImpl implements CaretHandler {
         if (success) {
           return { success: true, usedClipboard: false };
         }
-        console.warn('[Flint] Direct insertion failed in contenteditable, using clipboard fallback');
+        console.warn(
+          '[Flint] Direct insertion failed in contenteditable, using clipboard fallback'
+        );
         return await this.fallbackToClipboard(text, 'Direct insertion failed in contenteditable');
       }
 
       // Element doesn't support direct insertion
       console.warn('[Flint] Element does not support direct insertion, using clipboard fallback');
-      return await this.fallbackToClipboard(text, 'Unsupported editor type (e.g., Google Docs, complex editors)');
+      return await this.fallbackToClipboard(
+        text,
+        'Unsupported editor type (e.g., Google Docs, complex editors)'
+      );
     } catch (error) {
       console.error('[Flint] Error inserting text at caret:', error);
-      return await this.fallbackToClipboard(text, `Insertion error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return await this.fallbackToClipboard(
+        text,
+        `Insertion error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -270,8 +288,10 @@ class CaretHandlerImpl implements CaretHandler {
       }
 
       // Handle textarea and input elements
-      if (activeElement instanceof HTMLTextAreaElement || 
-          activeElement instanceof HTMLInputElement) {
+      if (
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLInputElement
+      ) {
         const success = this.replaceInTextarea(activeElement, text);
         if (success) {
           return { success: true, usedClipboard: false };
@@ -286,16 +306,24 @@ class CaretHandlerImpl implements CaretHandler {
         if (success) {
           return { success: true, usedClipboard: false };
         }
-        console.warn('[Flint] Direct replacement failed in contenteditable, using clipboard fallback');
+        console.warn(
+          '[Flint] Direct replacement failed in contenteditable, using clipboard fallback'
+        );
         return await this.fallbackToClipboard(text, 'Direct replacement failed in contenteditable');
       }
 
       // Element doesn't support direct replacement
       console.warn('[Flint] Element does not support direct replacement, using clipboard fallback');
-      return await this.fallbackToClipboard(text, 'Unsupported editor type (e.g., Google Docs, complex editors)');
+      return await this.fallbackToClipboard(
+        text,
+        'Unsupported editor type (e.g., Google Docs, complex editors)'
+      );
     } catch (error) {
       console.error('[Flint] Error replacing selection:', error);
-      return await this.fallbackToClipboard(text, `Replacement error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return await this.fallbackToClipboard(
+        text,
+        `Replacement error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -338,10 +366,7 @@ class CaretHandlerImpl implements CaretHandler {
   /**
    * Insert text in a textarea or input element
    */
-  private insertInTextarea(
-    element: HTMLTextAreaElement | HTMLInputElement, 
-    text: string
-  ): boolean {
+  private insertInTextarea(element: HTMLTextAreaElement | HTMLInputElement, text: string): boolean {
     try {
       const start = element.selectionStart ?? 0;
       const end = element.selectionEnd ?? 0;
@@ -373,19 +398,19 @@ class CaretHandlerImpl implements CaretHandler {
   private insertInContentEditable(text: string): boolean {
     try {
       const selection = window.getSelection();
-      
+
       if (!selection || selection.rangeCount === 0) {
         return false;
       }
 
       const range = selection.getRangeAt(0);
-      
+
       // Delete any selected content first
       range.deleteContents();
 
       // Create text node with new content
       const textNode = document.createTextNode(text);
-      
+
       // Insert the text node at the range
       range.insertNode(textNode);
 
@@ -413,7 +438,7 @@ class CaretHandlerImpl implements CaretHandler {
    * Replace selected text in a textarea or input element
    */
   private replaceInTextarea(
-    element: HTMLTextAreaElement | HTMLInputElement, 
+    element: HTMLTextAreaElement | HTMLInputElement,
     text: string
   ): boolean {
     try {
@@ -446,19 +471,19 @@ class CaretHandlerImpl implements CaretHandler {
   private replaceInContentEditable(text: string): boolean {
     try {
       const selection = window.getSelection();
-      
+
       if (!selection || selection.rangeCount === 0) {
         return false;
       }
 
       const range = selection.getRangeAt(0);
-      
+
       // Delete the selected content
       range.deleteContents();
 
       // Create text node with replacement text
       const textNode = document.createTextNode(text);
-      
+
       // Insert the text node
       range.insertNode(textNode);
 
@@ -499,7 +524,7 @@ class CaretHandlerImpl implements CaretHandler {
         return {
           success: false,
           usedClipboard: false,
-          error: 'Clipboard API not available in this context'
+          error: 'Clipboard API not available in this context',
         };
       }
 
@@ -510,14 +535,14 @@ class CaretHandlerImpl implements CaretHandler {
 
       return {
         success: true,
-        usedClipboard: true
+        usedClipboard: true,
       };
     } catch (error) {
       console.error('[Flint] Clipboard fallback failed:', error);
       return {
         success: false,
         usedClipboard: false,
-        error: `Clipboard operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        error: `Clipboard operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
   }

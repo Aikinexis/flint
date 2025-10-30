@@ -23,12 +23,9 @@ export interface GeneratePanelProps {
  * GeneratePanel component for text generation using Writer API
  * Provides prompt input and generated text output
  */
-export function GeneratePanel({
-  pinnedNotes = [],
-  onGenerateComplete,
-}: GeneratePanelProps) {
+export function GeneratePanel({ pinnedNotes = [], onGenerateComplete }: GeneratePanelProps) {
   // App state no longer needed after history removal
-  
+
   // Component state
   const [prompt, setPrompt] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -93,7 +90,7 @@ export function GeneratePanel({
       if (areaName === 'local' && changes['generateSettings']) {
         const newSettings = changes['generateSettings'].newValue as GenerateSettings;
         setGenerateSettings(newSettings);
-        
+
         // Clear context when context awareness is disabled
         if (!newSettings.contextAwarenessEnabled && currentContext) {
           setCurrentContext(null);
@@ -133,10 +130,7 @@ export function GeneratePanel({
     if (!showLengthDropdown) return;
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        lengthDropdownRef.current &&
-        !lengthDropdownRef.current.contains(event.target as Node)
-      ) {
+      if (lengthDropdownRef.current && !lengthDropdownRef.current.contains(event.target as Node)) {
         setShowLengthDropdown(false);
       }
     };
@@ -166,17 +160,15 @@ export function GeneratePanel({
     };
   }, [showHistoryDropdown]);
 
-
-
   /**
    * Handles prompt input change
    */
   const handlePromptChange = (value: string) => {
     setPrompt(value);
-    
+
     // Reset history flag when user manually types (modifies the prompt)
     isPromptFromHistoryRef.current = false;
-    
+
     // Clear context when prompt input is cleared (Requirement 3.7)
     if (value.trim() === '') {
       setCurrentContext(null);
@@ -255,10 +247,7 @@ export function GeneratePanel({
     const currentText = prompt;
 
     // Insert text at cursor position
-    const newText =
-      currentText.substring(0, start) +
-      insertText +
-      currentText.substring(end);
+    const newText = currentText.substring(0, start) + insertText + currentText.substring(end);
     setPrompt(newText);
 
     // Set cursor position after inserted text
@@ -282,8 +271,7 @@ export function GeneratePanel({
     } else {
       // Start recording
       const SpeechRecognition =
-        (window as any).SpeechRecognition ||
-        (window as any).webkitSpeechRecognition;
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
       if (!SpeechRecognition) {
         setError('Speech recognition is not supported in this browser');
@@ -344,7 +332,10 @@ export function GeneratePanel({
         try {
           settings = await StorageService.getGenerateSettings();
         } catch (settingsError) {
-          console.error('[GeneratePanel] Failed to load generate settings, using defaults:', settingsError);
+          console.error(
+            '[GeneratePanel] Failed to load generate settings, using defaults:',
+            settingsError
+          );
           // Use hardcoded defaults as fallback (Requirement 6.7)
           settings = {
             shortLength: 100,
@@ -353,14 +344,12 @@ export function GeneratePanel({
           };
         }
       }
-      
+
       // Use default prompt if empty - "Continue writing" or "Extend this content"
       const effectivePrompt = prompt.trim() || 'Continue writing and extend this content naturally';
-      
+
       // Prepare pinned notes context
-      const pinnedNotesContent = pinnedNotes.map(
-        (note) => `${note.title}: ${note.content}`
-      );
+      const pinnedNotesContent = pinnedNotes.map((note) => `${note.title}: ${note.content}`);
 
       // Determine length hint based on selected length
       let lengthHint: number | undefined;
@@ -383,8 +372,7 @@ export function GeneratePanel({
 
       // Call AI service with timeout
       const generatePromise = AIService.generate(effectivePrompt, {
-        pinnedNotes:
-          pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
+        pinnedNotes: pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
         length: selectedLength,
         lengthHint: lengthHint,
         context: contextToPass,
@@ -392,10 +380,7 @@ export function GeneratePanel({
 
       // Add 60 second timeout for generation
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error('Operation timed out after 60 seconds')),
-          60000
-        )
+        setTimeout(() => reject(new Error('Operation timed out after 60 seconds')), 60000)
       );
 
       const result = await Promise.race([generatePromise, timeoutPromise]);
@@ -412,7 +397,7 @@ export function GeneratePanel({
         try {
           await StorageService.savePromptToHistory(prompt);
           console.log('[GeneratePanel] Prompt saved to history');
-          
+
           // Reload history to get updated list
           const history = await StorageService.getPromptHistory(4);
           setPromptHistory(history);
@@ -422,7 +407,7 @@ export function GeneratePanel({
           // Generation continues successfully even if prompt history save fails
         }
       }
-      
+
       // Reset the history flag after generation
       isPromptFromHistoryRef.current = false;
 
@@ -474,10 +459,7 @@ export function GeneratePanel({
         const message = err.message.toLowerCase();
 
         // User activation required error
-        if (
-          message.includes('user activation') ||
-          message.includes('click the button again')
-        ) {
+        if (message.includes('user activation') || message.includes('click the button again')) {
           errorMessage = 'Please click the button again to continue.';
         }
         // AI unavailable error
@@ -486,13 +468,11 @@ export function GeneratePanel({
           message.includes('chrome 128') ||
           message.includes('gemini nano')
         ) {
-          errorMessage =
-            'AI features require Chrome 128 or later with Gemini Nano enabled.';
+          errorMessage = 'AI features require Chrome 128 or later with Gemini Nano enabled.';
         }
         // Timeout error
         else if (message.includes('timed out') || message.includes('timeout')) {
-          errorMessage =
-            'Operation timed out. Try with a simpler prompt or check your connection.';
+          errorMessage = 'Operation timed out. Try with a simpler prompt or check your connection.';
         }
         // Generic error with original message
         else {
@@ -537,12 +517,10 @@ export function GeneratePanel({
     // Find the version to get its history ID
     const version = versions.find((v) => v.id === id);
     console.log('[GeneratePanel] Toggle like for version:', id, 'historyId:', version?.historyId);
-    
+
     // Update version state
-    setVersions((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, isLiked: !v.isLiked } : v))
-    );
-    
+    setVersions((prev) => prev.map((v) => (v.id === id ? { ...v, isLiked: !v.isLiked } : v)));
+
     // History update removed - now using snapshots instead
   };
 
@@ -550,18 +528,14 @@ export function GeneratePanel({
    * Handles version edit
    */
   const handleEdit = (id: string, newText: string) => {
-    setVersions((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, text: newText } : v))
-    );
+    setVersions((prev) => prev.map((v) => (v.id === id ? { ...v, text: newText } : v)));
   };
 
   /**
    * Handles title edit
    */
   const handleEditTitle = (id: string, newTitle: string) => {
-    setVersions((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, title: newTitle } : v))
-    );
+    setVersions((prev) => prev.map((v) => (v.id === id ? { ...v, title: newTitle } : v)));
   };
 
   /**
@@ -587,8 +561,6 @@ export function GeneratePanel({
     setWordCount(words);
     setCharCount(chars);
   };
-
-
 
   /**
    * Gets the label for the current length selection
@@ -617,8 +589,17 @@ export function GeneratePanel({
 
   return (
     <div className="flint-section flex flex-col h-full">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <h2 className="flint-section-header" style={{ marginBottom: 0 }}>Generate text</h2>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px',
+        }}
+      >
+        <h2 className="flint-section-header" style={{ marginBottom: 0 }}>
+          Generate text
+        </h2>
         {versions.length > 0 && (
           <div
             style={{
@@ -761,7 +742,9 @@ export function GeneratePanel({
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = 'var(--surface-2)';
                     // Enable auto-scroll on hover
-                    const textElement = e.currentTarget.querySelector('.prompt-text') as HTMLElement;
+                    const textElement = e.currentTarget.querySelector(
+                      '.prompt-text'
+                    ) as HTMLElement;
                     if (textElement && textElement.scrollWidth > textElement.clientWidth) {
                       textElement.style.animation = 'scroll-text 3s linear infinite';
                     }
@@ -769,7 +752,9 @@ export function GeneratePanel({
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = 'none';
                     // Disable auto-scroll
-                    const textElement = e.currentTarget.querySelector('.prompt-text') as HTMLElement;
+                    const textElement = e.currentTarget.querySelector(
+                      '.prompt-text'
+                    ) as HTMLElement;
                     if (textElement) {
                       textElement.style.animation = 'none';
                     }
@@ -808,7 +793,9 @@ export function GeneratePanel({
                     e.currentTarget.style.color = 'var(--accent)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.color = item.pinned ? 'var(--accent)' : 'var(--text-muted)';
+                    e.currentTarget.style.color = item.pinned
+                      ? 'var(--accent)'
+                      : 'var(--text-muted)';
                   }}
                 >
                   {item.pinned ? '★' : '☆'}
@@ -897,7 +884,14 @@ export function GeneratePanel({
                 }
               }}
             >
-              <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
                 <div style={{ fontWeight: 500 }}>Short</div>
                 <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7 }}>
                   ~{generateSettings?.shortLength || 100} words
@@ -932,7 +926,14 @@ export function GeneratePanel({
                 }
               }}
             >
-              <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
                 <div style={{ fontWeight: 500 }}>Medium</div>
                 <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7 }}>
                   ~{generateSettings?.mediumLength || 300} words
@@ -968,11 +969,16 @@ export function GeneratePanel({
                 }
               }}
             >
-              <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
                 <div style={{ fontWeight: 500 }}>Long</div>
-                <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7 }}>
-                  unlimited
-                </div>
+                <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7 }}>unlimited</div>
               </div>
             </button>
           </div>
@@ -1119,7 +1125,7 @@ export function GeneratePanel({
                 fill="currentColor"
                 aria-hidden="true"
               >
-                <path d="M 26.6875 12.6602 C 26.9687 12.6602 27.1094 12.4961 27.1797 12.2383 C 27.9062 8.3242 27.8594 8.2305 31.9375 7.4570 C 32.2187 7.4102 32.3828 7.2461 32.3828 6.9648 C 32.3828 6.6836 32.2187 6.5195 31.9375 6.4726 C 27.8828 5.6524 28.0000 5.5586 27.1797 1.6914 C 27.1094 1.4336 26.9687 1.2695 26.6875 1.2695 C 26.4062 1.2695 26.2656 1.4336 26.1953 1.6914 C 25.3750 5.5586 25.5156 5.6524 21.4375 6.4726 C 21.1797 6.5195 20.9922 6.6836 20.9922 6.9648 C 20.9922 7.2461 21.1797 7.4102 21.4375 7.4570 C 25.5156 8.2774 25.4687 8.3242 26.1953 12.2383 C 26.2656 12.4961 26.4062 12.6602 26.6875 12.6602 Z M 15.3438 28.7852 C 15.7891 28.7852 16.0938 28.5039 16.1406 28.0821 C 16.9844 21.8242 17.1953 21.8242 23.6641 20.5821 C 24.0860 20.5117 24.3906 20.2305 24.3906 19.7852 C 24.3906 19.3633 24.0860 19.0586 23.6641 18.9883 C 17.1953 18.0977 16.9609 17.8867 16.1406 11.5117 C 16.0938 11.0899 15.7891 10.7852 15.3438 10.7852 C 14.9219 10.7852 14.6172 11.0899 14.5703 11.5352 C 13.7969 17.8164 13.4687 17.7930 7.0469 18.9883 C 6.6250 19.0821 6.3203 19.3633 6.3203 19.7852 C 6.3203 20.2539 6.6250 20.5117 7.1406 20.5821 C 13.5156 21.6133 13.7969 21.7774 14.5703 28.0352 C 14.6172 28.5039 14.9219 28.7852 15.3438 28.7852 Z M 31.2344 54.7305 C 31.8438 54.7305 32.2891 54.2852 32.4062 53.6524 C 34.0703 40.8086 35.8750 38.8633 48.5781 37.4570 C 49.2344 37.3867 49.6797 36.8945 49.6797 36.2852 C 49.6797 35.6758 49.2344 35.2070 48.5781 35.1133 C 35.8750 33.7070 34.0703 31.7617 32.4062 18.9180 C 32.2891 18.2852 31.8438 17.8633 31.2344 17.8633 C 30.6250 17.8633 30.1797 18.2852 30.0860 18.9180 C 28.4219 31.7617 26.5938 33.7070 13.9140 35.1133 C 13.2344 35.2070 12.7891 35.6758 12.7891 36.2852 C 12.7891 36.8945 13.2344 37.3867 13.9140 37.4570 C 26.5703 39.1211 28.3281 40.8321 30.0860 53.6524 C 30.1797 54.2852 30.6250 54.7305 31.2344 54.7305 Z"/>
+                <path d="M 26.6875 12.6602 C 26.9687 12.6602 27.1094 12.4961 27.1797 12.2383 C 27.9062 8.3242 27.8594 8.2305 31.9375 7.4570 C 32.2187 7.4102 32.3828 7.2461 32.3828 6.9648 C 32.3828 6.6836 32.2187 6.5195 31.9375 6.4726 C 27.8828 5.6524 28.0000 5.5586 27.1797 1.6914 C 27.1094 1.4336 26.9687 1.2695 26.6875 1.2695 C 26.4062 1.2695 26.2656 1.4336 26.1953 1.6914 C 25.3750 5.5586 25.5156 5.6524 21.4375 6.4726 C 21.1797 6.5195 20.9922 6.6836 20.9922 6.9648 C 20.9922 7.2461 21.1797 7.4102 21.4375 7.4570 C 25.5156 8.2774 25.4687 8.3242 26.1953 12.2383 C 26.2656 12.4961 26.4062 12.6602 26.6875 12.6602 Z M 15.3438 28.7852 C 15.7891 28.7852 16.0938 28.5039 16.1406 28.0821 C 16.9844 21.8242 17.1953 21.8242 23.6641 20.5821 C 24.0860 20.5117 24.3906 20.2305 24.3906 19.7852 C 24.3906 19.3633 24.0860 19.0586 23.6641 18.9883 C 17.1953 18.0977 16.9609 17.8867 16.1406 11.5117 C 16.0938 11.0899 15.7891 10.7852 15.3438 10.7852 C 14.9219 10.7852 14.6172 11.0899 14.5703 11.5352 C 13.7969 17.8164 13.4687 17.7930 7.0469 18.9883 C 6.6250 19.0821 6.3203 19.3633 6.3203 19.7852 C 6.3203 20.2539 6.6250 20.5117 7.1406 20.5821 C 13.5156 21.6133 13.7969 21.7774 14.5703 28.0352 C 14.6172 28.5039 14.9219 28.7852 15.3438 28.7852 Z M 31.2344 54.7305 C 31.8438 54.7305 32.2891 54.2852 32.4062 53.6524 C 34.0703 40.8086 35.8750 38.8633 48.5781 37.4570 C 49.2344 37.3867 49.6797 36.8945 49.6797 36.2852 C 49.6797 35.6758 49.2344 35.2070 48.5781 35.1133 C 35.8750 33.7070 34.0703 31.7617 32.4062 18.9180 C 32.2891 18.2852 31.8438 17.8633 31.2344 17.8633 C 30.6250 17.8633 30.1797 18.2852 30.0860 18.9180 C 28.4219 31.7617 26.5938 33.7070 13.9140 35.1133 C 13.2344 35.2070 12.7891 35.6758 12.7891 36.2852 C 12.7891 36.8945 13.2344 37.3867 13.9140 37.4570 C 26.5703 39.1211 28.3281 40.8321 30.0860 53.6524 C 30.1797 54.2852 30.6250 54.7305 31.2344 54.7305 Z" />
               </svg>
             )}
           </button>
@@ -1198,8 +1204,6 @@ export function GeneratePanel({
         </div>
       )}
 
-
-
       {/* Pinned notes indicator */}
       {pinnedNotes.length > 0 && (
         <div
@@ -1232,8 +1236,7 @@ export function GeneratePanel({
             <path d="m6 11 6 6 6-6" />
             <path d="M19 21H5" />
           </svg>
-          {pinnedNotes.length} pinned{' '}
-          {pinnedNotes.length === 1 ? 'note' : 'notes'} will be included
+          {pinnedNotes.length} pinned {pinnedNotes.length === 1 ? 'note' : 'notes'} will be included
         </div>
       )}
     </div>

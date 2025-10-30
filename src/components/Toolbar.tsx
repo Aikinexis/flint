@@ -8,7 +8,7 @@ export interface ToolbarProps {
    * Callback when proofread button is clicked
    */
   onProofread?: () => void;
-  
+
   /**
    * Whether proofreading is in progress
    */
@@ -25,7 +25,7 @@ export function Toolbar({ onProofread, isProofreading = false }: ToolbarProps) {
         <img src={logo} alt="Flint" style={{ width: '24px', height: '24px' }} />
         <span className="text-lg font-semibold">Flint</span>
       </div>
-      
+
       {onProofread && (
         <button
           className="flint-btn ghost"

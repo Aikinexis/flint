@@ -2,7 +2,7 @@
  * Messaging service for panel-to-content script communication
  * Provides a centralized interface for sending messages to content scripts
  * via the background service worker
- * 
+ *
  * @module services/messaging
  */
 
@@ -61,7 +61,7 @@ export interface MessageResult {
 export class MessagingService {
   /**
    * Get the currently selected text from the active tab
-   * 
+   *
    * @returns Promise resolving to the selected text and editability status
    * @throws Error if no text is selected or communication fails
    */
@@ -84,7 +84,7 @@ export class MessagingService {
 
   /**
    * Insert text at the current caret position in the active tab
-   * 
+   *
    * @param text - Text to insert
    * @returns Promise resolving to the result of the insertion
    */
@@ -108,7 +108,7 @@ export class MessagingService {
 
   /**
    * Replace the currently selected text with new text
-   * 
+   *
    * @param text - Text to replace the selection with
    * @returns Promise resolving to the result of the replacement
    */
@@ -132,7 +132,7 @@ export class MessagingService {
 
   /**
    * Show the mini bar at the current selection position
-   * 
+   *
    * @returns Promise resolving to the result of the operation
    */
   async showMiniBar(): Promise<MessageResult> {
@@ -147,7 +147,7 @@ export class MessagingService {
 
   /**
    * Hide the mini bar
-   * 
+   *
    * @returns Promise resolving to the result of the operation
    */
   async hideMiniBar(): Promise<MessageResult> {
@@ -162,7 +162,7 @@ export class MessagingService {
 
   /**
    * Send a message to the content script via the background worker
-   * 
+   *
    * @param type - Message type
    * @param payload - Optional message payload
    * @returns Promise resolving to the response from the content script
@@ -179,12 +179,8 @@ export class MessagingService {
         source: 'panel',
       };
 
-      console.log('[MessagingService] Sending message:', message);
-
       // Send message via chrome.runtime (background worker will forward to content script)
       const response = await chrome.runtime.sendMessage(message);
-
-      console.log('[MessagingService] Received response:', response);
 
       // Ensure response has the expected structure
       if (!response || typeof response !== 'object') {

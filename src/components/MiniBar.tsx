@@ -18,10 +18,10 @@ type Props = {
   onBeforeOperation?: (operationType: 'rewrite' | 'summarize') => Promise<void>;
 };
 
-export const MiniBar: React.FC<Props> = ({ 
-  anchor, 
-  onClose, 
-  onSend, 
+export const MiniBar: React.FC<Props> = ({
+  anchor,
+  onClose,
+  onSend,
   toolbarRef,
   textareaRef,
   selectionRange,
@@ -30,8 +30,10 @@ export const MiniBar: React.FC<Props> = ({
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   // Store the selection range and text when minibar is shown
-  const capturedSelectionRef = React.useRef<{ start: number; end: number; text: string } | null>(null);
-  
+  const capturedSelectionRef = React.useRef<{ start: number; end: number; text: string } | null>(
+    null
+  );
+
   // Capture selection when anchor changes
   React.useEffect(() => {
     if (anchor && selectionRange) {
@@ -43,7 +45,7 @@ export const MiniBar: React.FC<Props> = ({
       console.log('[MiniBar] Selection captured:', capturedSelectionRef.current);
     }
   }, [anchor, selectionRange]);
-  
+
   if (!anchor) return null;
 
   /**
@@ -52,10 +54,10 @@ export const MiniBar: React.FC<Props> = ({
   const handleSummarize = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Use captured selection instead of current selection
     const captured = capturedSelectionRef.current;
-    
+
     // If no textarea ref provided, fall back to old behavior (navigate to tab)
     if (!textareaRef?.current || !captured) {
       onSend('summary', anchor.text);
@@ -77,12 +79,7 @@ export const MiniBar: React.FC<Props> = ({
       });
 
       // Replace text inline using captured range
-      await replaceTextInline(
-        textareaRef.current,
-        result,
-        captured.start,
-        captured.end
-      );
+      await replaceTextInline(textareaRef.current, result, captured.start, captured.end);
 
       // Close mini bar after successful replacement
       onClose();
@@ -100,10 +97,10 @@ export const MiniBar: React.FC<Props> = ({
   const handleRewrite = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Use captured selection instead of current selection
     const captured = capturedSelectionRef.current;
-    
+
     // If no textarea ref provided, fall back to old behavior (navigate to tab)
     if (!textareaRef?.current || !captured) {
       onSend('rewrite', anchor.text);
@@ -124,12 +121,7 @@ export const MiniBar: React.FC<Props> = ({
       });
 
       // Replace text inline using captured range
-      await replaceTextInline(
-        textareaRef.current,
-        result,
-        captured.start,
-        captured.end
-      );
+      await replaceTextInline(textareaRef.current, result, captured.start, captured.end);
 
       // Close mini bar after successful replacement
       onClose();
@@ -140,7 +132,7 @@ export const MiniBar: React.FC<Props> = ({
       setIsProcessing(false);
     }
   };
-  
+
   const ui = (
     <div
       ref={toolbarRef}
@@ -189,7 +181,14 @@ export const MiniBar: React.FC<Props> = ({
         }}
       >
         {isProcessing ? (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <circle cx="12" cy="12" r="10" opacity="0.25" />
             <path d="M12 2 A10 10 0 0 1 22 12" strokeLinecap="round">
               <animateTransform
@@ -203,7 +202,14 @@ export const MiniBar: React.FC<Props> = ({
             </path>
           </svg>
         ) : (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <line x1="8" y1="6" x2="21" y2="6" />
             <line x1="8" y1="12" x2="21" y2="12" />
             <line x1="8" y1="18" x2="21" y2="18" />
@@ -241,7 +247,14 @@ export const MiniBar: React.FC<Props> = ({
         }}
       >
         {isProcessing ? (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <circle cx="12" cy="12" r="10" opacity="0.25" />
             <path d="M12 2 A10 10 0 0 1 22 12" strokeLinecap="round">
               <animateTransform
@@ -255,7 +268,14 @@ export const MiniBar: React.FC<Props> = ({
             </path>
           </svg>
         ) : (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
           </svg>
@@ -288,7 +308,14 @@ export const MiniBar: React.FC<Props> = ({
           e.currentTarget.style.background = 'transparent';
         }}
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>

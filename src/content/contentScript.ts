@@ -1,10 +1,10 @@
 /**
  * Content Script Coordinator
- * 
+ *
  * Main entry point for content scripts injected into web pages.
  * Coordinates between SelectionHandler, CaretHandler, and MiniBarInjector
  * to provide text selection, manipulation, and mini bar functionality.
- * 
+ *
  * @module content/contentScript
  */
 
@@ -15,7 +15,7 @@ import { createMiniBarInjector, MiniBarInjector } from './injector';
 /**
  * Message types for communication with panel and background
  */
-type MessageType = 
+type MessageType =
   | 'GET_SELECTION'
   | 'GET_CURSOR_CONTEXT'
   | 'INSERT_TEXT'
@@ -77,8 +77,10 @@ class ContentScriptCoordinator {
    * Check if current page is Google Docs
    */
   private isGoogleDocs(): boolean {
-    return window.location.hostname === 'docs.google.com' && 
-           window.location.pathname.startsWith('/document/');
+    return (
+      window.location.hostname === 'docs.google.com' &&
+      window.location.pathname.startsWith('/document/')
+    );
   }
 
   /**
@@ -88,28 +90,25 @@ class ContentScriptCoordinator {
   private setupPanelStateListener(): void {
     // Check panel state every 2 seconds (reduced from 500ms to minimize overhead)
     setInterval(() => {
-      chrome.runtime.sendMessage(
-        { type: 'PING_PANEL', source: 'content-script' },
-        (response) => {
-          const wasOpen = this.isPanelOpen;
-          this.isPanelOpen = !chrome.runtime.lastError && response?.success === true;
-          
-          // If panel was just opened, clear any existing selection
-          if (!wasOpen && this.isPanelOpen) {
-            const selection = window.getSelection();
-            if (selection) {
-              selection.removeAllRanges();
-            }
-            this.miniBarInjector.hide();
-            this.lastSelectionText = '';
+      chrome.runtime.sendMessage({ type: 'PING_PANEL', source: 'content-script' }, (response) => {
+        const wasOpen = this.isPanelOpen;
+        this.isPanelOpen = !chrome.runtime.lastError && response?.success === true;
+
+        // If panel was just opened, clear any existing selection
+        if (!wasOpen && this.isPanelOpen) {
+          const selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
           }
-          
-          // If panel was just closed, hide mini bar
-          if (wasOpen && !this.isPanelOpen) {
-            this.miniBarInjector.hide();
-          }
+          this.miniBarInjector.hide();
+          this.lastSelectionText = '';
         }
-      );
+
+        // If panel was just closed, hide mini bar
+        if (wasOpen && !this.isPanelOpen) {
+          this.miniBarInjector.hide();
+        }
+      });
     }, 2000);
   }
 
@@ -134,7 +133,9 @@ class ContentScriptCoordinator {
 
       // Skip mini bar on Google Docs (doesn't work reliably)
       if (this.isGoogleDocs()) {
-        console.log('[Flint] Skipping mini bar on Google Docs - use keyboard shortcuts or copy/paste instead');
+        console.log(
+          '[Flint] Skipping mini bar on Google Docs - use keyboard shortcuts or copy/paste instead'
+        );
         return;
       }
 
@@ -181,7 +182,7 @@ class ContentScriptCoordinator {
             console.error('[Flint] Error handling message:', error);
             sendResponse({
               success: false,
-              error: error instanceof Error ? error.message : 'Unknown error'
+              error: error instanceof Error ? error.message : 'Unknown error',
             });
           });
 
@@ -219,7 +220,7 @@ class ContentScriptCoordinator {
       default:
         return {
           success: false,
-          error: `Unknown message type: ${message.type}`
+          error: `Unknown message type: ${message.type}`,
         };
     }
   }
@@ -235,7 +236,7 @@ class ContentScriptCoordinator {
       if (!selectedText) {
         return {
           success: false,
-          error: 'No text selected'
+          error: 'No text selected',
         };
       }
 
@@ -243,14 +244,14 @@ class ContentScriptCoordinator {
         success: true,
         data: {
           text: selectedText,
-          isEditable: this.selectionHandler.isEditableSelection()
-        }
+          isEditable: this.selectionHandler.isEditableSelection(),
+        },
       };
     } catch (error) {
       console.error('[Flint] Error getting selection:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to get selection'
+        error: error instanceof Error ? error.message : 'Failed to get selection',
       };
     }
   }
@@ -266,19 +267,19 @@ class ContentScriptCoordinator {
       if (!context) {
         return {
           success: false,
-          error: 'No cursor position found or not in editable field'
+          error: 'No cursor position found or not in editable field',
         };
       }
 
       return {
         success: true,
-        data: context
+        data: context,
       };
     } catch (error) {
       console.error('[Flint] Error getting cursor context:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to get cursor context'
+        error: error instanceof Error ? error.message : 'Failed to get cursor context',
       };
     }
   }
@@ -292,7 +293,7 @@ class ContentScriptCoordinator {
       if (!text) {
         return {
           success: false,
-          error: 'No text provided for insertion'
+          error: 'No text provided for insertion',
         };
       }
 
@@ -302,7 +303,7 @@ class ContentScriptCoordinator {
       if (!result.success) {
         return {
           success: false,
-          error: result.error || 'Failed to insert text'
+          error: result.error || 'Failed to insert text',
         };
       }
 
@@ -313,14 +314,14 @@ class ContentScriptCoordinator {
           usedClipboard: result.usedClipboard,
           message: result.usedClipboard
             ? 'Text copied to clipboard. Please paste it manually.'
-            : 'Text inserted successfully'
-        }
+            : 'Text inserted successfully',
+        },
       };
     } catch (error) {
       console.error('[Flint] Error inserting text:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to insert text'
+        error: error instanceof Error ? error.message : 'Failed to insert text',
       };
     }
   }
@@ -334,7 +335,7 @@ class ContentScriptCoordinator {
       if (!text) {
         return {
           success: false,
-          error: 'No text provided for replacement'
+          error: 'No text provided for replacement',
         };
       }
 
@@ -343,7 +344,7 @@ class ContentScriptCoordinator {
       if (!selectedText) {
         return {
           success: false,
-          error: 'No text selected to replace'
+          error: 'No text selected to replace',
         };
       }
 
@@ -353,7 +354,7 @@ class ContentScriptCoordinator {
       if (!result.success) {
         return {
           success: false,
-          error: result.error || 'Failed to replace text'
+          error: result.error || 'Failed to replace text',
         };
       }
 
@@ -367,14 +368,14 @@ class ContentScriptCoordinator {
           usedClipboard: result.usedClipboard,
           message: result.usedClipboard
             ? 'Text copied to clipboard. Please paste it manually to replace the selection.'
-            : 'Text replaced successfully'
-        }
+            : 'Text replaced successfully',
+        },
       };
     } catch (error) {
       console.error('[Flint] Error replacing text:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to replace text'
+        error: error instanceof Error ? error.message : 'Failed to replace text',
       };
     }
   }
@@ -389,13 +390,13 @@ class ContentScriptCoordinator {
 
       return {
         success: true,
-        data: { message: 'Mini bar shown' }
+        data: { message: 'Mini bar shown' },
       };
     } catch (error) {
       console.error('[Flint] Error showing mini bar:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to show mini bar'
+        error: error instanceof Error ? error.message : 'Failed to show mini bar',
       };
     }
   }
@@ -410,13 +411,13 @@ class ContentScriptCoordinator {
 
       return {
         success: true,
-        data: { message: 'Mini bar hidden' }
+        data: { message: 'Mini bar hidden' },
       };
     } catch (error) {
       console.error('[Flint] Error hiding mini bar:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to hide mini bar'
+        error: error instanceof Error ? error.message : 'Failed to hide mini bar',
       };
     }
   }
@@ -454,14 +455,14 @@ class ContentScriptCoordinator {
       onClose: () => {
         this.miniBarInjector.hide();
         this.selectionHandler.clearPreservedSelection();
-      }
+      },
     });
   }
 
   /**
    * Send a message to the panel via background worker
    * Used for mini bar button actions
-   * 
+   *
    * Note: Messages are sent with source='content-script' so the background
    * script knows to forward them to the panel. This prevents double-delivery.
    */
@@ -471,7 +472,7 @@ class ContentScriptCoordinator {
       {
         type,
         payload,
-        source: 'content-script'
+        source: 'content-script',
       },
       (response) => {
         if (chrome.runtime.lastError) {

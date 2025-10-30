@@ -60,7 +60,7 @@ export function SummaryPanel({
 }: SummaryPanelProps) {
   // Get app actions (state no longer needed after history removal)
   const { actions } = useAppState();
-  
+
   // Ref to track last processed initialText
   const lastInitialTextRef = useRef<string>(initialText);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -74,23 +74,25 @@ export function SummaryPanel({
     actions.setCurrentText(text);
     clear();
   };
-  
+
   // Component state
   const [mode, setMode] = useState<SummaryMode>('bullets');
   const [readingLevel, setReadingLevel] = useState<ReadingLevel>('moderate');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMockProvider, setIsMockProvider] = useState(false);
-  
+
   // Version carousel state - initialize with empty version
-  const [versions, setVersions] = useState<Version[]>(() => [{
-    id: `original-${Date.now()}`,
-    text: initialText,
-    label: 'Original',
-    isOriginal: true,
-    isLiked: false,
-    timestamp: Date.now(),
-  }]);
+  const [versions, setVersions] = useState<Version[]>(() => [
+    {
+      id: `original-${Date.now()}`,
+      text: initialText,
+      label: 'Original',
+      isOriginal: true,
+      isLiked: false,
+      timestamp: Date.now(),
+    },
+  ]);
   const [currentVersionIndex, setCurrentVersionIndex] = useState(0);
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
@@ -101,18 +103,20 @@ export function SummaryPanel({
     if (initialText && initialText !== lastInitialTextRef.current) {
       lastInitialTextRef.current = initialText;
       // Strip timestamp marker if present (format: text\0timestamp)
-      const cleanText = initialText.includes('\0') 
+      const cleanText = initialText.includes('\0')
         ? initialText.substring(0, initialText.lastIndexOf('\0'))
         : initialText;
       // Replace with version containing new text
-      setVersions([{
-        id: `original-${Date.now()}`,
-        text: cleanText,
-        label: 'Original',
-        isOriginal: true,
-        isLiked: false,
-        timestamp: Date.now(),
-      }]);
+      setVersions([
+        {
+          id: `original-${Date.now()}`,
+          text: cleanText,
+          label: 'Original',
+          isOriginal: true,
+          isLiked: false,
+          timestamp: Date.now(),
+        },
+      ]);
       setCurrentVersionIndex(0);
     }
   }, [initialText]);
@@ -126,14 +130,16 @@ export function SummaryPanel({
       if (areaName === 'local' && changes['flint.historyClearedAt']) {
         console.log('[SummaryPanel] History cleared, resetting versions');
         // Reset versions to empty original version
-        setVersions([{
-          id: `original-${Date.now()}`,
-          text: '',
-          label: 'Original',
-          isOriginal: true,
-          isLiked: false,
-          timestamp: Date.now(),
-        }]);
+        setVersions([
+          {
+            id: `original-${Date.now()}`,
+            text: '',
+            label: 'Original',
+            isOriginal: true,
+            isLiked: false,
+            timestamp: Date.now(),
+          },
+        ]);
         setCurrentVersionIndex(0);
       }
     };
@@ -164,7 +170,7 @@ export function SummaryPanel({
    */
   const handleSummarize = async () => {
     const currentVersion = versions[currentVersionIndex];
-    
+
     // Validate that we have text
     if (!currentVersion || !currentVersion.text.trim()) {
       setError('Please enter text to summarize');
@@ -186,7 +192,7 @@ export function SummaryPanel({
       }
 
       // Prepare pinned notes context
-      const pinnedNotesContent = pinnedNotes.map(note => `${note.title}: ${note.content}`);
+      const pinnedNotesContent = pinnedNotes.map((note) => `${note.title}: ${note.content}`);
 
       // Call AI service with timeout
       const summarizePromise = AIService.summarize(currentVersion.text, {
@@ -220,7 +226,7 @@ export function SummaryPanel({
         historyId: historyItemId,
       };
 
-      setVersions(prev => [...prev, newVersion]);
+      setVersions((prev) => [...prev, newVersion]);
       setCurrentVersionIndex(versions.length); // Navigate to new version
 
       // Call completion callback if provided
@@ -239,12 +245,17 @@ export function SummaryPanel({
           errorMessage = 'Please click the button again to continue.';
         }
         // AI unavailable error
-        else if (message.includes('not available') || message.includes('chrome 128') || message.includes('gemini nano')) {
+        else if (
+          message.includes('not available') ||
+          message.includes('chrome 128') ||
+          message.includes('gemini nano')
+        ) {
           errorMessage = 'AI features require Chrome 128 or later with Gemini Nano enabled.';
         }
         // Timeout error
         else if (message.includes('timed out') || message.includes('timeout')) {
-          errorMessage = 'Operation timed out after 60 seconds. Try with shorter text or check your connection.';
+          errorMessage =
+            'Operation timed out after 60 seconds. Try with shorter text or check your connection.';
         }
         // Generic error with original message
         else {
@@ -280,7 +291,7 @@ export function SummaryPanel({
    * Handles version deletion
    */
   const handleDelete = (id: string) => {
-    setVersions(prev => prev.filter(v => v.id !== id));
+    setVersions((prev) => prev.filter((v) => v.id !== id));
   };
 
   /**
@@ -290,12 +301,10 @@ export function SummaryPanel({
     // Find the version to get its history ID
     const version = versions.find((v) => v.id === id);
     console.log('[SummaryPanel] Toggle like for version:', id, 'historyId:', version?.historyId);
-    
+
     // Update version state
-    setVersions(prev => prev.map(v => 
-      v.id === id ? { ...v, isLiked: !v.isLiked } : v
-    ));
-    
+    setVersions((prev) => prev.map((v) => (v.id === id ? { ...v, isLiked: !v.isLiked } : v)));
+
     // Update history if this version has a history ID
     // History update removed - now using snapshots instead
   };
@@ -304,18 +313,14 @@ export function SummaryPanel({
    * Handles version edit
    */
   const handleEdit = (id: string, newText: string) => {
-    setVersions(prev => prev.map(v => 
-      v.id === id ? { ...v, text: newText } : v
-    ));
+    setVersions((prev) => prev.map((v) => (v.id === id ? { ...v, text: newText } : v)));
   };
 
   /**
    * Handles title edit
    */
   const handleEditTitle = (id: string, newTitle: string) => {
-    setVersions(prev => prev.map(v => 
-      v.id === id ? { ...v, title: newTitle } : v
-    ));
+    setVersions((prev) => prev.map((v) => (v.id === id ? { ...v, title: newTitle } : v)));
   };
 
   /**
@@ -325,14 +330,16 @@ export function SummaryPanel({
   const handleClear = () => {
     // Reset the ref so the same text can be loaded again from minibar
     lastInitialTextRef.current = '';
-    setVersions([{
-      id: `original-${Date.now()}`,
-      text: '',
-      label: 'Original',
-      isOriginal: true,
-      isLiked: false,
-      timestamp: Date.now(),
-    }]);
+    setVersions([
+      {
+        id: `original-${Date.now()}`,
+        text: '',
+        label: 'Original',
+        isOriginal: true,
+        isLiked: false,
+        timestamp: Date.now(),
+      },
+    ]);
     setCurrentVersionIndex(0);
     setError(null);
     setIsMockProvider(false);
@@ -354,9 +361,22 @@ export function SummaryPanel({
   };
 
   return (
-    <div ref={scrollContainerRef} className="flint-section flex flex-col h-full" style={{ position: 'relative', overflow: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <h2 className="flint-section-header" style={{ marginBottom: 0 }}>Summarize text</h2>
+    <div
+      ref={scrollContainerRef}
+      className="flint-section flex flex-col h-full"
+      style={{ position: 'relative', overflow: 'auto' }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px',
+        }}
+      >
+        <h2 className="flint-section-header" style={{ marginBottom: 0 }}>
+          Summarize text
+        </h2>
         {versions.length > 0 && (
           <div
             style={{
@@ -544,7 +564,9 @@ export function SummaryPanel({
           role="alert"
           aria-live="assertive"
         >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+          <div
+            style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}
+          >
             <svg
               width="16"
               height="16"
@@ -631,14 +653,12 @@ export function SummaryPanel({
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, marginBottom: '4px' }}>Using Mock Provider</div>
             <div style={{ opacity: 0.9 }}>
-              AI features require Chrome 128 or later with Gemini Nano enabled.
-              The result shown is a demonstration using a mock provider.
+              AI features require Chrome 128 or later with Gemini Nano enabled. The result shown is
+              a demonstration using a mock provider.
             </div>
           </div>
         </div>
       )}
-
-
 
       {/* Pinned notes indicator */}
       {pinnedNotes.length > 0 && (
