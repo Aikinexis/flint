@@ -704,9 +704,16 @@ export function ProjectManager({
                 className="flint-input"
                 value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)}
-                placeholder="Add a description..."
-                rows={3}
-                style={{ width: '100%', resize: 'vertical' }}
+                placeholder="Project description"
+                rows={6}
+                style={{
+                  width: '100%',
+                  minHeight: '120px',
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
+                  lineHeight: '1.5',
+                  padding: '12px',
+                }}
               />
             </div>
 

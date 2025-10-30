@@ -57,6 +57,20 @@ export interface ToolControlsProps {
   }>;
 
   /**
+   * Persistent prompt values (controlled from parent)
+   */
+  generatePrompt?: string;
+  rewritePrompt?: string;
+  summarizePrompt?: string;
+
+  /**
+   * Callbacks for prompt changes
+   */
+  onGeneratePromptChange?: (prompt: string) => void;
+  onRewritePromptChange?: (prompt: string) => void;
+  onSummarizePromptChange?: (prompt: string) => void;
+
+  /**
    * Callback when an operation starts
    */
   onOperationStart?: (operationType?: 'generate' | 'rewrite' | 'summarize') => void;
@@ -83,12 +97,51 @@ export function ToolControlsContainer({
   content,
   selection: _selection,
   editorRef,
+  generatePrompt: generatePromptProp = '',
+  rewritePrompt: rewritePromptProp = '',
+  summarizePrompt: summarizePromptProp = '',
+  onGeneratePromptChange,
+  onRewritePromptChange,
+  onSummarizePromptChange,
   onOperationStart,
   onOperationComplete,
   onOperationError,
 }: ToolControlsProps) {
+  // Use controlled prompts from parent, with local state as fallback
+  const [prompt, setPromptInternal] = useState(generatePromptProp);
+  const [customPrompt, setCustomPromptInternal] = useState(rewritePromptProp);
+  const [summaryPrompt, setSummaryPromptInternal] = useState(summarizePromptProp);
+
+  // Sync with parent props when they change
+  useEffect(() => {
+    setPromptInternal(generatePromptProp);
+  }, [generatePromptProp]);
+
+  useEffect(() => {
+    setCustomPromptInternal(rewritePromptProp);
+  }, [rewritePromptProp]);
+
+  useEffect(() => {
+    setSummaryPromptInternal(summarizePromptProp);
+  }, [summarizePromptProp]);
+
+  // Wrapper functions to update both local and parent state
+  const setPrompt = (value: string) => {
+    setPromptInternal(value);
+    onGeneratePromptChange?.(value);
+  };
+
+  const setCustomPrompt = (value: string) => {
+    setCustomPromptInternal(value);
+    onRewritePromptChange?.(value);
+  };
+
+  const setSummaryPrompt = (value: string) => {
+    setSummaryPromptInternal(value);
+    onSummarizePromptChange?.(value);
+  };
+
   // Generate controls state
-  const [prompt, setPrompt] = useState('');
   const [selectedLength, setSelectedLength] = useState<'short' | 'medium' | 'long'>('short');
   const [showLengthDropdown, setShowLengthDropdown] = useState(false);
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
@@ -98,7 +151,6 @@ export function ToolControlsContainer({
   const [isPromptFromHistory, setIsPromptFromHistory] = useState(false);
 
   // Rewrite controls state
-  const [customPrompt, setCustomPrompt] = useState('');
   const [selectedPreset, setSelectedPreset] = useState<string>('Simplify');
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [isRewriteRecording, setIsRewriteRecording] = useState(false);
@@ -110,7 +162,6 @@ export function ToolControlsContainer({
   const [showReadingLevelDropdown, setShowReadingLevelDropdown] = useState(false);
   const [showSummaryLengthDropdown, setShowSummaryLengthDropdown] = useState(false);
   const [showSummaryModeDropdown, setShowSummaryModeDropdown] = useState(false);
-  const [summaryPrompt, setSummaryPrompt] = useState('');
   const [isSummarizeRecording, setIsSummarizeRecording] = useState(false);
 
   // Common state
@@ -347,16 +398,34 @@ export function ToolControlsContainer({
       return;
     }
 
+    // If nothing is selected, select all text on first press
+    if (capturedSelection.start === capturedSelection.end) {
+      const textarea = editorRef?.current?.getTextarea();
+      if (textarea && content.trim()) {
+        // Select all text
+        textarea.focus();
+        textarea.setSelectionRange(0, content.length);
+        
+        // Update captured selection in editor ref
+        if (editorRef?.current) {
+          editorRef.current.updateCapturedSelection(0, content.length);
+        }
+        
+        console.log('[ToolControls] No selection - selected all text. Press again to rewrite.');
+        return;
+      } else {
+        onOperationError?.('Please type or paste text in the editor first');
+        return;
+      }
+    }
+
     // Get selected text using captured selection
-    const textToRewrite =
-      capturedSelection.start !== capturedSelection.end
-        ? content.substring(capturedSelection.start, capturedSelection.end)
-        : content;
+    const textToRewrite = content.substring(capturedSelection.start, capturedSelection.end);
 
     console.log('[ToolControls] Text to rewrite:', textToRewrite.substring(0, 50) + '...');
 
     if (!textToRewrite.trim()) {
-      onOperationError?.('Please type or paste text in the editor first');
+      onOperationError?.('Please select text to rewrite');
       return;
     }
 
@@ -416,14 +485,32 @@ export function ToolControlsContainer({
       return;
     }
 
+    // If nothing is selected, select all text on first press
+    if (capturedSelection.start === capturedSelection.end) {
+      const textarea = editorRef?.current?.getTextarea();
+      if (textarea && content.trim()) {
+        // Select all text
+        textarea.focus();
+        textarea.setSelectionRange(0, content.length);
+        
+        // Update captured selection in editor ref
+        if (editorRef?.current) {
+          editorRef.current.updateCapturedSelection(0, content.length);
+        }
+        
+        console.log('[ToolControls] No selection - selected all text. Press again to summarize.');
+        return;
+      } else {
+        onOperationError?.('Please type or paste text in the editor first');
+        return;
+      }
+    }
+
     // Get selected text using captured selection
-    const textToSummarize =
-      capturedSelection.start !== capturedSelection.end
-        ? content.substring(capturedSelection.start, capturedSelection.end)
-        : content;
+    const textToSummarize = content.substring(capturedSelection.start, capturedSelection.end);
 
     if (!textToSummarize.trim()) {
-      onOperationError?.('Please select or enter text to summarize');
+      onOperationError?.('Please select text to summarize');
       return;
     }
 
@@ -635,20 +722,14 @@ export function ToolControlsContainer({
             } else {
               // Append to prompt box
               if (tool === 'generate') {
-                setPrompt((prev) => {
-                  const needsSpace = prev.length > 0 && !prev.endsWith(' ');
-                  return prev + (needsSpace ? ' ' : '') + formattedText;
-                });
+                const needsSpace = prompt.length > 0 && !prompt.endsWith(' ');
+                setPrompt(prompt + (needsSpace ? ' ' : '') + formattedText);
               } else if (tool === 'rewrite') {
-                setCustomPrompt((prev) => {
-                  const needsSpace = prev.length > 0 && !prev.endsWith(' ');
-                  return prev + (needsSpace ? ' ' : '') + formattedText;
-                });
+                const needsSpace = customPrompt.length > 0 && !customPrompt.endsWith(' ');
+                setCustomPrompt(customPrompt + (needsSpace ? ' ' : '') + formattedText);
               } else {
-                setSummaryPrompt((prev) => {
-                  const needsSpace = prev.length > 0 && !prev.endsWith(' ');
-                  return prev + (needsSpace ? ' ' : '') + formattedText;
-                });
+                const needsSpace = summaryPrompt.length > 0 && !summaryPrompt.endsWith(' ');
+                setSummaryPrompt(summaryPrompt + (needsSpace ? ' ' : '') + formattedText);
               }
             }
 

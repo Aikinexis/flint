@@ -35,6 +35,11 @@ function PanelContent() {
   // Single unified editor ref shared across all tools
   const unifiedEditorRef = useRef<UnifiedEditorRef>(null);
 
+  // Persistent prompt state across tool switches
+  const [generatePrompt, setGeneratePrompt] = useState('');
+  const [rewritePrompt, setRewritePrompt] = useState('');
+  const [summarizePrompt, setSummarizePrompt] = useState('');
+
   // Track if content change is from AI or manual input (for future features)
   const isAIGeneratedRef = useRef<boolean>(false);
 
@@ -327,7 +332,24 @@ function PanelContent() {
       // Set new timeout for auto-save (500ms delay)
       autoSaveTimeoutRef.current = setTimeout(async () => {
         // Get current project from ref (stable reference)
-        const projectToSave = currentProjectRef.current;
+        let projectToSave = currentProjectRef.current;
+
+        // If no project exists and user is typing, auto-create one
+        if (!projectToSave && content.trim()) {
+          try {
+            console.log('[Panel] No project selected, auto-creating new project');
+            const newProject = await StorageService.createProject('Untitled Project', content);
+            setCurrentProject(newProject);
+            currentProjectRef.current = newProject;
+            setProjects((prev) => [newProject, ...prev]);
+            projectToSave = newProject;
+            console.log('[Panel] Auto-created project:', newProject.id);
+          } catch (error) {
+            console.error('[Panel] Failed to auto-create project:', error);
+            return;
+          }
+        }
+
         if (projectToSave) {
           try {
             setIsSaving(true);
@@ -353,8 +375,8 @@ function PanelContent() {
           } finally {
             setIsSaving(false);
           }
-        } else {
-          console.warn('[Panel] No current project to save to');
+        } else if (!content.trim()) {
+          console.log('[Panel] No content to save, skipping project creation');
         }
       }, 500);
 
@@ -538,6 +560,9 @@ function PanelContent() {
             const spacedResult =
               (needsSpaceBefore ? ' ' : '') + result + (needsSpaceAfter ? ' ' : '');
 
+            // Store the content before streaming for undo history
+            const contentBeforeGenerate = editorContent;
+
             // Use streaming effect to type out the text
             await simulateStreaming(
               textarea,
@@ -546,15 +571,35 @@ function PanelContent() {
               capturedSelection.start, // No selection, just insert at cursor
               (currentText, _currentLength) => {
                 // Update React state as text streams in
-                const beforeCursor = editorContent.substring(0, capturedSelection.start);
-                const afterCursor = editorContent.substring(capturedSelection.start);
+                const beforeCursor = contentBeforeGenerate.substring(0, capturedSelection.start);
+                const afterCursor = contentBeforeGenerate.substring(capturedSelection.start);
                 const newContent = beforeCursor + currentText + afterCursor;
                 setEditorContent(newContent);
               },
               () => {
                 // On complete, place cursor at end of inserted text
                 const insertEnd = capturedSelection.start + spacedResult.length;
+                textarea.focus();
                 textarea.setSelectionRange(insertEnd, insertEnd);
+
+                // Update captured selection in editor ref
+                if (editorRef?.current) {
+                  editorRef.current.updateCapturedSelection(insertEnd, insertEnd);
+                }
+
+                // Push to undo history AFTER streaming completes
+                const finalContent =
+                  contentBeforeGenerate.substring(0, capturedSelection.start) +
+                  spacedResult +
+                  contentBeforeGenerate.substring(capturedSelection.start);
+                if (editorRef?.current) {
+                  editorRef.current.pushToHistory(finalContent, insertEnd, insertEnd);
+                  console.log('[Panel] Pushed AI generate to undo history');
+                }
+
+                // Trigger auto-save/auto-create by calling handleEditorContentChange
+                handleEditorContentChange(finalContent);
+
                 // Reset AI flag after streaming completes
                 isAIGeneratedRef.current = false;
               }
@@ -591,6 +636,9 @@ function PanelContent() {
             capturedSelection.end
           );
 
+          // Store the content before streaming for undo history
+          const contentBeforeRewrite = editorContent;
+
           // Use streaming effect to type out the text
           await simulateStreaming(
             textarea,
@@ -599,8 +647,8 @@ function PanelContent() {
             capturedSelection.end,
             (currentText, currentLength) => {
               // Update React state as text streams in
-              const beforeSelection = editorContent.substring(0, capturedSelection.start);
-              const afterSelection = editorContent.substring(capturedSelection.end);
+              const beforeSelection = contentBeforeRewrite.substring(0, capturedSelection.start);
+              const afterSelection = contentBeforeRewrite.substring(capturedSelection.end);
               const newContent = beforeSelection + currentText + afterSelection;
               setEditorContent(newContent);
 
@@ -611,7 +659,26 @@ function PanelContent() {
             () => {
               // On complete, select the final text
               const newEnd = capturedSelection.start + spacedResult.length;
+              textarea.focus();
               textarea.setSelectionRange(capturedSelection.start, newEnd);
+
+              // Update captured selection in editor ref
+              if (editorRef?.current) {
+                editorRef.current.updateCapturedSelection(capturedSelection.start, newEnd);
+              }
+
+              // Push to undo history AFTER streaming completes
+              const finalContent =
+                contentBeforeRewrite.substring(0, capturedSelection.start) +
+                spacedResult +
+                contentBeforeRewrite.substring(capturedSelection.end);
+              if (editorRef?.current) {
+                editorRef.current.pushToHistory(finalContent, capturedSelection.start, newEnd);
+                console.log('[Panel] Pushed AI rewrite/summarize to undo history');
+              }
+
+              // Trigger auto-save/auto-create by calling handleEditorContentChange
+              handleEditorContentChange(finalContent);
             }
           );
 
@@ -651,10 +718,19 @@ function PanelContent() {
     try {
       const loadedProjects = await StorageService.getProjects();
       setProjects(loadedProjects);
+
+      // If current project was updated, refresh it too
+      if (currentProject) {
+        const updatedCurrentProject = loadedProjects.find(p => p.id === currentProject.id);
+        if (updatedCurrentProject) {
+          setCurrentProject(updatedCurrentProject);
+          console.log('[Panel] Current project refreshed after update:', updatedCurrentProject.title);
+        }
+      }
     } catch (error) {
       console.error('[Panel] Failed to load projects:', error);
     }
-  }, []);
+  }, [currentProject]);
 
   /**
    * Handle project selection
@@ -1118,159 +1194,112 @@ function PanelContent() {
           {(visitedTabs.has('generate') ||
             visitedTabs.has('rewrite') ||
             visitedTabs.has('summary')) && (
-            <div
-              style={{
-                display: ['generate', 'rewrite', 'summary'].includes(state.activeTab)
-                  ? 'flex'
-                  : 'none',
-                height: '100%',
-                flexDirection: 'column',
-                padding: '24px',
-              }}
-            >
-              {/* Shared Editor Toolbar */}
               <div
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '12px',
+                  display: ['generate', 'rewrite', 'summary'].includes(state.activeTab)
+                    ? 'flex'
+                    : 'none',
+                  height: '100%',
+                  flexDirection: 'column',
+                  padding: '24px 14px', // 24px top/bottom, 14px left/right
                 }}
               >
-                {isEditingTitle ? (
-                  <input
-                    type="text"
-                    value={editingTitle}
-                    onChange={(e) => setEditingTitle(e.target.value)}
-                    onBlur={handleTitleSave}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleTitleSave();
-                      } else if (e.key === 'Escape') {
-                        setIsEditingTitle(false);
-                      }
-                    }}
-                    autoFocus
-                    style={{
-                      fontSize: 'var(--fs-lg)',
-                      fontWeight: 600,
-                      color: 'var(--text)',
-                      background: 'var(--surface-2)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-sm)',
-                      padding: '4px 8px',
-                      outline: 'none',
-                      flex: 1,
-                      maxWidth: '400px',
-                    }}
-                  />
-                ) : (
-                  <h2
-                    onClick={handleTitleEditStart}
-                    style={{
-                      fontSize: 'var(--fs-lg)',
-                      fontWeight: 600,
-                      color: 'var(--text)',
-                      margin: 0,
-                      cursor: 'pointer',
-                      padding: '4px 8px',
-                      borderRadius: 'var(--radius-sm)',
-                      transition: 'background 0.2s',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-2)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                    title="Click to edit project name"
-                  >
-                    {currentProject?.title || 'Untitled Project'}
-                  </h2>
-                )}
+                {/* Shared Editor Toolbar */}
                 <div
                   style={{
                     display: 'flex',
-                    gap: '4px',
+                    justifyContent: 'space-between',
                     alignItems: 'center',
-                    position: 'relative',
+                    marginBottom: '12px',
                   }}
                 >
-                  {/* Processing indicator */}
-                  {state.isProcessing && (
-                    <div
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        border: '2px solid var(--border)',
-                        borderTopColor: 'var(--text)',
-                        borderRadius: '50%',
-                        animation: 'spin 0.8s linear infinite',
+                  {isEditingTitle ? (
+                    <input
+                      type="text"
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      onBlur={handleTitleSave}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleTitleSave();
+                        } else if (e.key === 'Escape') {
+                          setIsEditingTitle(false);
+                        }
                       }}
-                      aria-label="Processing"
+                      autoFocus
+                      style={{
+                        fontSize: 'var(--fs-lg)',
+                        fontWeight: 600,
+                        color: 'var(--text)',
+                        background: 'var(--surface-2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '4px 8px',
+                        outline: 'none',
+                        flex: 1,
+                        maxWidth: '400px',
+                      }}
                     />
+                  ) : (
+                    <h2
+                      onClick={handleTitleEditStart}
+                      style={{
+                        fontSize: 'var(--fs-lg)',
+                        fontWeight: 600,
+                        color: 'var(--text)',
+                        margin: 0,
+                        cursor: 'pointer',
+                        padding: '4px 12px',
+                        borderRadius: 'var(--radius-sm)',
+                        overflow: 'auto',
+                        maxWidth: '400px',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title="Click to edit project name"
+                    >
+                      {currentProject?.title || 'Untitled Project'}
+                    </h2>
                   )}
-
-                  {/* Copy button */}
-                  <button
-                    onClick={() => {
-                      if (editorContent) {
-                        navigator.clipboard
-                          .writeText(editorContent)
-                          .then(() => {
-                            console.log('[Panel] Content copied to clipboard');
-                          })
-                          .catch((err) => {
-                            console.error('[Panel] Failed to copy:', err);
-                          });
-                      }
-                    }}
-                    disabled={!editorContent}
-                    aria-label="Copy content"
-                    title="Copy content to clipboard"
+                  <div
                     style={{
-                      width: '32px',
-                      height: '32px',
-                      padding: 0,
                       display: 'flex',
+                      gap: '4px',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      background: 'transparent',
-                      border: 'none',
-                      borderRadius: 'var(--radius-sm)',
-                      color: 'var(--text-muted)',
-                      cursor: editorContent ? 'pointer' : 'not-allowed',
-                      opacity: editorContent ? 1 : 0.5,
-                      transition: 'all 0.2s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (editorContent) {
-                        e.currentTarget.style.background = 'var(--surface-2)';
-                        e.currentTarget.style.color = 'var(--text)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.color = 'var(--text-muted)';
+                      position: 'relative',
                     }}
                   >
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                    </svg>
-                  </button>
+                    {/* Processing indicator */}
+                    {state.isProcessing && (
+                      <div
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          border: '2px solid var(--border)',
+                          borderTopColor: 'var(--text)',
+                          borderRadius: '50%',
+                          animation: 'spin 0.8s linear infinite',
+                        }}
+                        aria-label="Processing"
+                      />
+                    )}
 
-                  {/* Export button */}
-                  <div ref={exportMenuRef} style={{ position: 'relative' }}>
+                    {/* Copy button */}
                     <button
-                      onClick={() => setShowExportMenu(!showExportMenu)}
-                      disabled={!currentProject}
-                      aria-label="Export project"
-                      aria-expanded={showExportMenu}
-                      title="Export (auto-formats on export)"
+                      onClick={() => {
+                        if (editorContent) {
+                          navigator.clipboard
+                            .writeText(editorContent)
+                            .then(() => {
+                              console.log('[Panel] Content copied to clipboard');
+                            })
+                            .catch((err) => {
+                              console.error('[Panel] Failed to copy:', err);
+                            });
+                        }
+                      }}
+                      disabled={!editorContent}
+                      aria-label="Copy content"
+                      title="Copy content to clipboard"
                       style={{
                         width: '32px',
                         height: '32px',
@@ -1282,12 +1311,12 @@ function PanelContent() {
                         border: 'none',
                         borderRadius: 'var(--radius-sm)',
                         color: 'var(--text-muted)',
-                        cursor: currentProject ? 'pointer' : 'not-allowed',
-                        opacity: currentProject ? 1 : 0.5,
+                        cursor: editorContent ? 'pointer' : 'not-allowed',
+                        opacity: editorContent ? 1 : 0.5,
                         transition: 'all 0.2s ease',
                       }}
                       onMouseEnter={(e) => {
-                        if (currentProject) {
+                        if (editorContent) {
                           e.currentTarget.style.background = 'var(--surface-2)';
                           e.currentTarget.style.color = 'var(--text)';
                         }
@@ -1305,169 +1334,222 @@ function PanelContent() {
                         stroke="currentColor"
                         strokeWidth="2"
                       >
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="17 8 12 3 7 8" />
-                        <line x1="12" y1="3" x2="12" y2="15" />
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                       </svg>
                     </button>
 
-                    {showExportMenu && (
-                      <div
+                    {/* Export button */}
+                    <div ref={exportMenuRef} style={{ position: 'relative' }}>
+                      <button
+                        onClick={() => setShowExportMenu(!showExportMenu)}
+                        disabled={!currentProject}
+                        aria-label="Export project"
+                        aria-expanded={showExportMenu}
+                        title="Export (auto-formats on export)"
                         style={{
-                          position: 'absolute',
-                          top: 'calc(100% + 4px)',
-                          right: 0,
-                          minWidth: '160px',
-                          background: 'var(--surface-2)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--radius-md)',
-                          boxShadow: 'var(--shadow-soft)',
-                          padding: '4px',
-                          zIndex: 100,
+                          width: '32px',
+                          height: '32px',
+                          padding: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'transparent',
+                          border: 'none',
+                          borderRadius: 'var(--radius-sm)',
+                          color: 'var(--text-muted)',
+                          cursor: currentProject ? 'pointer' : 'not-allowed',
+                          opacity: currentProject ? 1 : 0.5,
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (currentProject) {
+                            e.currentTarget.style.background = 'var(--surface-2)';
+                            e.currentTarget.style.color = 'var(--text)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = 'var(--text-muted)';
                         }}
                       >
-                        <button
-                          onClick={() => handleExport('txt')}
-                          style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text)',
-                            fontSize: 'var(--fs-sm)',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            borderRadius: 'var(--radius-sm)',
-                            transition: 'background 0.2s',
-                          }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background = 'var(--surface-3)')
-                          }
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
                         >
-                          Plain Text (.txt)
-                        </button>
-                        <button
-                          onClick={() => handleExport('md')}
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                      </button>
+
+                      {showExportMenu && (
+                        <div
                           style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text)',
-                            fontSize: 'var(--fs-sm)',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            borderRadius: 'var(--radius-sm)',
-                            transition: 'background 0.2s',
+                            position: 'absolute',
+                            top: 'calc(100% + 4px)',
+                            right: 0,
+                            minWidth: '160px',
+                            background: 'var(--surface-2)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--radius-md)',
+                            boxShadow: 'var(--shadow-soft)',
+                            padding: '4px',
+                            zIndex: 100,
                           }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background = 'var(--surface-3)')
-                          }
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                         >
-                          Markdown (.md)
-                        </button>
-                        <button
-                          onClick={() => handleExport('html')}
-                          style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text)',
-                            fontSize: 'var(--fs-sm)',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            borderRadius: 'var(--radius-sm)',
-                            transition: 'background 0.2s',
-                          }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background = 'var(--surface-3)')
-                          }
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                        >
-                          HTML (.html)
-                        </button>
-                        <button
-                          onClick={() => handleExport('docx')}
-                          style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text)',
-                            fontSize: 'var(--fs-sm)',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            borderRadius: 'var(--radius-sm)',
-                            transition: 'background 0.2s',
-                          }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background = 'var(--surface-3)')
-                          }
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                        >
-                          Docs (.doc)
-                        </button>
-                      </div>
-                    )}
+                          <button
+                            onClick={() => handleExport('txt')}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text)',
+                              fontSize: 'var(--fs-sm)',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              borderRadius: 'var(--radius-sm)',
+                              transition: 'background 0.2s',
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.background = 'var(--surface-3)')
+                            }
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            Plain Text (.txt)
+                          </button>
+                          <button
+                            onClick={() => handleExport('md')}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text)',
+                              fontSize: 'var(--fs-sm)',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              borderRadius: 'var(--radius-sm)',
+                              transition: 'background 0.2s',
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.background = 'var(--surface-3)')
+                            }
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            Markdown (.md)
+                          </button>
+                          <button
+                            onClick={() => handleExport('html')}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text)',
+                              fontSize: 'var(--fs-sm)',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              borderRadius: 'var(--radius-sm)',
+                              transition: 'background 0.2s',
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.background = 'var(--surface-3)')
+                            }
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            HTML (.html)
+                          </button>
+                          <button
+                            onClick={() => handleExport('docx')}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text)',
+                              fontSize: 'var(--fs-sm)',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              borderRadius: 'var(--radius-sm)',
+                              transition: 'background 0.2s',
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.background = 'var(--surface-3)')
+                            }
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            Docs (.doc)
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
+
+                {/* Single Unified Editor - shared across all tools */}
+                <UnifiedEditor
+                  ref={unifiedEditorRef}
+                  content={editorContent}
+                  onContentChange={handleEditorContentChange}
+                  activeTool={state.activeTab as 'generate' | 'rewrite' | 'summarize'}
+                  onSelectionChange={handleEditorSelectionChange}
+                  placeholder="Let's start writing!"
+                  disabled={isProcessing}
+                />
+
+                {/* Tool-specific controls - only one visible at a time */}
+                {state.activeTab === 'generate' && (
+                  <ToolControlsContainer
+                    activeTool="generate"
+                    pinnedNotes={state.pinnedNotes}
+                    content={editorContent}
+                    selection={editorSelection}
+                    editorRef={unifiedEditorRef}
+                    generatePrompt={generatePrompt}
+                    onGeneratePromptChange={setGeneratePrompt}
+                    onOperationStart={handleOperationStart}
+                    onOperationComplete={handleOperationComplete}
+                    onOperationError={handleOperationError}
+                  />
+                )}
+
+                {state.activeTab === 'rewrite' && (
+                  <ToolControlsContainer
+                    activeTool="rewrite"
+                    pinnedNotes={state.pinnedNotes}
+                    content={editorContent}
+                    selection={editorSelection}
+                    editorRef={unifiedEditorRef}
+                    rewritePrompt={rewritePrompt}
+                    onRewritePromptChange={setRewritePrompt}
+                    onOperationStart={handleOperationStart}
+                    onOperationComplete={handleOperationComplete}
+                    onOperationError={handleOperationError}
+                  />
+                )}
+
+                {state.activeTab === 'summary' && (
+                  <ToolControlsContainer
+                    activeTool="summarize"
+                    pinnedNotes={state.pinnedNotes}
+                    content={editorContent}
+                    selection={editorSelection}
+                    editorRef={unifiedEditorRef}
+                    summarizePrompt={summarizePrompt}
+                    onSummarizePromptChange={setSummarizePrompt}
+                    onOperationStart={handleOperationStart}
+                    onOperationComplete={handleOperationComplete}
+                    onOperationError={handleOperationError}
+                  />
+                )}
               </div>
-
-              {/* Single Unified Editor - shared across all tools */}
-              <UnifiedEditor
-                ref={unifiedEditorRef}
-                content={editorContent}
-                onContentChange={handleEditorContentChange}
-                activeTool={state.activeTab as 'generate' | 'rewrite' | 'summarize'}
-                onSelectionChange={handleEditorSelectionChange}
-                placeholder="Let's start writing!"
-                disabled={isProcessing}
-              />
-
-              {/* Tool-specific controls - only one visible at a time */}
-              {state.activeTab === 'generate' && (
-                <ToolControlsContainer
-                  activeTool="generate"
-                  pinnedNotes={state.pinnedNotes}
-                  content={editorContent}
-                  selection={editorSelection}
-                  editorRef={unifiedEditorRef}
-                  onOperationStart={handleOperationStart}
-                  onOperationComplete={handleOperationComplete}
-                  onOperationError={handleOperationError}
-                />
-              )}
-
-              {state.activeTab === 'rewrite' && (
-                <ToolControlsContainer
-                  activeTool="rewrite"
-                  pinnedNotes={state.pinnedNotes}
-                  content={editorContent}
-                  selection={editorSelection}
-                  editorRef={unifiedEditorRef}
-                  onOperationStart={handleOperationStart}
-                  onOperationComplete={handleOperationComplete}
-                  onOperationError={handleOperationError}
-                />
-              )}
-
-              {state.activeTab === 'summary' && (
-                <ToolControlsContainer
-                  activeTool="summarize"
-                  pinnedNotes={state.pinnedNotes}
-                  content={editorContent}
-                  selection={editorSelection}
-                  editorRef={unifiedEditorRef}
-                  onOperationStart={handleOperationStart}
-                  onOperationComplete={handleOperationComplete}
-                  onOperationError={handleOperationError}
-                />
-              )}
-            </div>
-          )}
+            )}
 
           {/* Old separate tab divs removed - now using single unified editor above */}
 
@@ -1503,6 +1585,47 @@ function PanelContent() {
           )}
         </ErrorBoundary>
       </div>
+
+      {/* Custom scrollbar styling for project title */}
+      <style>{`
+        /* Hide scrollbar by default */
+        h2[title="Click to edit project name"] {
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none; /* IE/Edge */
+        }
+        
+        h2[title="Click to edit project name"]::-webkit-scrollbar {
+          height: 6px;
+          background: transparent;
+        }
+        
+        h2[title="Click to edit project name"]::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        
+        h2[title="Click to edit project name"]::-webkit-scrollbar-thumb {
+          background: transparent;
+          border-radius: 3px;
+        }
+        
+        h2[title="Click to edit project name"]::-webkit-scrollbar-corner {
+          background: transparent;
+        }
+        
+        /* Show scrollbar on hover */
+        h2[title="Click to edit project name"]:hover {
+          scrollbar-width: thin; /* Firefox */
+          scrollbar-color: var(--border) transparent; /* Firefox */
+        }
+        
+        h2[title="Click to edit project name"]:hover::-webkit-scrollbar-thumb {
+          background: var(--border);
+        }
+        
+        h2[title="Click to edit project name"]:hover::-webkit-scrollbar-thumb:hover {
+          background: var(--text-muted);
+        }
+      `}</style>
     </div>
   );
 }

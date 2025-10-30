@@ -1,7 +1,8 @@
-import { useRef, forwardRef, useImperativeHandle, useMemo, useState } from 'react';
+import { useRef, forwardRef, useImperativeHandle, useMemo, useState, useEffect } from 'react';
 import { CursorIndicator } from './CursorIndicator';
 import { SelectionOverlay } from './SelectionOverlay';
 import { expandToWordBoundaries } from '../utils/textSelection';
+import { useUndoRedo } from '../hooks/useUndoRedo';
 
 /**
  * Selection range interface
@@ -63,6 +64,11 @@ export interface UnifiedEditorRef {
   updateCapturedSelection: (start: number, end: number) => void;
   getCapturedSelection: () => SelectionRange;
   insertAtCursor: (text: string, selectAfterInsert?: boolean, replaceSelection?: boolean) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  pushToHistory: (content: string, selectionStart: number, selectionEnd: number) => void;
 }
 
 /**
@@ -98,6 +104,44 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
     // Captured selection range - preserved even when textarea loses focus
     const capturedSelectionRef = useRef<SelectionRange>({ start: 0, end: 0 });
 
+    // Custom undo/redo system
+    const undoRedo = useUndoRedo(100);
+    
+    // Store undoRedo in a ref so it's stable across renders
+    const undoRedoRef = useRef(undoRedo);
+    undoRedoRef.current = undoRedo;
+    
+    // Flag to prevent pushing state during undo/redo operations
+    const isUndoRedoOperationRef = useRef(false);
+    
+    // Debounce timer for pushing states to history
+    const pushStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    
+    // Track if we've initialized the history
+    const hasInitializedRef = useRef(false);
+
+    // Initialize history with initial content
+    useEffect(() => {
+      if (!hasInitializedRef.current && content) {
+        console.log('[UnifiedEditor] Initializing undo history with content:', content.substring(0, 50));
+        undoRedoRef.current.pushState({
+          content,
+          selectionStart: 0,
+          selectionEnd: 0,
+        });
+        hasInitializedRef.current = true;
+      }
+    }, [content]); // Only depend on content
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+      return () => {
+        if (pushStateTimeoutRef.current) {
+          clearTimeout(pushStateTimeoutRef.current);
+        }
+      };
+    }, []);
+
     // No restoration effect needed! With single editor architecture, selection naturally persists
 
     // Expose textarea element and control methods to parent via ref
@@ -123,6 +167,50 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
         setShowSelectionOverlay(true);
       },
       getCapturedSelection: () => capturedSelectionRef.current,
+      undo: () => {
+        const prevState = undoRedoRef.current.undo();
+        if (prevState && textareaRef.current) {
+          isUndoRedoOperationRef.current = true;
+          onContentChange(prevState.content);
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.setSelectionRange(
+                prevState.selectionStart,
+                prevState.selectionEnd
+              );
+              textareaRef.current.focus();
+            }
+            isUndoRedoOperationRef.current = false;
+          }, 0);
+        }
+      },
+      redo: () => {
+        const nextState = undoRedoRef.current.redo();
+        if (nextState && textareaRef.current) {
+          isUndoRedoOperationRef.current = true;
+          onContentChange(nextState.content);
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.setSelectionRange(
+                nextState.selectionStart,
+                nextState.selectionEnd
+              );
+              textareaRef.current.focus();
+            }
+            isUndoRedoOperationRef.current = false;
+          }, 0);
+        }
+      },
+      canUndo: () => undoRedoRef.current.canUndo(),
+      canRedo: () => undoRedoRef.current.canRedo(),
+      pushToHistory: (content: string, selectionStart: number, selectionEnd: number) => {
+        console.log('[UnifiedEditor] Manually pushing to history:', content.substring(0, 50));
+        undoRedoRef.current.pushState({
+          content,
+          selectionStart,
+          selectionEnd,
+        });
+      },
       insertAtCursor: (
         text: string,
         selectAfterInsert: boolean = false,
@@ -201,10 +289,24 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
               start: insertStart,
               end: insertEnd,
             });
+            
+            // Push to undo history (AI operation completed)
+            undoRedoRef.current.pushState({
+              content: newContent,
+              selectionStart: insertStart,
+              selectionEnd: insertEnd,
+            });
           } else {
             // Just move cursor to end of inserted text
             const newCursorPos = startPos + textToInsert.length;
             textarea.setSelectionRange(newCursorPos, newCursorPos);
+            
+            // Push to undo history (AI operation completed)
+            undoRedoRef.current.pushState({
+              content: newContent,
+              selectionStart: newCursorPos,
+              selectionEnd: newCursorPos,
+            });
           }
         }, 0);
       },
@@ -214,25 +316,83 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
      * Handles textarea content change
      */
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      onContentChange(e.target.value);
+      const newContent = e.target.value;
+      onContentChange(newContent);
+      
+      // Push to undo history (debounced to avoid too many states during typing)
+      if (!isUndoRedoOperationRef.current) {
+        if (pushStateTimeoutRef.current) {
+          clearTimeout(pushStateTimeoutRef.current);
+        }
+        
+        console.log('[UnifiedEditor] Content changed, will push state in 300ms');
+        pushStateTimeoutRef.current = setTimeout(() => {
+          if (textareaRef.current) {
+            console.log('[UnifiedEditor] Pushing state to history:', newContent.substring(0, 50));
+            undoRedoRef.current.pushState({
+              content: newContent,
+              selectionStart: textareaRef.current.selectionStart,
+              selectionEnd: textareaRef.current.selectionEnd,
+            });
+          }
+        }, 300); // 300ms debounce
+      } else {
+        console.log('[UnifiedEditor] Content changed during undo/redo, NOT pushing to history');
+      }
     };
 
     /**
-     * Handles keyboard shortcuts (undo/redo are native, but we log for debugging)
+     * Handles keyboard shortcuts for undo/redo
      */
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       // Undo: Cmd+Z (Mac) or Ctrl+Z (Windows/Linux)
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
-        console.log('[UnifiedEditor] Undo triggered (native)');
-        // Native undo will handle this automatically
+        e.preventDefault();
+        console.log('[UnifiedEditor] Undo triggered, canUndo:', undoRedoRef.current.canUndo());
+        const prevState = undoRedoRef.current.undo();
+        console.log('[UnifiedEditor] Undo returned state:', prevState ? 'YES' : 'NO');
+        if (prevState && textareaRef.current) {
+          isUndoRedoOperationRef.current = true;
+          console.log('[UnifiedEditor] Restoring content:', prevState.content.substring(0, 50));
+          onContentChange(prevState.content);
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.setSelectionRange(
+                prevState.selectionStart,
+                prevState.selectionEnd
+              );
+            }
+            isUndoRedoOperationRef.current = false;
+          }, 0);
+        } else {
+          console.log('[UnifiedEditor] Cannot undo - no previous state');
+        }
       }
       // Redo: Cmd+Shift+Z (Mac) or Ctrl+Y (Windows/Linux)
       else if (
         ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') ||
         (e.ctrlKey && e.key === 'y')
       ) {
-        console.log('[UnifiedEditor] Redo triggered (native)');
-        // Native redo will handle this automatically
+        e.preventDefault();
+        console.log('[UnifiedEditor] Redo triggered, canRedo:', undoRedoRef.current.canRedo());
+        const nextState = undoRedoRef.current.redo();
+        console.log('[UnifiedEditor] Redo returned state:', nextState ? 'YES' : 'NO');
+        if (nextState && textareaRef.current) {
+          isUndoRedoOperationRef.current = true;
+          console.log('[UnifiedEditor] Restoring content:', nextState.content.substring(0, 50));
+          onContentChange(nextState.content);
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.setSelectionRange(
+                nextState.selectionStart,
+                nextState.selectionEnd
+              );
+            }
+            isUndoRedoOperationRef.current = false;
+          }, 0);
+        } else {
+          console.log('[UnifiedEditor] Cannot redo - no next state');
+        }
       }
     };
 
@@ -452,7 +612,9 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
             resize: 'none',
             border: 'none',
             background: 'var(--bg)',
-            padding: '16px',
+            paddingTop: '16px',
+            paddingLeft: '12px', // Align with title text
+            paddingRight: '10px', // Reduced padding for scrollbar
             paddingBottom: '48px', // Make room for counter at bottom
             fontSize: 'var(--fs-md)',
             lineHeight: '1.6',

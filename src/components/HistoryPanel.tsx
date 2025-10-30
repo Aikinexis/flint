@@ -569,7 +569,7 @@ export function HistoryPanel({
         /* History panel toggle button - just an arrow icon */
         .history-panel-toggle {
           position: fixed;
-          right: 76px;
+          right: 69px;
           top: 50%;
           transform: translateY(-50%);
           z-index: 99;

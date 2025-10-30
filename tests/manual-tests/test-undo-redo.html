@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Undo/Redo Test - Flint</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+    h1 {
+      color: #60a5fa;
+      margin-bottom: 10px;
+    }
+    .instructions {
+      background: #2a2a2a;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+      border-left: 4px solid #60a5fa;
+    }
+    .instructions h2 {
+      margin-top: 0;
+      color: #60a5fa;
+      font-size: 18px;
+    }
+    .instructions ol {
+      margin: 10px 0;
+      padding-left: 20px;
+    }
+    .instructions li {
+      margin: 8px 0;
+      line-height: 1.6;
+    }
+    .test-section {
+      background: #2a2a2a;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .test-section h3 {
+      margin-top: 0;
+      color: #60a5fa;
+    }
+    .status {
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-weight: 500;
+    }
+    .status.success {
+      background: #065f46;
+      color: #d1fae5;
+    }
+    .status.error {
+      background: #7f1d1d;
+      color: #fecaca;
+    }
+    .status.info {
+      background: #1e3a8a;
+      color: #bfdbfe;
+    }
+    code {
+      background: #3a3a3a;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 14px;
+    }
+    .keyboard-shortcut {
+      display: inline-block;
+      background: #3a3a3a;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid #4a4a4a;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+      margin: 0 2px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔄 Undo/Redo Functionality Test</h1>
+  
+  <div class="instructions">
+    <h2>Test Instructions</h2>
+    <ol>
+      <li>Load the Flint extension in Chrome</li>
+      <li>Open the side panel</li>
+      <li>Create or open a project</li>
+      <li>Perform the following tests:</li>
+    </ol>
+  </div>
+
+  <div class="test-section">
+    <h3>Test 1: Manual Typing Undo/Redo</h3>
+    <ol>
+      <li>Type some text in the editor (e.g., "Hello world")</li>
+      <li>Wait 300ms (debounce period)</li>
+      <li>Type more text (e.g., " This is a test")</li>
+      <li>Press <span class="keyboard-shortcut">Cmd+Z</span> (Mac) or <span class="keyboard-shortcut">Ctrl+Z</span> (Windows/Linux)</li>
+      <li>Verify: The last typed text should be removed</li>
+      <li>Press <span class="keyboard-shortcut">Cmd+Shift+Z</span> (Mac) or <span class="keyboard-shortcut">Ctrl+Y</span> (Windows/Linux)</li>
+      <li>Verify: The text should be restored</li>
+    </ol>
+    <div class="status info">
+      ✓ Expected: Undo removes recent changes, Redo restores them
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h3>Test 2: AI Operation Undo/Redo</h3>
+    <ol>
+      <li>Type some text in the editor</li>
+      <li>Select the text</li>
+      <li>Click "Rewrite" and apply a rewrite operation</li>
+      <li>Press <span class="keyboard-shortcut">Cmd+Z</span> / <span class="keyboard-shortcut">Ctrl+Z</span></li>
+      <li>Verify: The rewritten text is undone, original text is restored</li>
+      <li>Press <span class="keyboard-shortcut">Cmd+Shift+Z</span> / <span class="keyboard-shortcut">Ctrl+Y</span></li>
+      <li>Verify: The rewritten text is restored</li>
+    </ol>
+    <div class="status info">
+      ✓ Expected: AI operations can be undone and redone just like manual edits
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h3>Test 3: Generate Operation Undo/Redo</h3>
+    <ol>
+      <li>Place cursor in the editor</li>
+      <li>Use the Generate tool to insert text at cursor</li>
+      <li>Press <span class="keyboard-shortcut">Cmd+Z</span> / <span class="keyboard-shortcut">Ctrl+Z</span></li>
+      <li>Verify: The generated text is removed</li>
+      <li>Press <span class="keyboard-shortcut">Cmd+Shift+Z</span> / <span class="keyboard-shortcut">Ctrl+Y</span></li>
+      <li>Verify: The generated text is restored</li>
+    </ol>
+    <div class="status info">
+      ✓ Expected: Generated text can be undone and redone
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h3>Test 4: Multiple Undo/Redo Steps</h3>
+    <ol>
+      <li>Type "Step 1"</li>
+      <li>Wait 300ms</li>
+      <li>Type " Step 2"</li>
+      <li>Wait 300ms</li>
+      <li>Type " Step 3"</li>
+      <li>Press <span class="keyboard-shortcut">Cmd+Z</span> / <span class="keyboard-shortcut">Ctrl+Z</span> three times</li>
+      <li>Verify: Each undo removes one step in reverse order</li>
+      <li>Press <span class="keyboard-shortcut">Cmd+Shift+Z</span> / <span class="keyboard-shortcut">Ctrl+Y</span> three times</li>
+      <li>Verify: Each redo restores one step in forward order</li>
+    </ol>
+    <div class="status info">
+      ✓ Expected: Multiple undo/redo operations work correctly in sequence
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h3>Test 5: Undo After New Edit (Redo History Cleared)</h3>
+    <ol>
+      <li>Type "Original text"</li>
+      <li>Press <span class="keyboard-shortcut">Cmd+Z</span> / <span class="keyboard-shortcut">Ctrl+Z</span> to undo</li>
+      <li>Type "New text" (different from original)</li>
+      <li>Press <span class="keyboard-shortcut">Cmd+Shift+Z</span> / <span class="keyboard-shortcut">Ctrl+Y</span> to try redo</li>
+      <li>Verify: Redo does nothing (redo history was cleared when new text was typed)</li>
+    </ol>
+    <div class="status info">
+      ✓ Expected: Making a new edit after undo clears the redo history
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h3>Test 6: Selection Restoration</h3>
+    <ol>
+      <li>Type "Hello world test"</li>
+      <li>Select the word "world"</li>
+      <li>Type "universe" to replace it</li>
+      <li>Press <span class="keyboard-shortcut">Cmd+Z</span> / <span class="keyboard-shortcut">Ctrl+Z</span></li>
+      <li>Verify: "world" is restored AND the word is selected again</li>
+    </ol>
+    <div class="status info">
+      ✓ Expected: Undo/redo restores both content and selection state
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h3>✅ Success Criteria</h3>
+    <ul>
+      <li>All manual typing can be undone and redone</li>
+      <li>All AI operations (Generate, Rewrite, Summarize) can be undone and redone</li>
+      <li>Multiple undo/redo steps work correctly</li>
+      <li>Selection state is preserved during undo/redo</li>
+      <li>Redo history is cleared when making new edits after undo</li>
+      <li>No console errors during undo/redo operations</li>
+    </ul>
+  </div>
+
+  <div class="status success" style="margin-top: 30px;">
+    <strong>Implementation Complete!</strong><br>
+    Custom undo/redo system has been implemented in <code>src/hooks/useUndoRedo.ts</code> and integrated into <code>src/components/UnifiedEditor.tsx</code>
+  </div>
+</body>
+</html>
