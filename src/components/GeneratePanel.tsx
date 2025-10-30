@@ -54,6 +54,7 @@ export function GeneratePanel({
   const speechRecognitionRef = useRef<any>(null);
   const lengthDropdownRef = useRef<HTMLDivElement>(null);
   const historyDropdownRef = useRef<HTMLDivElement>(null);
+  const isPromptFromHistoryRef = useRef<boolean>(false);
 
   // Load prompt history on mount
   useEffect(() => {
@@ -173,6 +174,9 @@ export function GeneratePanel({
   const handlePromptChange = (value: string) => {
     setPrompt(value);
     
+    // Reset history flag when user manually types (modifies the prompt)
+    isPromptFromHistoryRef.current = false;
+    
     // Clear context when prompt input is cleared (Requirement 3.7)
     if (value.trim() === '') {
       setCurrentContext(null);
@@ -186,6 +190,8 @@ export function GeneratePanel({
   const handlePromptDoubleClick = () => {
     if (prompt === '' && promptHistory.length > 0) {
       setPrompt(promptHistory[0]!.text);
+      // Mark that this prompt came from history
+      isPromptFromHistoryRef.current = true;
     }
   };
 
@@ -195,6 +201,8 @@ export function GeneratePanel({
   const selectPromptFromHistory = (promptText: string) => {
     setPrompt(promptText);
     setShowHistoryDropdown(false);
+    // Mark that this prompt came from history so we don't save it again
+    isPromptFromHistoryRef.current = true;
     if (promptInputRef.current) {
       promptInputRef.current.focus();
     }
@@ -346,6 +354,9 @@ export function GeneratePanel({
         }
       }
       
+      // Use default prompt if empty - "Continue writing" or "Extend this content"
+      const effectivePrompt = prompt.trim() || 'Continue writing and extend this content naturally';
+      
       // Prepare pinned notes context
       const pinnedNotesContent = pinnedNotes.map(
         (note) => `${note.title}: ${note.content}`
@@ -371,7 +382,7 @@ export function GeneratePanel({
       // If currentContext is null, contextToPass remains undefined and generation proceeds without context
 
       // Call AI service with timeout
-      const generatePromise = AIService.generate(prompt, {
+      const generatePromise = AIService.generate(effectivePrompt, {
         pinnedNotes:
           pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
         length: selectedLength,
@@ -395,19 +406,25 @@ export function GeneratePanel({
       let historyItemId: string | undefined;
 
       // Save prompt to prompt history (Requirement 6.6)
+      // Only save if user provided a custom prompt (not the default and not from history)
       // Handle IndexedDB storage failures gracefully - log error and continue without saving
-      try {
-        await StorageService.savePromptToHistory(prompt);
-        console.log('[GeneratePanel] Prompt saved to history');
-        
-        // Reload history to get updated list
-        const history = await StorageService.getPromptHistory(4);
-        setPromptHistory(history);
-      } catch (promptHistoryError) {
-        // Gracefully handle storage failure - log error and continue (Requirement 6.6)
-        console.error('[GeneratePanel] Failed to save prompt to history:', promptHistoryError);
-        // Generation continues successfully even if prompt history save fails
+      if (prompt.trim() && !isPromptFromHistoryRef.current) {
+        try {
+          await StorageService.savePromptToHistory(prompt);
+          console.log('[GeneratePanel] Prompt saved to history');
+          
+          // Reload history to get updated list
+          const history = await StorageService.getPromptHistory(4);
+          setPromptHistory(history);
+        } catch (promptHistoryError) {
+          // Gracefully handle storage failure - log error and continue (Requirement 6.6)
+          console.error('[GeneratePanel] Failed to save prompt to history:', promptHistoryError);
+          // Generation continues successfully even if prompt history save fails
+        }
       }
+      
+      // Reset the history flag after generation
+      isPromptFromHistoryRef.current = false;
 
       // Generate output summary and update context (Requirements 3.2, 3.3, 3.5, 3.6, 3.9)
       // Context is based on OUTPUT summary, not the user's prompt
@@ -432,7 +449,7 @@ export function GeneratePanel({
         id: `generate-${Date.now()}`,
         text: result,
         label: `Result ${versions.length + 1}`,
-        title: prompt.slice(0, 50) + (prompt.length > 50 ? '...' : ''), // Use first 50 chars of prompt as title
+        title: effectivePrompt.slice(0, 50) + (effectivePrompt.length > 50 ? '...' : ''), // Use first 50 chars of prompt as title
         isOriginal: false,
         isLiked: false,
         timestamp: Date.now(),
@@ -973,6 +990,8 @@ export function GeneratePanel({
             if (e.key === 'Tab' && prompt === '' && promptHistory.length > 0) {
               e.preventDefault();
               setPrompt(promptHistory[0]!.text);
+              // Mark that this prompt came from history
+              isPromptFromHistoryRef.current = true;
             } else if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               handleGenerate();
@@ -1064,7 +1083,7 @@ export function GeneratePanel({
           <button
             className="flint-btn primary"
             onClick={handleGenerate}
-            disabled={isProcessing || !prompt.trim()}
+            disabled={isProcessing}
             aria-label="Generate"
             aria-busy={isProcessing}
             title="Generate"

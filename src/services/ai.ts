@@ -26,6 +26,7 @@ export interface AIAvailability {
 export interface SummaryOptions {
   mode: 'bullets' | 'paragraph' | 'brief';
   readingLevel: 'simple' | 'moderate' | 'detailed' | 'complex';
+  length?: 'short' | 'medium' | 'long';
   pinnedNotes?: string[];
 }
 
@@ -243,35 +244,44 @@ export class AIService {
         brief: 'headline',
       };
 
-      // Map reading level to length with word count guidance
-      const lengthMap: Record<string, string> = {
-        elementary: 'short',
-        'middle-school': 'short',
-        'high-school': 'medium',
-        college: 'long',
+      // Use explicit length if provided, otherwise map from reading level
+      const lengthFromReadingLevel: Record<string, string> = {
+        simple: 'short',
+        moderate: 'medium',
+        detailed: 'medium',
+        complex: 'long',
       };
+      
+      const summaryLength = options.length || lengthFromReadingLevel[options.readingLevel] || 'medium';
 
-      // Add word count targets to shared context based on reading level
+      // Add word count targets to shared context based on length
       const wordCountGuidance: Record<string, string> = {
-        elementary: 'Keep summary very brief, around 50-75 words.',
-        'middle-school': 'Keep summary concise, around 75-100 words.',
-        'high-school': 'Provide a moderate summary, around 100-150 words.',
-        college: 'Provide a detailed summary, around 150-250 words.',
+        short: 'Keep summary very brief, around 25 words total.',
+        medium: 'Provide a moderate summary, around 50 words total.',
+        long: 'Provide a detailed summary, around 200 words total.',
       };
 
-      // Merge pinned notes and word count guidance into shared context
+      // Add specific guidance for bullet points to keep them brief
+      const bulletGuidance = options.mode === 'bullets' 
+        ? 'Each bullet point must be extremely brief - just the key point in 3-5 words maximum, like a headline.'
+        : '';
+
+      // Merge pinned notes, word count guidance, and bullet guidance into shared context
       let sharedContext = '';
       if (options.pinnedNotes?.length) {
         sharedContext = `Audience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`;
       }
-      if (wordCountGuidance[options.readingLevel]) {
-        sharedContext += (sharedContext ? '\n\n' : '') + wordCountGuidance[options.readingLevel];
+      if (wordCountGuidance[summaryLength]) {
+        sharedContext += (sharedContext ? '\n\n' : '') + wordCountGuidance[summaryLength];
+      }
+      if (bulletGuidance) {
+        sharedContext += (sharedContext ? '\n\n' : '') + bulletGuidance;
       }
 
       const summarizer = await (self as any).Summarizer.create({
         type: typeMap[options.mode] || 'key-points',
         format: 'plain-text',
-        length: lengthMap[options.readingLevel] || 'medium',
+        length: summaryLength,
         sharedContext,
         outputLanguage: 'en', // Required for optimal output quality and safety
       });
@@ -369,25 +379,56 @@ export class AIService {
       return MockAIProvider.generate(prompt, options);
     }
 
-    // Build prompt with context if provided
-    let fullPrompt = prompt;
+    // Build context-aware prompt
+    let fullPrompt = '';
+    
     if (options.context) {
-      // Format context to help AI understand surrounding text
-      fullPrompt = `Surrounding text context:\n${options.context}\n\nUser request: ${prompt}\n\nGenerate text that fits naturally with the surrounding context.`;
-    }
+      // Extract text before and after cursor for better context
+      const contextLines = options.context.split('\n');
+      const beforeContext = contextLines.slice(0, -1).join('\n').slice(-500); // Last 500 chars before
+      const afterContext = contextLines.slice(-1).join('\n').slice(0, 500); // First 500 chars after
+      
+      // Build intelligent prompt based on context
+      fullPrompt = `You are a writing assistant. The user is writing a document and needs you to generate text at their cursor position.
 
-    // Add critical instructions
-    fullPrompt += `\n\nCRITICAL INSTRUCTIONS:
+CONTEXT BEFORE CURSOR:
+${beforeContext || '[Start of document]'}
+
+CONTEXT AFTER CURSOR:
+${afterContext || '[End of document]'}
+
+USER'S INSTRUCTION: ${prompt}
+
+CRITICAL RULES:
+- Generate ONLY new text that fits at the cursor position
+- Do NOT repeat, quote, or paraphrase any of the context text shown above
+- Do NOT use ellipsis (...) or placeholder text
+- Match the writing style, tone, and format of the surrounding text
+- Ensure the generated text flows naturally with what comes before and after
+- Output ONLY the new text itself - no explanations, no meta-commentary
+- Do NOT say things like "Here's the text:" or "Based on the context..."
+- Start directly with the actual content`;
+    } else {
+      // No context - standalone generation
+      fullPrompt = `${prompt}
+
+CRITICAL INSTRUCTIONS:
 - Output ONLY the generated text itself
 - Do NOT include any meta-commentary, explanations, or acknowledgments
 - Do NOT say things like "Here's the text:" or "I will generate..."
+- Do NOT use ellipsis (...) or placeholder text
 - Start directly with the requested content`;
+    }
 
     // Add word count target if specified
     if (options.lengthHint) {
       fullPrompt += `\n- Generate approximately ${options.lengthHint} words`;
     } else if (options.length === 'long') {
-      fullPrompt += `\n- Generate a comprehensive, detailed response`;
+      fullPrompt += `\n- Generate a detailed response (around 200 words)`;
+    } else if (options.length === 'short') {
+      fullPrompt += `\n- Generate a very brief response (around 25 words)`;
+    } else {
+      fullPrompt += `\n- Generate a moderate response (around 50 words)`;
     }
 
     // Merge pinned notes into context
@@ -440,6 +481,68 @@ export class AIService {
       return text;
     }
     return '...' + text.slice(-300).trim();
+  }
+
+  /**
+   * Proofreads text using the Prompt API (Proofreader API is not reliable yet)
+   * @param text - The text to proofread
+   * @returns Promise resolving to corrected text and corrections array
+   * @throws Error if API is unavailable or user activation is missing
+   */
+  static async proofread(text: string): Promise<{ corrected: string; corrections: any[] }> {
+    this.ensureUserActivation();
+
+    const availability = await this.checkAvailability();
+
+    // Use Prompt API for spell/grammar checking (Proofreader API is experimental and unreliable)
+    if (availability.promptAPI === 'unavailable') {
+      throw new Error('Prompt API not available. Please enable Chrome AI features.');
+    }
+
+    try {
+      console.log('[AI] Using Prompt API for proofreading...');
+      
+      const prompt = `You are a spell checker and grammar corrector. Fix all spelling and grammar errors in the following text.
+
+CRITICAL RULES:
+- Output ONLY the corrected text
+- Do NOT add explanations, comments, or meta-text
+- Do NOT say things like "Here's the corrected text:" or "I fixed..."
+- Keep the same formatting and structure
+- Only fix spelling and grammar errors
+- Do NOT change the meaning or rewrite the content
+
+Text to correct:
+${text}`;
+
+      const corrected = await this.prompt(prompt);
+      
+      // Clean up the response (remove any extra formatting or quotes)
+      let cleanedText = corrected.trim();
+      
+      // Remove common wrapper phrases if present
+      cleanedText = cleanedText
+        .replace(/^(Here's the corrected text:|Corrected text:|Here is the corrected version:)\s*/i, '')
+        .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+        .trim();
+      
+      // Count corrections by comparing differences
+      const corrections = cleanedText !== text ? [{ type: 'correction' }] : [];
+      
+      console.log('[AI] Proofreading completed:', {
+        original: text.substring(0, 50),
+        corrected: cleanedText.substring(0, 50),
+        changed: cleanedText !== text
+      });
+      
+      return {
+        corrected: cleanedText,
+        corrections,
+      };
+    } catch (error) {
+      console.error('[AI] Prompt API proofreading failed:', error);
+      throw new Error('Proofreading failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
   }
 }
 

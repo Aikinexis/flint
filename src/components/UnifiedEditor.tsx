@@ -1,6 +1,4 @@
 import { useRef, forwardRef, useImperativeHandle, useMemo, useState } from 'react';
-import { usePanelMiniBar } from '../hooks/usePanelMiniBar';
-import { MiniBar } from './MiniBar';
 import { CursorIndicator } from './CursorIndicator';
 import { SelectionOverlay } from './SelectionOverlay';
 import { expandToWordBoundaries } from '../utils/textSelection';
@@ -52,20 +50,6 @@ export interface UnifiedEditorProps {
    */
   readOnly?: boolean;
 
-  /**
-   * Pinned notes for AI context (passed to MiniBar)
-   */
-  pinnedNotes?: string[];
-
-  /**
-   * Callback when MiniBar navigates to a different tab (fallback behavior)
-   */
-  onMiniBarNavigate?: (panel: 'rewrite' | 'summary', text: string) => void;
-
-  /**
-   * Callback to create snapshot before AI operation in MiniBar
-   */
-  onBeforeMiniBarOperation?: (operationType: 'rewrite' | 'summarize') => Promise<void>;
 }
 
 /**
@@ -79,6 +63,7 @@ export interface UnifiedEditorRef {
   hideSelectionOverlay: () => void;
   updateCapturedSelection: (start: number, end: number) => void;
   getCapturedSelection: () => SelectionRange;
+  insertAtCursor: (text: string, selectAfterInsert?: boolean, replaceSelection?: boolean) => void;
 }
 
 /**
@@ -93,19 +78,12 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(fu
   placeholder = 'Start typing or paste text here...',
   disabled = false,
   readOnly = false,
-  pinnedNotes = [],
-  onMiniBarNavigate,
-  onBeforeMiniBarOperation,
 }, ref) {
   // Ref for the textarea element
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Track cursor position and selection state
   const selectionRef = useRef<SelectionRange>({ start: 0, end: 0 });
-
-  // Mini bar for text selection
-  const miniBarRef = useRef<HTMLDivElement>(null);
-  const { anchor, clear } = usePanelMiniBar(miniBarRef);
 
   // State for showing indicators
   const [showSelectionOverlay, setShowSelectionOverlay] = useState(false);
@@ -115,16 +93,6 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(fu
   const capturedSelectionRef = useRef<SelectionRange>({ start: 0, end: 0 });
   
   // No restoration effect needed! With single editor architecture, selection naturally persists
-
-  /**
-   * Handle MiniBar navigation (fallback when inline replacement not available)
-   */
-  const handleMiniBarNavigate = (panel: 'rewrite' | 'summary', text: string) => {
-    if (onMiniBarNavigate) {
-      onMiniBarNavigate(panel, text);
-    }
-    clear();
-  };
 
   // Expose textarea element and control methods to parent via ref
   useImperativeHandle(ref, () => ({
@@ -149,6 +117,69 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(fu
       setShowSelectionOverlay(true);
     },
     getCapturedSelection: () => capturedSelectionRef.current,
+    insertAtCursor: (text: string, selectAfterInsert: boolean = false, replaceSelection: boolean = false) => {
+      if (!textareaRef.current) return;
+      
+      console.log('[UnifiedEditor] insertAtCursor called with text:', text.substring(0, 50) + '...', 'select:', selectAfterInsert, 'replace:', replaceSelection);
+      
+      const textarea = textareaRef.current;
+      
+      let startPos, endPos;
+      if (replaceSelection && capturedSelectionRef.current.start !== capturedSelectionRef.current.end) {
+        // Replace the captured selection
+        startPos = capturedSelectionRef.current.start;
+        endPos = capturedSelectionRef.current.end;
+        console.log('[UnifiedEditor] Replacing selection:', startPos, '-', endPos);
+      } else {
+        // Insert at cursor
+        startPos = textarea.selectionStart;
+        endPos = startPos;
+      }
+      
+      const before = content.substring(0, startPos);
+      const after = content.substring(endPos);
+      
+      console.log('[UnifiedEditor] Insert/replace position:', startPos, '-', endPos);
+      console.log('[UnifiedEditor] Content length before:', content.length);
+      
+      // Insert with proper spacing (only if inserting, not replacing)
+      const needsSpaceBefore = !replaceSelection && before.length > 0 && !before.endsWith('\n') && !before.endsWith(' ');
+      const needsSpaceAfter = !replaceSelection && after.length > 0 && !after.startsWith('\n') && !after.startsWith(' ');
+      
+      const spaceBefore = needsSpaceBefore ? ' ' : '';
+      const spaceAfter = needsSpaceAfter ? ' ' : '';
+      const textToInsert = spaceBefore + text + spaceAfter;
+      const newContent = before + textToInsert + after;
+      
+      console.log('[UnifiedEditor] New content length:', newContent.length);
+      
+      // Update content
+      onContentChange(newContent);
+      
+      // Calculate selection range (excluding added spaces)
+      const insertStart = startPos + spaceBefore.length;
+      const insertEnd = insertStart + text.length;
+      
+      setTimeout(() => {
+        textarea.focus();
+        if (selectAfterInsert) {
+          // Select the inserted text (excluding spaces)
+          textarea.setSelectionRange(insertStart, insertEnd);
+          // Update captured selection refs
+          capturedSelectionRef.current = { start: insertStart, end: insertEnd };
+          selectionRef.current = { start: insertStart, end: insertEnd };
+          setCapturedSelection({ start: insertStart, end: insertEnd });
+          setShowSelectionOverlay(true);
+          // Notify parent of selection
+          onSelectionChange({ start: insertStart, end: insertEnd });
+          console.log('[UnifiedEditor] Text inserted and selected:', { start: insertStart, end: insertEnd });
+        } else {
+          // Just move cursor to end of inserted text
+          const newCursorPos = startPos + textToInsert.length;
+          textarea.setSelectionRange(newCursorPos, newCursorPos);
+        }
+      }, 0);
+    },
   }));
 
   /**
@@ -156,6 +187,22 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(fu
    */
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onContentChange(e.target.value);
+  };
+
+  /**
+   * Handles keyboard shortcuts (undo/redo are native, but we log for debugging)
+   */
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Undo: Cmd+Z (Mac) or Ctrl+Z (Windows/Linux)
+    if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+      console.log('[UnifiedEditor] Undo triggered (native)');
+      // Native undo will handle this automatically
+    }
+    // Redo: Cmd+Shift+Z (Mac) or Ctrl+Y (Windows/Linux)
+    else if (((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') || (e.ctrlKey && e.key === 'y')) {
+      console.log('[UnifiedEditor] Redo triggered (native)');
+      // Native redo will handle this automatically
+    }
   };
 
   /**
@@ -205,6 +252,9 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(fu
       onSelectionChange({ start: expanded.start, end: expanded.end });
     } else {
       // No selection - just cursor position
+      // Update state to trigger re-render of cursor indicator
+      setCapturedSelection({ start, end });
+      
       // Hide overlay locally but DON'T notify parent (preserves shared selection across tools)
       setShowSelectionOverlay(false);
       console.log('[UnifiedEditor] ✓ Cursor position captured (no selection, hiding overlay):', { start, end });
@@ -230,9 +280,10 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(fu
     const start = textareaRef.current.selectionStart;
     const end = textareaRef.current.selectionEnd;
 
-    // Update captured refs but DON'T hide the overlay
+    // Update captured refs and state
     selectionRef.current = { start, end };
     capturedSelectionRef.current = { start, end };
+    setCapturedSelection({ start, end }); // Update state to trigger re-render
     
     console.log('[UnifiedEditor] 🔵 BLUR - CAPTURED SELECTION:', { start, end, capturedRef: capturedSelectionRef.current });
 
@@ -247,27 +298,59 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(fu
   // Remove the problematic useEffect that was interfering with typing
   // The cursor position is already tracked by handleSelect and doesn't need restoration
 
-  // Calculate word and character counts
+  // Check if there's an actual selection (not just cursor)
+  const hasSelection = useMemo(() => {
+    return capturedSelection.start !== capturedSelection.end;
+  }, [capturedSelection.start, capturedSelection.end]);
+
+  // Calculate word and character counts (for selection or full content)
   const wordCount = useMemo(() => {
+    if (hasSelection) {
+      const selectedText = content.substring(capturedSelection.start, capturedSelection.end);
+      return selectedText.trim() === '' ? 0 : selectedText.trim().split(/\s+/).length;
+    }
     return content.trim() === '' ? 0 : content.trim().split(/\s+/).length;
-  }, [content]);
+  }, [content, hasSelection, capturedSelection.start, capturedSelection.end]);
 
   const charCount = useMemo(() => {
+    if (hasSelection) {
+      return capturedSelection.end - capturedSelection.start;
+    }
     return content.length;
-  }, [content]);
+  }, [content.length, hasSelection, capturedSelection.start, capturedSelection.end]);
   
   // Calculate cursor direction for generate tool indicator
+  // Use state value (capturedSelection) instead of ref to trigger re-renders
   const cursorDirection: 'forward' | 'backward' | 'bidirectional' = useMemo(() => {
-    const cursorPos = capturedSelectionRef.current.start;
+    const cursorPos = capturedSelection.start;
     
-    if (cursorPos === 0) {
-      return 'backward'; // At start, text flows backward (to the left)
-    } else if (cursorPos >= content.length) {
-      return 'forward'; // At end, text flows forward (to the right)
-    } else {
-      return 'bidirectional'; // In middle, text can flow both ways
+    // Check characters around cursor position
+    const charBefore = cursorPos > 0 ? content[cursorPos - 1] : '';
+    const charAfter = cursorPos < content.length ? content[cursorPos] : '';
+    
+    // At start of document (position 0 with content after)
+    if (cursorPos === 0 && content.length > 0) {
+      return 'backward'; // Show left arrow (text generates before existing content)
     }
-  }, [content, capturedSelectionRef.current.start]);
+    
+    // At end of document
+    if (cursorPos >= content.length) {
+      return 'forward'; // Show right arrow (text appends)
+    }
+    
+    // At end of a line/paragraph (next char is newline)
+    if (charAfter === '\n') {
+      return 'forward'; // Show right arrow (continuing the paragraph)
+    }
+    
+    // At start of a line/paragraph (previous char is newline, or at position 0)
+    if (charBefore === '\n' || cursorPos === 0) {
+      return 'backward'; // Show left arrow (text generates at start of line)
+    }
+    
+    // In the middle of a line
+    return 'bidirectional'; // Show both arrows (text can go either way)
+  }, [content, capturedSelection.start]);
 
   return (
     <div
@@ -279,7 +362,23 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(fu
         position: 'relative',
       }}
     >
-
+      {/* Processing overlay - prevents interaction during AI operations */}
+      {disabled && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.02)',
+            zIndex: 100,
+            cursor: 'not-allowed',
+            pointerEvents: 'all',
+          }}
+          aria-hidden="true"
+        />
+      )}
       
       {/* Selection overlay - highlights selected text with colored border */}
       <SelectionOverlay 
@@ -295,12 +394,14 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(fu
         onChange={handleChange}
         onSelect={handleSelect}
         onKeyUp={handleSelect}
+        onKeyDown={handleKeyDown}
         onClick={handleClick}
         onBlur={handleBlur}
         onMouseUp={handleSelect}
         placeholder={placeholder}
         disabled={disabled}
         readOnly={readOnly}
+        spellCheck={true}
         aria-label="Document editor"
         dir="ltr"
         style={{
@@ -323,7 +424,7 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(fu
         }}
       />
 
-      {/* Word and character counter - positioned at bottom of textarea */}
+      {/* Bottom status bar with cursor indicator and word counter */}
       {content.length > 0 && (
         <div
           style={{
@@ -336,50 +437,46 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(fu
             userSelect: 'none',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: '8px',
             pointerEvents: 'none',
             background: 'var(--bg)',
             padding: '4px 8px',
             borderRadius: 'var(--radius-sm)',
             zIndex: 10,
           }}
-          aria-label={`${wordCount} ${wordCount === 1 ? 'word' : 'words'}, ${charCount} ${charCount === 1 ? 'character' : 'characters'}`}
         >
-          <span>{wordCount}w</span>
-          <span style={{ opacity: 0.5 }}>·</span>
-          <span>{charCount}c</span>
-        </div>
-      )}
-      
-      {/* Cursor direction indicator - positioned between word counter and sidebar, only in generate tool */}
-      {activeTool === 'generate' && content.length > 0 && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '16px',
-            right: '16px',
-            pointerEvents: 'none',
-            zIndex: 10,
-          }}
-        >
-          <CursorIndicator 
-            show={true}
-            direction={cursorDirection}
-          />
+          {/* Cursor direction indicator - only show in generate tool when NO selection */}
+          {activeTool === 'generate' && !hasSelection && (
+            <CursorIndicator 
+              show={true}
+              direction={cursorDirection}
+            />
+          )}
+          
+          {/* Word and character counter */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '2px 8px',
+              borderRadius: hasSelection ? '12px' : '0',
+              border: hasSelection ? '1px solid var(--primary)' : '1px solid transparent',
+              boxShadow: hasSelection ? '0 0 8px color-mix(in srgb, var(--primary) 40%, transparent)' : 'none',
+              transition: 'all 0.2s ease',
+            }}
+            aria-label={hasSelection 
+              ? `${wordCount} ${wordCount === 1 ? 'word' : 'words'}, ${charCount} ${charCount === 1 ? 'character' : 'characters'} selected`
+              : `${wordCount} ${wordCount === 1 ? 'word' : 'words'}, ${charCount} ${charCount === 1 ? 'character' : 'characters'}`
+            }
+          >
+            <span>{wordCount}w</span>
+            <span style={{ opacity: 0.5 }}>·</span>
+            <span>{charCount}c</span>
+          </div>
         </div>
       )}
 
-      {/* Mini bar for text selection with inline replacement */}
-      <MiniBar
-        anchor={anchor}
-        onClose={clear}
-        onSend={handleMiniBarNavigate}
-        toolbarRef={miniBarRef}
-        textareaRef={textareaRef}
-        selectionRange={capturedSelectionRef.current}
-        pinnedNotes={pinnedNotes}
-        onBeforeOperation={onBeforeMiniBarOperation}
-      />
     </div>
   );
 });

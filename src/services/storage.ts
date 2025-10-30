@@ -87,6 +87,8 @@ export interface Settings {
   localOnlyMode: boolean;
   accentHue: number; // Hue value (0-360) for OKLCH color system
   historyMigrated?: boolean; // Flag to track if history has been migrated to snapshots
+  autoCorrectEnabled?: boolean; // Auto-correct spelling and grammar after typing pause
+  autoCorrectDelay?: number; // Delay in milliseconds before auto-correct triggers (default 3000)
 }
 
 /**
@@ -97,6 +99,8 @@ const DEFAULT_SETTINGS: Settings = {
   theme: 'dark',
   localOnlyMode: false,
   accentHue: 255, // Default blue hue
+  autoCorrectEnabled: false, // Off by default
+  autoCorrectDelay: 3000, // 3 seconds
 };
 
 /**
@@ -728,8 +732,8 @@ export class StorageService extends StorageServiceBase {
    * Default generate settings (word counts)
    */
   private static readonly DEFAULT_GENERATE_SETTINGS: GenerateSettings = {
-    shortLength: 100, // ~100 words
-    mediumLength: 300, // ~300 words
+    shortLength: 25, // ~25 words
+    mediumLength: 50, // ~50 words
     contextAwarenessEnabled: true,
   };
 

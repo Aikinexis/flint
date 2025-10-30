@@ -31,9 +31,13 @@ function PanelContent() {
   // Unified editor state
   const [editorContent, setEditorContent] = useState('');
   const [editorSelection, setEditorSelection] = useState<SelectionRange>({ start: 0, end: 0 });
+  const [isProcessing, setIsProcessing] = useState(false);
   
   // Single unified editor ref shared across all tools
   const unifiedEditorRef = useRef<UnifiedEditorRef>(null);
+  
+  // Track if content change is from AI or manual input (for future features)
+  const isAIGeneratedRef = useRef<boolean>(false);
   
 
 
@@ -50,6 +54,8 @@ function PanelContent() {
   // Export menu state
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  
+
   
   // Project title editing state
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -119,10 +125,14 @@ function PanelContent() {
       _sender: chrome.runtime.MessageSender,
       sendResponse: (response: { success: boolean; data?: unknown; error?: string }) => void
     ) => {
-      console.log('[Panel] Received message:', message);
+      // Don't log PING_PANEL messages (they're just noise)
+      if (message.type !== 'PING_PANEL') {
+        console.log('[Panel] Received message:', message);
+      }
 
-      // Only handle messages from content script
-      if (message.source !== 'content-script') {
+      // Only handle messages relayed through background worker
+      // This prevents double-delivery (content script sends to background, background relays to panel)
+      if (message.source !== 'background-relay') {
         return;
       }
 
@@ -178,6 +188,48 @@ function PanelContent() {
           }
           sendResponse({ success: true, data: { message: 'Opened Rewrite tab' } });
           break;
+
+        case 'INSERT_AND_OPEN_GENERATE':
+          // Insert text at cursor position
+          if (message.payload?.text && unifiedEditorRef.current) {
+            const textToInsert = message.payload.text.trim();
+            console.log('[Panel] INSERT_AND_OPEN_GENERATE - inserting text:', textToInsert.substring(0, 50) + '...');
+            unifiedEditorRef.current.insertAtCursor(textToInsert);
+          }
+          // Open generate tab
+          actions.setActiveTab('generate');
+          setVisitedTabs(prev => new Set(prev).add('generate'));
+          chrome.storage.local.set({ 'flint.lastTab': 'generate' });
+          sendResponse({ success: true, data: { message: 'Inserted text and opened Generate tab' } });
+          return true;
+
+        case 'INSERT_AND_OPEN_SUMMARY':
+          // Insert text at cursor position and select it for summarizing
+          if (message.payload?.text && unifiedEditorRef.current) {
+            const textToInsert = message.payload.text.trim();
+            console.log('[Panel] INSERT_AND_OPEN_SUMMARY - inserting text:', textToInsert.substring(0, 50) + '...');
+            unifiedEditorRef.current.insertAtCursor(textToInsert, true); // true = select after insert
+          }
+          // Open summary tab
+          actions.setActiveTab('summary');
+          setVisitedTabs(prev => new Set(prev).add('summary'));
+          chrome.storage.local.set({ 'flint.lastTab': 'summary' });
+          sendResponse({ success: true, data: { message: 'Inserted text and opened Summary tab' } });
+          return true;
+
+        case 'INSERT_AND_OPEN_REWRITE':
+          // Insert text at cursor position and select it for rewriting
+          if (message.payload?.text && unifiedEditorRef.current) {
+            const textToInsert = message.payload.text.trim();
+            console.log('[Panel] INSERT_AND_OPEN_REWRITE - inserting text:', textToInsert.substring(0, 50) + '...');
+            unifiedEditorRef.current.insertAtCursor(textToInsert, true); // true = select after insert
+          }
+          // Open rewrite tab
+          actions.setActiveTab('rewrite');
+          setVisitedTabs(prev => new Set(prev).add('rewrite'));
+          chrome.storage.local.set({ 'flint.lastTab': 'rewrite' });
+          sendResponse({ success: true, data: { message: 'Inserted text and opened Rewrite tab' } });
+          return true;
 
         default:
           // Not a message we handle
@@ -240,7 +292,7 @@ function PanelContent() {
   }, []);
 
   /**
-   * Handle unified editor content change with auto-save and auto-snapshot
+   * Handle unified editor content change with auto-save, auto-snapshot, and auto-correct
    */
   const handleEditorContentChange = useCallback((content: string) => {
     setEditorContent(content);
@@ -266,6 +318,8 @@ function PanelContent() {
           const updatedProject = await StorageService.updateProject(projectToSave.id, { content });
           if (updatedProject) {
             setCurrentProject(updatedProject);
+            // Also update the projects list so export from project card has latest content
+            setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
             console.log('[Panel] Project auto-saved successfully:', projectToSave.id, 'Content length:', content.length);
           }
         } catch (error) {
@@ -310,7 +364,35 @@ function PanelContent() {
         }
       }
     }, 3000);
+    
+
   }, [actions]);
+
+  /**
+   * Force save current project immediately (for export)
+   */
+  const handleForceSave = useCallback(async () => {
+    // Clear any pending auto-save timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    
+    const projectToSave = currentProjectRef.current;
+    if (projectToSave) {
+      try {
+        console.log('[Panel] Force saving project before export');
+        const updatedProject = await StorageService.updateProject(projectToSave.id, { content: editorContent });
+        if (updatedProject) {
+          setCurrentProject(updatedProject);
+          setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
+          console.log('[Panel] Force save completed');
+        }
+      } catch (error) {
+        console.error('[Panel] Force save failed:', error);
+        throw error;
+      }
+    }
+  }, [editorContent]);
 
   /**
    * Handle unified editor selection change
@@ -321,50 +403,11 @@ function PanelContent() {
   }, []);
 
   /**
-   * Handle snapshot creation before MiniBar AI operations
-   */
-  const handleBeforeMiniBarOperation = useCallback(async (operationType: 'rewrite' | 'summarize') => {
-    if (!currentProject) {
-      console.log('[Panel] No current project, skipping snapshot creation');
-      return;
-    }
-
-    try {
-      // Generate action description based on operation type
-      let actionDescription = '';
-      switch (operationType) {
-        case 'rewrite':
-          actionDescription = 'Rewrote selection';
-          break;
-        case 'summarize':
-          actionDescription = 'Summarized selection';
-          break;
-      }
-
-      // Create snapshot with current content before replacement
-      const snapshot = await StorageService.createSnapshot(
-        currentProject.id,
-        editorContent,
-        operationType,
-        actionDescription,
-        editorSelection
-      );
-
-      // Add snapshot to local state immediately
-      setSnapshots(prev => [snapshot, ...prev]);
-
-      console.log(`[Panel] Created snapshot before MiniBar ${operationType} operation:`, snapshot.id);
-    } catch (error) {
-      console.error('[Panel] Failed to create snapshot from MiniBar:', error);
-      // Continue with operation even if snapshot creation fails
-    }
-  }, [currentProject, editorContent, editorSelection]);
-
-  /**
    * Handle operation start from tool controls
    */
   const handleOperationStart = useCallback((operationType?: ToolType) => {
     actions.setIsProcessing(true);
+    setIsProcessing(true); // Disable editor during processing
     
     // Show appropriate indicator based on operation type
     const editorRef = unifiedEditorRef;
@@ -385,6 +428,7 @@ function PanelContent() {
    */
   const handleOperationComplete = useCallback(async (result: string, operationType: ToolType) => {
     actions.setIsProcessing(false);
+    setIsProcessing(false); // Re-enable editor after processing
     actions.setCurrentResult(result);
     
     // Create snapshot before replacement if we have a current project
@@ -434,14 +478,31 @@ function PanelContent() {
     const capturedSelection = editorRef?.current?.getCapturedSelection();
     console.log('[Panel] Using captured selection from editor ref:', capturedSelection);
     
+    // Mark that this content change is from AI (not manual input)
+    isAIGeneratedRef.current = true;
+    
     // For generate operations, insert at cursor position with streaming effect
     if (operationType === 'generate') {
       if (textarea && capturedSelection) {
         try {
+          // Check if we need to add a space before the generated text
+          // Add space if cursor is right after a non-whitespace character
+          const charBefore = capturedSelection.start > 0 ? editorContent[capturedSelection.start - 1] : '';
+          const firstChar = result[0] || '';
+          const needsSpaceBefore = charBefore && !/\s/.test(charBefore) && firstChar && !/\s/.test(firstChar);
+          
+          // Check if we need to add a space after the generated text
+          const charAfter = capturedSelection.start < editorContent.length ? editorContent[capturedSelection.start] : '';
+          const lastChar = result[result.length - 1] || '';
+          const needsSpaceAfter = charAfter && !/\s/.test(charAfter) && lastChar && !/\s/.test(lastChar);
+          
+          // Add spaces if needed
+          const spacedResult = (needsSpaceBefore ? ' ' : '') + result + (needsSpaceAfter ? ' ' : '');
+          
           // Use streaming effect to type out the text
           await simulateStreaming(
             textarea,
-            result,
+            spacedResult,
             capturedSelection.start,
             capturedSelection.start, // No selection, just insert at cursor
             (currentText, _currentLength) => {
@@ -453,8 +514,10 @@ function PanelContent() {
             },
             () => {
               // On complete, place cursor at end of inserted text
-              const insertEnd = capturedSelection.start + result.length;
+              const insertEnd = capturedSelection.start + spacedResult.length;
               textarea.setSelectionRange(insertEnd, insertEnd);
+              // Reset AI flag after streaming completes
+              isAIGeneratedRef.current = false;
             }
           );
           
@@ -524,6 +587,7 @@ function PanelContent() {
    */
   const handleOperationError = useCallback((error: string) => {
     actions.setIsProcessing(false);
+    setIsProcessing(false); // Re-enable editor after error
     actions.setError(error);
     alert(error); // Simple error display for now
     console.error('[Panel] Operation error:', error);
@@ -771,6 +835,7 @@ function PanelContent() {
   const handleSnapshotRestore = useCallback((content: string) => {
     setEditorContent(content);
     actions.setCurrentText(content);
+    actions.setIsHistoryPanelOpen(false); // Close history panel to show restored content
     console.log('[Panel] Restored snapshot content to editor');
   }, [actions]);
 
@@ -780,6 +845,16 @@ function PanelContent() {
   const handleHistoryPanelToggle = useCallback(() => {
     actions.toggleHistoryPanel();
   }, [actions]);
+
+  /**
+   * Auto-close history panel when switching to non-editor tabs
+   */
+  useEffect(() => {
+    const nonEditorTabs = ['settings', 'projects', 'home'];
+    if (nonEditorTabs.includes(state.activeTab) && state.isHistoryPanelOpen) {
+      actions.setIsHistoryPanelOpen(false);
+    }
+  }, [state.activeTab, state.isHistoryPanelOpen, actions]);
 
   /**
    * Handle export in specified format (with auto-format)
@@ -860,6 +935,8 @@ function PanelContent() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showExportMenu]);
+
+
 
   return (
     <div className="flint-bg h-screen relative">
@@ -1057,6 +1134,7 @@ function PanelContent() {
                   </h2>
                 )}
                 <div style={{ display: 'flex', gap: '4px', position: 'relative' }}>
+                  {/* Export button */}
                   <div ref={exportMenuRef} style={{ position: 'relative' }}>
                     <button
                       onClick={() => setShowExportMenu(!showExportMenu)}
@@ -1200,8 +1278,7 @@ function PanelContent() {
                 activeTool={state.activeTab as 'generate' | 'rewrite' | 'summarize'}
                 onSelectionChange={handleEditorSelectionChange}
                 placeholder="Let's start writing!"
-                pinnedNotes={state.pinnedNotes.map(note => note.content)}
-                onBeforeMiniBarOperation={handleBeforeMiniBarOperation}
+                disabled={isProcessing}
               />
               
               {/* Tool-specific controls - only one visible at a time */}
@@ -1256,6 +1333,8 @@ function PanelContent() {
                 onProjectCreate={handleProjectCreate}
                 onProjectDelete={handleProjectDelete}
                 onProjectUpdate={loadProjects}
+                onForceSave={handleForceSave}
+                currentProjectId={currentProject?.id}
                 isOpen={state.activeTab === 'projects'}
                 onClose={() => actions.setActiveTab('generate')}
               />

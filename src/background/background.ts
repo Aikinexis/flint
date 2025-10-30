@@ -22,6 +22,9 @@ type MessageType =
   | 'OPEN_SUMMARY_TAB'
   | 'OPEN_REWRITE_TAB'
   | 'OPEN_SETTINGS_TAB'
+  | 'INSERT_AND_OPEN_GENERATE'
+  | 'INSERT_AND_OPEN_SUMMARY'
+  | 'INSERT_AND_OPEN_REWRITE'
   | 'OPEN_HISTORY_TAB'
   // Settings messages
   | 'UPDATE_SHORTCUTS';
@@ -238,6 +241,9 @@ async function handleContentScriptMessage(
     case 'OPEN_SUMMARY_TAB':
     case 'OPEN_REWRITE_TAB':
     case 'OPEN_SETTINGS_TAB':
+    case 'INSERT_AND_OPEN_GENERATE':
+    case 'INSERT_AND_OPEN_SUMMARY':
+    case 'INSERT_AND_OPEN_REWRITE':
     case 'OPEN_HISTORY_TAB':
       // Forward message to panel - will only work if panel is open
       return forwardMessageToPanel(type, payload);
@@ -264,10 +270,12 @@ async function forwardMessageToPanel(
 ): Promise<MessageResponse> {
   try {
     // Send message to the extension (panel will receive it)
+    // Change source to 'background' to prevent double-delivery
+    // (panel filters out messages not from content-script, so we keep it)
     const response = await chrome.runtime.sendMessage({
       type,
       payload,
-      source: 'content-script'
+      source: 'background-relay' // Changed from 'content-script' to prevent duplicate
     });
 
     return response || {

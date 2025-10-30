@@ -42,9 +42,17 @@ export async function simulateStreaming(
       // Update textarea
       textarea.value = newContent;
       
-      // Dispatch input event for React
-      const inputEvent = new Event('input', { bubbles: true });
+      // Dispatch input event for React (use InputEvent for better compatibility)
+      const inputEvent = new InputEvent('input', { 
+        bubbles: true, 
+        cancelable: true,
+        composed: true 
+      });
       textarea.dispatchEvent(inputEvent);
+      
+      // Also dispatch change event as backup
+      const changeEvent = new Event('change', { bubbles: true });
+      textarea.dispatchEvent(changeEvent);
       
       // Update selection to show typing cursor at end of current text
       const cursorPos = startPosition + currentIndex;

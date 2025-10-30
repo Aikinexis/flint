@@ -33,6 +33,16 @@ export interface ProjectManagerProps {
   onProjectUpdate?: () => void;
 
   /**
+   * Callback to force save current project before export
+   */
+  onForceSave?: () => Promise<void>;
+
+  /**
+   * ID of the currently active project (to know which one to force save)
+   */
+  currentProjectId?: string;
+
+  /**
    * Whether the modal is open
    */
   isOpen: boolean;
@@ -53,6 +63,8 @@ export function ProjectManager({
   onProjectCreate,
   onProjectDelete,
   onProjectUpdate,
+  onForceSave,
+  currentProjectId,
   isOpen,
   onClose,
 }: ProjectManagerProps) {
@@ -107,9 +119,20 @@ export function ProjectManager({
   };
 
   // Handle export project
-  const handleExportProject = (project: Project, format: ExportFormat, e: React.MouseEvent) => {
+  const handleExportProject = async (project: Project, format: ExportFormat, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
+      // If exporting the current project, force save first to get latest content
+      if (project.id === currentProjectId && onForceSave) {
+        console.log(`[ProjectManager] Force saving current project before export`);
+        await onForceSave();
+        // Refresh the project from storage to get the latest content
+        const updatedProject = await StorageService.getProject(project.id);
+        if (updatedProject) {
+          project = updatedProject;
+        }
+      }
+      
       exportProject(project, format);
       setExportingProjectId(null);
       console.log(`[ProjectManager] Exported project ${project.id} as ${format}`);
@@ -211,7 +234,7 @@ export function ProjectManager({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))',
               gap: '16px',
               maxWidth: '1400px',
               margin: '0 auto',

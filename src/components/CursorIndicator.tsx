@@ -21,15 +21,11 @@ export function CursorIndicator({ show, direction = 'forward' }: CursorIndicator
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '4px',
-        padding: '4px 8px',
-        borderRadius: '6px',
-        background: 'var(--accent)',
-        color: 'white',
-        fontSize: '12px',
-        fontWeight: 500,
-        animation: 'pulse 1.5s ease-in-out infinite',
+        gap: '2px',
+        color: 'var(--text-muted)',
+        fontSize: '10px',
         userSelect: 'none',
+        opacity: 0.7,
       }}
       role="status"
       aria-label={`Text will be generated ${direction === 'bidirectional' ? 'around cursor' : direction === 'backward' ? 'before cursor' : 'after cursor'}`}
@@ -37,26 +33,26 @@ export function CursorIndicator({ show, direction = 'forward' }: CursorIndicator
       {direction === 'bidirectional' ? (
         <>
           <svg
-            width="12"
-            height="12"
+            width="10"
+            height="10"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2.5"
+            strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
             style={{ animation: 'slide-left 1s ease-in-out infinite' }}
           >
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
-          <span>|</span>
+          <span style={{ fontSize: '8px', opacity: 0.5 }}>|</span>
           <svg
-            width="12"
-            height="12"
+            width="10"
+            height="10"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2.5"
+            strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
             style={{ animation: 'slide-right 1s ease-in-out infinite' }}
@@ -67,30 +63,30 @@ export function CursorIndicator({ show, direction = 'forward' }: CursorIndicator
       ) : direction === 'backward' ? (
         <>
           <svg
-            width="12"
-            height="12"
+            width="10"
+            height="10"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2.5"
+            strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
             style={{ animation: 'slide-left 1s ease-in-out infinite' }}
           >
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
-          <span>|</span>
+          <span style={{ fontSize: '8px', opacity: 0.5 }}>|</span>
         </>
       ) : (
         <>
-          <span>|</span>
+          <span style={{ fontSize: '8px', opacity: 0.5 }}>|</span>
           <svg
-            width="12"
-            height="12"
+            width="10"
+            height="10"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2.5"
+            strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
             style={{ animation: 'slide-right 1s ease-in-out infinite' }}
@@ -107,21 +103,12 @@ export function CursorIndicator({ show, direction = 'forward' }: CursorIndicator
 if (typeof document !== 'undefined') {
   const style = document.createElement('style');
   style.textContent = `
-    @keyframes pulse {
-      0%, 100% {
-        opacity: 1;
-      }
-      50% {
-        opacity: 0.7;
-      }
-    }
-    
     @keyframes slide-right {
       0%, 100% {
         transform: translateX(0);
       }
       50% {
-        transform: translateX(3px);
+        transform: translateX(2px);
       }
     }
     
@@ -130,7 +117,7 @@ if (typeof document !== 'undefined') {
         transform: translateX(0);
       }
       50% {
-        transform: translateX(-3px);
+        transform: translateX(-2px);
       }
     }
   `;

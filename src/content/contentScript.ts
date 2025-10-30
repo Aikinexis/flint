@@ -86,7 +86,7 @@ class ContentScriptCoordinator {
    * Checks periodically if panel is open by pinging it
    */
   private setupPanelStateListener(): void {
-    // Check panel state every 500ms
+    // Check panel state every 2 seconds (reduced from 500ms to minimize overhead)
     setInterval(() => {
       chrome.runtime.sendMessage(
         { type: 'PING_PANEL', source: 'content-script' },
@@ -110,7 +110,7 @@ class ContentScriptCoordinator {
           }
         }
       );
-    }, 500);
+    }, 2000);
   }
 
   /**
@@ -427,37 +427,28 @@ class ContentScriptCoordinator {
    */
   private showMiniBar(): void {
     this.miniBarInjector.show({
-      onRecord: () => {
-        // Get cursor context for generation
-        const context = this.caretHandler.getCursorContext();
-        this.sendMessageToPanel('OPEN_GENERATE_TAB', { context });
-      },
-      onSummarize: () => {
-        // Preserve selection before opening panel
-        this.selectionHandler.preserveSelection();
-        
+      onGenerate: () => {
+        // Get selected text and send to panel to insert (not replace)
         const text = this.selectionHandler.getSelectedText();
         if (text) {
-          this.sendMessageToPanel('OPEN_SUMMARY_TAB', { text });
-          
-          // Restore selection after a short delay to ensure it stays visible
-          setTimeout(() => {
-            this.selectionHandler.restoreSelection();
-          }, 100);
+          this.sendMessageToPanel('INSERT_AND_OPEN_GENERATE', { text });
+          this.miniBarInjector.hide();
+        }
+      },
+      onSummarize: () => {
+        // Get selected text and send to panel to insert and open summarize tool
+        const text = this.selectionHandler.getSelectedText();
+        if (text) {
+          this.sendMessageToPanel('INSERT_AND_OPEN_SUMMARY', { text });
+          this.miniBarInjector.hide();
         }
       },
       onRewrite: () => {
-        // Preserve selection before opening panel
-        this.selectionHandler.preserveSelection();
-        
+        // Get selected text and send to panel to insert and open rewrite tool
         const text = this.selectionHandler.getSelectedText();
         if (text) {
-          this.sendMessageToPanel('OPEN_REWRITE_TAB', { text });
-          
-          // Restore selection after a short delay to ensure it stays visible
-          setTimeout(() => {
-            this.selectionHandler.restoreSelection();
-          }, 100);
+          this.sendMessageToPanel('INSERT_AND_OPEN_REWRITE', { text });
+          this.miniBarInjector.hide();
         }
       },
       onClose: () => {
@@ -470,8 +461,12 @@ class ContentScriptCoordinator {
   /**
    * Send a message to the panel via background worker
    * Used for mini bar button actions
+   * 
+   * Note: Messages are sent with source='content-script' so the background
+   * script knows to forward them to the panel. This prevents double-delivery.
    */
   private sendMessageToPanel(type: string, payload?: any): void {
+    console.log('[Flint] Sending message to background for panel relay:', type);
     chrome.runtime.sendMessage(
       {
         type,
@@ -480,9 +475,9 @@ class ContentScriptCoordinator {
       },
       (response) => {
         if (chrome.runtime.lastError) {
-          console.error('[Flint] Error sending message to panel:', chrome.runtime.lastError);
+          console.error('[Flint] Error sending message:', chrome.runtime.lastError);
         } else {
-          console.log('[Flint] Message sent to panel:', type, response);
+          console.log('[Flint] Message relayed successfully:', type, response);
         }
       }
     );

@@ -706,7 +706,7 @@ export function Settings({
                 letterSpacing: '0.05em',
               }}
             >
-              Generate Panel
+              AI Settings
             </h3>
             <svg
               width="16"
@@ -921,7 +921,7 @@ export function Settings({
                   marginBottom: '4px',
                 }}
               >
-                Use previous prompt as context
+                Context aware
               </label>
               <p
                 style={{
@@ -1179,6 +1179,98 @@ export function Settings({
             </span>
           </label>
         </div>
+          </div>
+        )}
+      </section>
+
+      {/* Keyboard Shortcuts Section */}
+      <section
+        style={{
+          marginBottom: '24px',
+          paddingBottom: '24px',
+          borderBottom: '1px solid var(--border-muted)',
+        }}
+      >
+        <button
+          onClick={() => toggleSection('shortcuts')}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            marginBottom: expandedSections.shortcuts ? '16px' : '0',
+            cursor: 'pointer',
+            color: 'var(--text)',
+          }}
+          aria-expanded={expandedSections.shortcuts}
+          aria-controls="shortcuts-content"
+        >
+          <h3
+            style={{
+              fontSize: 'var(--fs-sm)',
+              fontWeight: 600,
+              color: 'var(--text)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              margin: 0,
+            }}
+          >
+            Keyboard Shortcuts
+          </h3>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            style={{
+              transform: expandedSections.shortcuts ? 'rotate(90deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+            }}
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+
+        {expandedSections.shortcuts && (
+          <div id="shortcuts-content">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>Undo</span>
+                <code style={{ 
+                  padding: '4px 12px', 
+                  background: 'var(--surface)', 
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-muted)',
+                  fontSize: 'var(--fs-sm)',
+                  fontFamily: 'monospace',
+                  color: 'var(--text)'
+                }}>
+                  {navigator.platform.includes('Mac') ? '⌘Z' : 'Ctrl+Z'}
+                </code>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>Redo</span>
+                <code style={{ 
+                  padding: '4px 12px', 
+                  background: 'var(--surface)', 
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-muted)',
+                  fontSize: 'var(--fs-sm)',
+                  fontFamily: 'monospace',
+                  color: 'var(--text)'
+                }}>
+                  {navigator.platform.includes('Mac') ? '⌘⇧Z' : 'Ctrl+Y'}
+                </code>
+              </div>
+            </div>
           </div>
         )}
       </section>

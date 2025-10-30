@@ -52,6 +52,8 @@ export interface ToolControlsProps {
     hideSelectionOverlay: () => void;
     updateCapturedSelection: (start: number, end: number) => void;
     getCapturedSelection: () => { start: number; end: number };
+    getTextarea: () => HTMLTextAreaElement | null;
+    insertAtCursor: (text: string, selectAfterInsert?: boolean, replaceSelection?: boolean) => void;
   }>;
 
   /**
@@ -87,7 +89,7 @@ export function ToolControlsContainer({
 }: ToolControlsProps) {
   // Generate controls state
   const [prompt, setPrompt] = useState('');
-  const [selectedLength, setSelectedLength] = useState<'short' | 'medium' | 'long'>('medium');
+  const [selectedLength, setSelectedLength] = useState<'short' | 'medium' | 'long'>('short');
   const [showLengthDropdown, setShowLengthDropdown] = useState(false);
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
   const [promptHistory, setPromptHistory] = useState<PromptHistoryItem[]>([]);
@@ -95,7 +97,7 @@ export function ToolControlsContainer({
   const [isGenerateRecording, setIsGenerateRecording] = useState(false);
 
   // Rewrite controls state
-  const [customPrompt, setCustomPrompt] = useState('Simplify');
+  const [customPrompt, setCustomPrompt] = useState('');
   const [selectedPreset, setSelectedPreset] = useState<string>('Simplify');
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [isRewriteRecording, setIsRewriteRecording] = useState(false);
@@ -103,6 +105,7 @@ export function ToolControlsContainer({
   // Summarize controls state
   const [mode, setMode] = useState<SummaryMode>('bullets');
   const [readingLevel, setReadingLevel] = useState<ReadingLevel>('moderate');
+  const [summaryLength, setSummaryLength] = useState<'short' | 'medium' | 'long'>('short');
 
   // Common state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -114,6 +117,8 @@ export function ToolControlsContainer({
   const historyDropdownRef = useRef<HTMLDivElement>(null);
   const presetMenuRef = useRef<HTMLDivElement>(null);
   const speechRecognitionRef = useRef<any>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const lastFocusedElementRef = useRef<'editor' | 'prompt' | null>(null);
 
   // Rewrite presets
   const presets = [
@@ -143,6 +148,21 @@ export function ToolControlsContainer({
 
     loadData();
   }, []);
+
+  // Track which element has focus (editor or prompt) for voice transcription
+  useEffect(() => {
+    const handleFocus = (e: FocusEvent) => {
+      const textarea = editorRef?.current?.getTextarea();
+      if (e.target === textarea) {
+        lastFocusedElementRef.current = 'editor';
+      } else if (e.target === promptInputRef.current || e.target === customPromptInputRef.current) {
+        lastFocusedElementRef.current = 'prompt';
+      }
+    };
+
+    document.addEventListener('focusin', handleFocus);
+    return () => document.removeEventListener('focusin', handleFocus);
+  }, [editorRef]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -174,13 +194,23 @@ export function ToolControlsContainer({
   };
 
   /**
+   * Handles stop button click - cancels ongoing AI operation
+   */
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsProcessing(false);
+    onOperationError?.('Operation cancelled by user');
+  };
+
+  /**
    * Handles generate operation
    */
   const handleGenerate = async () => {
-    if (!prompt.trim()) {
-      onOperationError?.('Please enter a prompt');
-      return;
-    }
+    // Use default prompt if empty
+    const effectivePrompt = prompt.trim() || 'Continue writing and extend this content naturally';
 
     // Validate captured selection exists (for cursor position)
     const capturedSelection = editorRef?.current?.getCapturedSelection();
@@ -211,41 +241,40 @@ export function ToolControlsContainer({
       else if (selectedLength === 'medium') lengthHint = settings.mediumLength;
 
       // Get surrounding context based on cursor position
+      // Format: text before cursor, then newline, then text after cursor
       let surroundingContext: string | undefined;
-      if (capturedSelection && settings.contextAwarenessEnabled) {
+      if (capturedSelection && settings.contextAwarenessEnabled && content.trim()) {
         const cursorPos = capturedSelection.start;
-        const contextLength = 500; // Characters to include before/after cursor
+        const contextLength = 1000; // Characters to include before/after cursor
         
-        if (cursorPos === 0) {
-          // At start - provide text after cursor
-          const textAfter = content.substring(0, contextLength);
-          if (textAfter.trim()) {
-            surroundingContext = `Text after insertion point:\n${textAfter}`;
-          }
-        } else if (cursorPos >= content.length) {
-          // At end - provide text before cursor
-          const textBefore = content.substring(Math.max(0, content.length - contextLength));
-          if (textBefore.trim()) {
-            surroundingContext = `Text before insertion point:\n${textBefore}`;
-          }
-        } else {
-          // In middle - provide text before and after
-          const textBefore = content.substring(Math.max(0, cursorPos - contextLength / 2), cursorPos);
-          const textAfter = content.substring(cursorPos, Math.min(content.length, cursorPos + contextLength / 2));
-          if (textBefore.trim() || textAfter.trim()) {
-            surroundingContext = `Text before insertion point:\n${textBefore}\n\n[INSERTION POINT]\n\nText after insertion point:\n${textAfter}`;
-          }
+        // Get text before and after cursor
+        const textBefore = content.substring(Math.max(0, cursorPos - contextLength), cursorPos);
+        const textAfter = content.substring(cursorPos, Math.min(content.length, cursorPos + contextLength));
+        
+        // Format as: before\nafter (AI service will split on last newline)
+        if (textBefore.trim() || textAfter.trim()) {
+          surroundingContext = `${textBefore}\n${textAfter}`;
+          console.log('[ToolControls] Passing context to AI:', {
+            cursorPos,
+            beforeLength: textBefore.length,
+            afterLength: textAfter.length,
+            contextPreview: surroundingContext.substring(0, 100) + '...'
+          });
         }
       }
 
-      const result = await AIService.generate(prompt, {
+      const result = await AIService.generate(effectivePrompt, {
         pinnedNotes: pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
         length: selectedLength,
         lengthHint,
         context: surroundingContext,
       });
 
-      await StorageService.savePromptToHistory(prompt);
+      // Only save to history if user provided a custom prompt
+      if (prompt.trim()) {
+        await StorageService.savePromptToHistory(prompt);
+      }
+      
       setPrompt('');
       onOperationComplete?.(result, 'generate');
     } catch (error) {
@@ -297,10 +326,8 @@ export function ToolControlsContainer({
 
     console.log('[ToolControls] customPrompt value:', customPrompt, 'length:', customPrompt.length);
     
-    if (!customPrompt.trim()) {
-      onOperationError?.('Please choose a preset from the dropdown (↓) or type rewrite instructions');
-      return;
-    }
+    // Use "Simplify" as default if prompt is empty
+    const effectivePrompt = customPrompt.trim() || 'Simplify';
 
     setIsProcessing(true);
     onOperationStart?.('rewrite');
@@ -309,9 +336,9 @@ export function ToolControlsContainer({
       const pinnedNotesContent = pinnedNotes.map(note => `${note.title}: ${note.content}`);
       
       // Enhance "Simplify" preset to also make text shorter
-      const enhancedPrompt = customPrompt.trim() === 'Simplify' 
+      const enhancedPrompt = effectivePrompt === 'Simplify' 
         ? 'Simplify and make it shorter'
-        : customPrompt.trim();
+        : effectivePrompt;
       
       console.log('[ToolControls] Calling AIService.rewrite...');
       const result = await AIService.rewrite(textToRewrite, {
@@ -369,11 +396,17 @@ export function ToolControlsContainer({
       const result = await AIService.summarize(textToSummarize, {
         mode,
         readingLevel,
+        length: summaryLength,
         pinnedNotes: pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
       });
 
-      // Format markdown bullets (*) to actual bullet points (•)
-      const formattedResult = result.replace(/^\* /gm, '• ');
+      // Format markdown bullets to actual bullet points
+      // Handle both * and - markdown bullets, with or without space
+      let formattedResult = result
+        .replace(/^\*\s+/gm, '• ')  // * with space
+        .replace(/^\* /gm, '• ')     // * with single space
+        .replace(/^-\s+/gm, '• ')    // - with space
+        .replace(/^- /gm, '• ');     // - with single space
 
       onOperationComplete?.(formattedResult, 'summarize');
     } catch (error) {
@@ -386,6 +419,7 @@ export function ToolControlsContainer({
 
   /**
    * Handles voice recording toggle
+   * Transcribes into editor if it has focus, otherwise into prompt box
    */
   const handleVoiceToggle = (tool: 'generate' | 'rewrite') => {
     const isRecording = tool === 'generate' ? isGenerateRecording : isRewriteRecording;
@@ -407,29 +441,166 @@ export function ToolControlsContainer({
       const recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
       recognition.interimResults = true;
-      recognition.continuous = false;
+      recognition.continuous = true; // Keep listening longer
+      recognition.maxAlternatives = 1;
+
+      // Track accumulated transcript
+      let accumulatedTranscript = '';
+      let lastResultTime = Date.now();
 
       recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        const isFinal = event.results[0].isFinal;
+        let finalTranscript = '';
+        
+        // Collect all final results
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            const transcript = event.results[i][0].transcript;
+            
+            // Detect pause (if more than 1 second since last result, add comma)
+            const now = Date.now();
+            const timeSinceLast = now - lastResultTime;
+            
+            if (accumulatedTranscript && timeSinceLast > 1000 && !accumulatedTranscript.endsWith(',') && !accumulatedTranscript.endsWith('.')) {
+              accumulatedTranscript += ',';
+            }
+            
+            accumulatedTranscript += (accumulatedTranscript ? ' ' : '') + transcript;
+            lastResultTime = now;
+            finalTranscript = accumulatedTranscript;
+          }
+        }
 
-        if (isFinal) {
-          if (tool === 'generate') {
-            setPrompt(prev => prev + transcript);
+        if (finalTranscript) {
+          // Check current focus dynamically (allows switching during recording)
+          const shouldInsertInEditor = lastFocusedElementRef.current === 'editor';
+          
+          // Smart formatting helper
+          const formatTranscript = (text: string, existingContent: string, cursorPos: number): string => {
+            let formatted = text.trim();
+            
+            if (!formatted) return '';
+            
+            // Ensure sentence ends with period if it doesn't have punctuation
+            if (!/[.!?,;:]$/.test(formatted)) {
+              formatted += '.';
+            }
+            
+            // Capitalize first letter
+            formatted = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+            
+            // Capitalize after sentence endings within the text
+            formatted = formatted.replace(/([.!?]\s+)([a-z])/g, (_match, punct, letter) => {
+              return punct + letter.toUpperCase();
+            });
+            
+            // Check if we need leading space
+            const charBeforeCursor = existingContent.charAt(cursorPos - 1);
+            const needsLeadingSpace = charBeforeCursor && charBeforeCursor !== ' ' && charBeforeCursor !== '\n';
+            
+            // Check if we need trailing space
+            const charAfterCursor = existingContent.charAt(cursorPos);
+            const needsTrailingSpace = charAfterCursor && charAfterCursor !== ' ' && charAfterCursor !== '\n';
+            
+            return (needsLeadingSpace ? ' ' : '') + formatted + (needsTrailingSpace ? ' ' : '');
+          };
+
+          if (shouldInsertInEditor && editorRef?.current) {
+            // Get selection to check if we should replace or insert
+            const textarea = editorRef.current.getTextarea();
+            const capturedSelection = editorRef.current.getCapturedSelection();
+            
+            if (textarea && capturedSelection) {
+              // Check if there's a selection to replace
+              const hasSelection = capturedSelection.start !== capturedSelection.end;
+              
+              if (hasSelection) {
+                // Replace selection - just capitalize, no extra formatting
+                let formattedText = finalTranscript.trim();
+                if (formattedText.length > 0) {
+                  formattedText = formattedText.charAt(0).toUpperCase() + formattedText.slice(1);
+                }
+                editorRef.current.insertAtCursor(formattedText, true, true); // selectAfterInsert = true, replaceSelection = true
+              } else {
+                // Insert at cursor with smart formatting
+                const cursorPos = textarea.selectionStart;
+                const formattedText = formatTranscript(finalTranscript, content, cursorPos);
+                editorRef.current.insertAtCursor(formattedText, true, false); // selectAfterInsert = true
+              }
+              accumulatedTranscript = '';
+            }
           } else {
-            setCustomPrompt(prev => prev + transcript);
+            // Insert into prompt box (simpler formatting)
+            let formattedText = finalTranscript.trim();
+            
+            // Capitalize first letter
+            if (formattedText.length > 0) {
+              formattedText = formattedText.charAt(0).toUpperCase() + formattedText.slice(1);
+            }
+            
+            // Check if there's selected text in the prompt input
+            const promptInput = tool === 'generate' ? promptInputRef.current : customPromptInputRef.current;
+            
+            if (promptInput && promptInput.selectionStart !== promptInput.selectionEnd) {
+              // Replace selected text in prompt box
+              const start = promptInput.selectionStart || 0;
+              const end = promptInput.selectionEnd || 0;
+              const currentValue = tool === 'generate' ? prompt : customPrompt;
+              const newValue = currentValue.substring(0, start) + formattedText + currentValue.substring(end);
+              
+              if (tool === 'generate') {
+                setPrompt(newValue);
+              } else {
+                setCustomPrompt(newValue);
+              }
+              
+              // Set cursor after inserted text
+              setTimeout(() => {
+                if (promptInput) {
+                  promptInput.setSelectionRange(start + formattedText.length, start + formattedText.length);
+                }
+              }, 0);
+            } else {
+              // Append to prompt box
+              if (tool === 'generate') {
+                setPrompt(prev => {
+                  const needsSpace = prev.length > 0 && !prev.endsWith(' ');
+                  return prev + (needsSpace ? ' ' : '') + formattedText;
+                });
+              } else {
+                setCustomPrompt(prev => {
+                  const needsSpace = prev.length > 0 && !prev.endsWith(' ');
+                  return prev + (needsSpace ? ' ' : '') + formattedText;
+                });
+              }
+            }
+            
+            // Reset accumulated transcript after insertion
+            accumulatedTranscript = '';
           }
         }
       };
 
       recognition.onerror = (event: any) => {
         console.error('[ToolControlsContainer] Speech recognition error:', event.error);
-        onOperationError?.('Speech recognition error. Please try again.');
+        if (event.error !== 'no-speech') {
+          onOperationError?.('Speech recognition error. Please try again.');
+        }
         setIsRecording(false);
       };
 
       recognition.onend = () => {
         setIsRecording(false);
+      };
+
+      // Auto-stop after 30 seconds (increased from default ~5 seconds)
+      const autoStopTimeout = setTimeout(() => {
+        if (speechRecognitionRef.current) {
+          speechRecognitionRef.current.stop();
+        }
+      }, 30000);
+
+      recognition.onstop = () => {
+        clearTimeout(autoStopTimeout);
       };
 
       try {
@@ -662,11 +833,10 @@ export function ToolControlsContainer({
 
             <button
               className="flint-btn primary"
-              onClick={handleGenerate}
-              disabled={isProcessing || !prompt.trim()}
-              aria-label="Generate"
+              onClick={isProcessing ? handleStop : handleGenerate}
+              aria-label={isProcessing ? 'Stop' : 'Generate'}
               aria-busy={isProcessing}
-              title="Generate"
+              title={isProcessing ? 'Stop generation' : 'Generate'}
               style={{
                 width: '36px',
                 height: '36px',
@@ -678,18 +848,13 @@ export function ToolControlsContainer({
             >
               {isProcessing ? (
                 <svg
-                  width="16"
-                  height="16"
+                  width="14"
+                  height="14"
                   viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ animation: 'spin 1s linear infinite' }}
+                  fill="currentColor"
                   aria-hidden="true"
                 >
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  <rect x="6" y="6" width="12" height="12" rx="1" />
                 </svg>
               ) : (
                 <svg
@@ -864,12 +1029,15 @@ export function ToolControlsContainer({
               className="flint-btn primary"
               onMouseDown={(e) => {
                 e.preventDefault();
-                handleRewrite();
+                if (isProcessing) {
+                  handleStop();
+                } else {
+                  handleRewrite();
+                }
               }}
-              disabled={isProcessing}
-              aria-label="Rewrite"
+              aria-label={isProcessing ? 'Stop' : 'Rewrite'}
               aria-busy={isProcessing}
-              title="Rewrite"
+              title={isProcessing ? 'Stop rewriting' : 'Rewrite'}
               style={{
                 width: '36px',
                 height: '36px',
@@ -881,18 +1049,13 @@ export function ToolControlsContainer({
             >
               {isProcessing ? (
                 <svg
-                  width="16"
-                  height="16"
+                  width="14"
+                  height="14"
                   viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ animation: 'spin 1s linear infinite' }}
+                  fill="currentColor"
                   aria-hidden="true"
                 >
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  <rect x="6" y="6" width="12" height="12" rx="1" />
                 </svg>
               ) : (
                 <svg
@@ -938,23 +1101,44 @@ export function ToolControlsContainer({
             </div>
           </div>
 
-          {/* Reading level dropdown */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: '8px' }}>
-              Reading level
-            </label>
-            <select
-              className="flint-input"
-              value={readingLevel}
-              onChange={(e) => setReadingLevel(e.target.value as ReadingLevel)}
-              disabled={isProcessing}
-              style={{ width: '100%', height: '48px', padding: '12px 16px' }}
-            >
-              <option value="simple">Simple</option>
-              <option value="moderate">Moderate</option>
-              <option value="detailed">Detailed</option>
-              <option value="complex">Complex</option>
-            </select>
+          {/* Reading level and length controls */}
+          <div style={{ marginBottom: '16px', display: 'flex', gap: '12px' }}>
+            {/* Reading level dropdown */}
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                Reading level
+              </label>
+              <select
+                className="flint-input"
+                value={readingLevel}
+                onChange={(e) => setReadingLevel(e.target.value as ReadingLevel)}
+                disabled={isProcessing}
+                style={{ width: '100%', height: '48px', padding: '12px 16px' }}
+              >
+                <option value="simple">Simple</option>
+                <option value="moderate">Moderate</option>
+                <option value="detailed">Detailed</option>
+                <option value="complex">Complex</option>
+              </select>
+            </div>
+
+            {/* Length dropdown */}
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                Length
+              </label>
+              <select
+                className="flint-input"
+                value={summaryLength}
+                onChange={(e) => setSummaryLength(e.target.value as 'short' | 'medium' | 'long')}
+                disabled={isProcessing}
+                style={{ width: '100%', height: '48px', padding: '12px 16px' }}
+              >
+                <option value="short">Short</option>
+                <option value="medium">Medium</option>
+                <option value="long">Long</option>
+              </select>
+            </div>
           </div>
 
           {/* Summarize button */}
@@ -962,9 +1146,12 @@ export function ToolControlsContainer({
             className="flint-btn primary"
             onMouseDown={(e) => {
               e.preventDefault();
-              handleSummarize();
+              if (isProcessing) {
+                handleStop();
+              } else {
+                handleSummarize();
+              }
             }}
-            disabled={isProcessing}
             style={{ 
               width: '100%',
               display: 'flex',
@@ -972,14 +1159,14 @@ export function ToolControlsContainer({
               justifyContent: 'center',
               gap: '8px',
             }}
-            aria-label={isProcessing ? 'Summarizing...' : 'Summarize'}
+            aria-label={isProcessing ? 'Stop' : 'Summarize'}
           >
             {isProcessing ? (
               <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="1" />
                 </svg>
-                <span>Processing...</span>
+                <span>Stop</span>
               </>
             ) : (
               'Summarize'

@@ -21,6 +21,7 @@ export function SelectionOverlay({
 }: SelectionOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const mirrorRef = useRef<HTMLDivElement | null>(null);
+  const accentHueRef = useRef<string>('255');
 
   useEffect(() => {
     if (!show || !overlayRef.current || !textarea || selectionStart === selectionEnd) {
@@ -33,6 +34,11 @@ export function SelectionOverlay({
 
     const updateOverlay = () => {
       if (!overlayRef.current || !textarea) return;
+      
+      // Get current accent hue from CSS variable
+      const rootStyles = getComputedStyle(document.documentElement);
+      const currentAccentHue = rootStyles.getPropertyValue('--accent-hue').trim() || '255';
+      accentHueRef.current = currentAccentHue;
 
       // Create a mirror div that exactly matches the textarea
       const mirror = document.createElement('div');
@@ -91,10 +97,16 @@ export function SelectionOverlay({
       const selectedSpan = document.createElement('span');
       selectedSpan.textContent = textSelected;
       selectedSpan.style.color = 'transparent';
-      selectedSpan.style.background = 'rgba(99, 102, 241, 0.15)';
-      selectedSpan.style.border = '1px solid rgb(99, 102, 241)';
+      
+      // Build primary color using current accent hue
+      // Match the --primary definition from tokens.css: oklch(60% 0.12 var(--accent-hue) / 0.9)
+      const primaryColor = `oklch(60% 0.12 ${accentHueRef.current} / 0.9)`;
+      
+      // Use theme colors with computed primary
+      selectedSpan.style.background = `color-mix(in oklab, ${primaryColor} 15%, transparent)`;
+      selectedSpan.style.border = `1px solid ${primaryColor}`;
       selectedSpan.style.borderRadius = '6px';
-      selectedSpan.style.boxShadow = '0 0 0 1px rgba(99, 102, 241, 0.3), 0 0 12px rgba(99, 102, 241, 0.4)';
+      selectedSpan.style.boxShadow = `0 0 0 1px color-mix(in oklab, ${primaryColor} 30%, transparent), 0 0 12px color-mix(in oklab, ${primaryColor} 40%, transparent)`;
       selectedSpan.style.animation = 'selection-pulse 1.5s ease-in-out infinite';
       
       const afterSpan = document.createElement('span');
@@ -140,10 +152,21 @@ export function SelectionOverlay({
     textarea.addEventListener('input', handleInput);
     window.addEventListener('resize', handleResize);
     
+    // Listen for theme changes by observing CSS variable changes
+    const themeObserver = new MutationObserver(() => {
+      updateOverlay();
+    });
+    
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    });
+    
     return () => {
       textarea.removeEventListener('scroll', handleScroll);
       textarea.removeEventListener('input', handleInput);
       window.removeEventListener('resize', handleResize);
+      themeObserver.disconnect();
       if (overlayRef.current) {
         overlayRef.current.innerHTML = '';
       }
