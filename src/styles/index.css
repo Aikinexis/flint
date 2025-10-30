@@ -398,6 +398,20 @@ input[type='range']:focus-visible::-moz-range-thumb {
   }
 }
 
+/* Pulse glow animation for processing indicator */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px hsla(var(--accent-hue), 70%, 60%, 0.4), 0 0 40px hsla(var(--accent-hue), 70%, 60%, 0.2);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 30px hsla(var(--accent-hue), 70%, 60%, 0.6), 0 0 60px hsla(var(--accent-hue), 70%, 60%, 0.3);
+    opacity: 0.9;
+  }
+}
+
+
+
 /* Generated text shimmer animation */
 @keyframes shimmer-border {
   0% {

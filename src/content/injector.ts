@@ -64,6 +64,7 @@ class MiniBarInjectorImpl implements MiniBarInjector {
   private scrollHandler: (() => void) | null = null;
   private resizeHandler: (() => void) | null = null;
   private callbacks: MiniBarCallbacks | null = null;
+  private scrollTimeout: number | null = null;
 
   constructor() {
     // Create shadow host on initialization
@@ -107,8 +108,9 @@ class MiniBarInjectorImpl implements MiniBarInjector {
       align-items: center;
       opacity: 0;
       transform: translate3d(0, 0, 0) scale(0.9);
-      transition: opacity 0.2s ease, transform 0.2s ease, left 0.15s ease, top 0.15s ease;
+      transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), left 0.2s ease, top 0.2s ease;
       will-change: transform, opacity, left, top;
+      z-index: 999999;
     `;
 
     // Add buttons
@@ -342,6 +344,12 @@ class MiniBarInjectorImpl implements MiniBarInjector {
    * Hide the mini bar
    */
   hide(): void {
+    // Clear scroll timeout
+    if (this.scrollTimeout) {
+      clearTimeout(this.scrollTimeout);
+      this.scrollTimeout = null;
+    }
+
     if (this.bar) {
       // Fade out animation
       this.bar.style.opacity = '0';
@@ -371,13 +379,88 @@ class MiniBarInjectorImpl implements MiniBarInjector {
   }
 
   /**
-   * Set up scroll event listener to hide mini bar on scroll
-   * With fixed positioning, minibar stays in place but selection moves, so hide it
+   * Set up scroll event listener to hide minibar while scrolling
+   * Recalculates position and reappears after scrolling stops
    */
   private setupScrollRepositioning(): void {
-    // Hide mini bar immediately on scroll
     this.scrollHandler = () => {
-      this.hide();
+      // Hide minibar immediately when scrolling starts (use opacity and scale)
+      if (this.bar) {
+        this.bar.style.opacity = '0';
+        this.bar.style.transform = 'translate3d(0, 0, 0) scale(0.9)';
+        this.bar.style.pointerEvents = 'none';
+      }
+
+      // Clear existing timeout
+      if (this.scrollTimeout) {
+        clearTimeout(this.scrollTimeout);
+      }
+
+      // Recalculate position and show after scrolling stops (200ms delay - faster response)
+      this.scrollTimeout = window.setTimeout(() => {
+        // Check if selection still exists
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0 || selection.toString().trim().length === 0) {
+          this.hide();
+          return;
+        }
+
+        // Recalculate position based on current selection
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        
+        // Check if selection is visible in viewport
+        const viewportHeight = window.innerHeight;
+        if (rect.bottom < 0 || rect.top > viewportHeight) {
+          // Selection is outside viewport, keep hidden
+          return;
+        }
+
+        // Calculate new position
+        const minibarWidth = 180;
+        const minibarHeight = 40;
+        const offset = 8;
+
+        let left = rect.left + rect.width / 2 - minibarWidth / 2;
+        let top = rect.top - minibarHeight - offset;
+
+        // Keep within viewport bounds
+        const viewportWidth = window.innerWidth;
+
+        if (left < 10) left = 10;
+        if (left + minibarWidth > viewportWidth - 10) {
+          left = viewportWidth - minibarWidth - 10;
+        }
+
+        if (top < 10) {
+          top = rect.bottom + offset; // Show below if no room above
+        }
+
+        if (top + minibarHeight > viewportHeight - 10) {
+          top = viewportHeight - minibarHeight - 10;
+        }
+
+        // Update position and show with smooth fade-in and zoom effect
+        if (this.bar) {
+          // Set position first while still hidden
+          this.bar.style.left = `${Math.round(left)}px`;
+          this.bar.style.top = `${Math.round(top)}px`;
+          
+          // Set initial zoom state (start small) and make visible
+          this.bar.style.opacity = '0';
+          this.bar.style.transform = 'translate3d(0, 0, 0) scale(0.5)';
+          this.bar.style.pointerEvents = 'none';
+          
+          // Smooth fade-in and zoom after a small delay (with bounce effect)
+          setTimeout(() => {
+            if (this.bar) {
+              this.bar.style.opacity = '1';
+              this.bar.style.transform = 'translate3d(0, 0, 0) scale(1)';
+              this.bar.style.pointerEvents = 'auto';
+            }
+          }, 50);
+        }
+      }, 300);
     };
 
     // Add scroll listener to window and document

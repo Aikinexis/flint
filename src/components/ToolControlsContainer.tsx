@@ -95,6 +95,7 @@ export function ToolControlsContainer({
   const [promptHistory, setPromptHistory] = useState<PromptHistoryItem[]>([]);
   const [generateSettings, setGenerateSettings] = useState<GenerateSettings | null>(null);
   const [isGenerateRecording, setIsGenerateRecording] = useState(false);
+  const [isPromptFromHistory, setIsPromptFromHistory] = useState(false);
 
   // Rewrite controls state
   const [customPrompt, setCustomPrompt] = useState('');
@@ -106,6 +107,11 @@ export function ToolControlsContainer({
   const [mode, setMode] = useState<SummaryMode>('bullets');
   const [readingLevel, setReadingLevel] = useState<ReadingLevel>('moderate');
   const [summaryLength, setSummaryLength] = useState<'short' | 'medium' | 'long'>('short');
+  const [showReadingLevelDropdown, setShowReadingLevelDropdown] = useState(false);
+  const [showSummaryLengthDropdown, setShowSummaryLengthDropdown] = useState(false);
+  const [showSummaryModeDropdown, setShowSummaryModeDropdown] = useState(false);
+  const [summaryPrompt, setSummaryPrompt] = useState('');
+  const [isSummarizeRecording, setIsSummarizeRecording] = useState(false);
 
   // Common state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -113,9 +119,13 @@ export function ToolControlsContainer({
   // Refs
   const promptInputRef = useRef<HTMLInputElement>(null);
   const customPromptInputRef = useRef<HTMLInputElement>(null);
+  const summaryPromptInputRef = useRef<HTMLInputElement>(null);
   const lengthDropdownRef = useRef<HTMLDivElement>(null);
   const historyDropdownRef = useRef<HTMLDivElement>(null);
   const presetMenuRef = useRef<HTMLDivElement>(null);
+  const readingLevelDropdownRef = useRef<HTMLDivElement>(null);
+  const summaryLengthDropdownRef = useRef<HTMLDivElement>(null);
+  const summaryModeDropdownRef = useRef<HTMLDivElement>(null);
   const speechRecognitionRef = useRef<any>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastFocusedElementRef = useRef<'editor' | 'prompt' | null>(null);
@@ -155,7 +165,7 @@ export function ToolControlsContainer({
       const textarea = editorRef?.current?.getTextarea();
       if (e.target === textarea) {
         lastFocusedElementRef.current = 'editor';
-      } else if (e.target === promptInputRef.current || e.target === customPromptInputRef.current) {
+      } else if (e.target === promptInputRef.current || e.target === customPromptInputRef.current || e.target === summaryPromptInputRef.current) {
         lastFocusedElementRef.current = 'prompt';
       }
     };
@@ -175,6 +185,15 @@ export function ToolControlsContainer({
       }
       if (presetMenuRef.current && !presetMenuRef.current.contains(event.target as Node)) {
         setShowPresetMenu(false);
+      }
+      if (readingLevelDropdownRef.current && !readingLevelDropdownRef.current.contains(event.target as Node)) {
+        setShowReadingLevelDropdown(false);
+      }
+      if (summaryLengthDropdownRef.current && !summaryLengthDropdownRef.current.contains(event.target as Node)) {
+        setShowSummaryLengthDropdown(false);
+      }
+      if (summaryModeDropdownRef.current && !summaryModeDropdownRef.current.contains(event.target as Node)) {
+        setShowSummaryModeDropdown(false);
       }
     };
 
@@ -209,8 +228,10 @@ export function ToolControlsContainer({
    * Handles generate operation
    */
   const handleGenerate = async () => {
-    // Use default prompt if empty
-    const effectivePrompt = prompt.trim() || 'Continue writing and extend this content naturally';
+    // Use default intro prompt ONLY if both prompt and editor are empty
+    const effectivePrompt = prompt.trim() || 
+      (content.trim() ? 'Continue writing and extend this content naturally' : 
+       'Introduce Flint, a Chrome extension for AI-powered writing. Explain how it can help users generate, rewrite, and summarize text using Chrome\'s built-in AI. Keep it friendly and concise.');
 
     // Validate captured selection exists (for cursor position)
     const capturedSelection = editorRef?.current?.getCapturedSelection();
@@ -270,12 +291,16 @@ export function ToolControlsContainer({
         context: surroundingContext,
       });
 
-      // Only save to history if user provided a custom prompt
-      if (prompt.trim()) {
+      // Only save to history if user provided a custom prompt (not from history)
+      if (prompt.trim() && !isPromptFromHistory) {
         await StorageService.savePromptToHistory(prompt);
+        // Reload history to show the new prompt
+        const updatedHistory = await StorageService.getPromptHistory(4);
+        setPromptHistory(updatedHistory);
       }
       
       setPrompt('');
+      setIsPromptFromHistory(false); // Reset flag
       onOperationComplete?.(result, 'generate');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Generation failed';
@@ -403,10 +428,9 @@ export function ToolControlsContainer({
       // Format markdown bullets to actual bullet points
       // Handle both * and - markdown bullets, with or without space
       let formattedResult = result
-        .replace(/^\*\s+/gm, '• ')  // * with space
-        .replace(/^\* /gm, '• ')     // * with single space
-        .replace(/^-\s+/gm, '• ')    // - with space
-        .replace(/^- /gm, '• ');     // - with single space
+        .replace(/^\*\s*/gm, '• ')   // * with any amount of space (including none)
+        .replace(/^-\s*/gm, '• ')    // - with any amount of space (including none)
+        .replace(/^•\s*\*/gm, '• '); // Remove * after bullet point
 
       onOperationComplete?.(formattedResult, 'summarize');
     } catch (error) {
@@ -421,9 +445,9 @@ export function ToolControlsContainer({
    * Handles voice recording toggle
    * Transcribes into editor if it has focus, otherwise into prompt box
    */
-  const handleVoiceToggle = (tool: 'generate' | 'rewrite') => {
-    const isRecording = tool === 'generate' ? isGenerateRecording : isRewriteRecording;
-    const setIsRecording = tool === 'generate' ? setIsGenerateRecording : setIsRewriteRecording;
+  const handleVoiceToggle = (tool: 'generate' | 'rewrite' | 'summarize') => {
+    const isRecording = tool === 'generate' ? isGenerateRecording : tool === 'rewrite' ? isRewriteRecording : isSummarizeRecording;
+    const setIsRecording = tool === 'generate' ? setIsGenerateRecording : tool === 'rewrite' ? setIsRewriteRecording : setIsSummarizeRecording;
 
     if (isRecording) {
       if (speechRecognitionRef.current) {
@@ -538,19 +562,21 @@ export function ToolControlsContainer({
             }
             
             // Check if there's selected text in the prompt input
-            const promptInput = tool === 'generate' ? promptInputRef.current : customPromptInputRef.current;
+            const promptInput = tool === 'generate' ? promptInputRef.current : tool === 'rewrite' ? customPromptInputRef.current : summaryPromptInputRef.current;
             
             if (promptInput && promptInput.selectionStart !== promptInput.selectionEnd) {
               // Replace selected text in prompt box
               const start = promptInput.selectionStart || 0;
               const end = promptInput.selectionEnd || 0;
-              const currentValue = tool === 'generate' ? prompt : customPrompt;
+              const currentValue = tool === 'generate' ? prompt : tool === 'rewrite' ? customPrompt : summaryPrompt;
               const newValue = currentValue.substring(0, start) + formattedText + currentValue.substring(end);
               
               if (tool === 'generate') {
                 setPrompt(newValue);
-              } else {
+              } else if (tool === 'rewrite') {
                 setCustomPrompt(newValue);
+              } else {
+                setSummaryPrompt(newValue);
               }
               
               // Set cursor after inserted text
@@ -566,8 +592,13 @@ export function ToolControlsContainer({
                   const needsSpace = prev.length > 0 && !prev.endsWith(' ');
                   return prev + (needsSpace ? ' ' : '') + formattedText;
                 });
-              } else {
+              } else if (tool === 'rewrite') {
                 setCustomPrompt(prev => {
+                  const needsSpace = prev.length > 0 && !prev.endsWith(' ');
+                  return prev + (needsSpace ? ' ' : '') + formattedText;
+                });
+              } else {
+                setSummaryPrompt(prev => {
                   const needsSpace = prev.length > 0 && !prev.endsWith(' ');
                   return prev + (needsSpace ? ' ' : '') + formattedText;
                 });
@@ -676,26 +707,100 @@ export function ToolControlsContainer({
               }}
             >
               {promptHistory.map((item) => (
-                <button
+                <div
                   key={item.id}
-                  onClick={() => {
-                    setPrompt(item.text);
-                    setShowHistoryDropdown(false);
-                  }}
                   style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    background: 'none',
-                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
                     borderBottom: '1px solid var(--border-muted)',
-                    color: 'var(--text)',
-                    cursor: 'pointer',
-                    fontSize: 'var(--fs-sm)',
                   }}
                 >
-                  {item.text}
-                </button>
+                  {/* Pin button */}
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await StorageService.togglePromptPin(item.id);
+                      const updatedHistory = await StorageService.getPromptHistory(4);
+                      setPromptHistory(updatedHistory);
+                    }}
+                    aria-label={item.pinned ? 'Unpin prompt' : 'Pin prompt'}
+                    title={item.pinned ? 'Unpin' : 'Pin'}
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'transparent',
+                      border: 'none',
+                      borderRadius: 'var(--radius-sm)',
+                      color: item.pinned ? 'var(--primary)' : 'var(--text-muted)',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill={item.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                    </svg>
+                  </button>
+
+                  {/* Prompt text */}
+                  <button
+                    onClick={() => {
+                      setPrompt(item.text);
+                      setIsPromptFromHistory(true);
+                      setShowHistoryDropdown(false);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '4px 0',
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text)',
+                      cursor: 'pointer',
+                      fontSize: 'var(--fs-sm)',
+                    }}
+                  >
+                    {item.text}
+                  </button>
+
+                  {/* Delete button (only show if not pinned) */}
+                  {!item.pinned && (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        await StorageService.deletePromptFromHistory(item.id);
+                        const updatedHistory = await StorageService.getPromptHistory(4);
+                        setPromptHistory(updatedHistory);
+                      }}
+                      aria-label="Delete prompt"
+                      title="Delete"
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -746,7 +851,10 @@ export function ToolControlsContainer({
             className="flint-input"
             placeholder="Start writing..."
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            onChange={(e) => {
+              setPrompt(e.target.value);
+              setIsPromptFromHistory(false); // Reset flag when user types
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -936,7 +1044,7 @@ export function ToolControlsContainer({
                 minWidth: '160px',
               }}
             >
-              {presets.map((preset) => (
+              {presets.map((preset, index) => (
                 <button
                   key={preset}
                   onClick={() => {
@@ -952,6 +1060,8 @@ export function ToolControlsContainer({
                     color: 'var(--text)',
                     textAlign: 'left',
                     cursor: 'pointer',
+                    borderRadius: index === 0 ? 'var(--radius-md) var(--radius-md) 0 0' : 
+                                 index === presets.length - 1 ? '0 0 var(--radius-md) var(--radius-md)' : '0',
                   }}
                 >
                   {preset}
@@ -1081,97 +1191,345 @@ export function ToolControlsContainer({
       {/* Summarize Controls */}
       {activeTool === 'summarize' && (
         <div>
-          {/* Mode selector */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: '8px' }}>
-              Summary format
-            </label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {(['bullets', 'paragraph', 'brief'] as const).map((modeOption) => (
-                <button
-                  key={modeOption}
-                  className={`flint-btn ${mode === modeOption ? 'primary' : 'ghost'}`}
-                  onClick={() => setMode(modeOption)}
-                  disabled={isProcessing}
-                  style={{ flex: 1 }}
-                >
-                  {modeOption.charAt(0).toUpperCase() + modeOption.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Reading level and length controls */}
-          <div style={{ marginBottom: '16px', display: 'flex', gap: '12px' }}>
-            {/* Reading level dropdown */}
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                Reading level
-              </label>
-              <select
-                className="flint-input"
-                value={readingLevel}
-                onChange={(e) => setReadingLevel(e.target.value as ReadingLevel)}
+          {/* Top row: Summary Type and Reading Level dropdowns */}
+          <div style={{ marginBottom: '12px', display: 'flex', gap: '12px', justifyContent: 'flex-start' }}>
+            {/* Summary Type dropdown */}
+            <div style={{ position: 'relative', flex: 1 }}>
+              <button
+                className="flint-btn ghost"
+                onClick={() => !isProcessing && setShowSummaryModeDropdown(!showSummaryModeDropdown)}
                 disabled={isProcessing}
-                style={{ width: '100%', height: '48px', padding: '12px 16px' }}
+                aria-label={`Summary type: ${mode}`}
+                aria-expanded={showSummaryModeDropdown}
+                aria-haspopup="true"
+                title="Summary type"
+                style={{
+                  width: '100%',
+                  height: '36px',
+                  padding: '0 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  textTransform: 'capitalize',
+                }}
               >
-                <option value="simple">Simple</option>
-                <option value="moderate">Moderate</option>
-                <option value="detailed">Detailed</option>
-                <option value="complex">Complex</option>
-              </select>
-            </div>
-
-            {/* Length dropdown */}
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                Length
-              </label>
-              <select
-                className="flint-input"
-                value={summaryLength}
-                onChange={(e) => setSummaryLength(e.target.value as 'short' | 'medium' | 'long')}
-                disabled={isProcessing}
-                style={{ width: '100%', height: '48px', padding: '12px 16px' }}
-              >
-                <option value="short">Short</option>
-                <option value="medium">Medium</option>
-                <option value="long">Long</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Summarize button */}
-          <button
-            className="flint-btn primary"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              if (isProcessing) {
-                handleStop();
-              } else {
-                handleSummarize();
-              }
-            }}
-            style={{ 
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-            }}
-            aria-label={isProcessing ? 'Stop' : 'Summarize'}
-          >
-            {isProcessing ? (
-              <>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="6" y="6" width="12" height="12" rx="1" />
+                <span>{mode}</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="6 9 12 15 18 9" />
                 </svg>
-                <span>Stop</span>
-              </>
-            ) : (
-              'Summarize'
-            )}
-          </button>
+              </button>
+              
+              {showSummaryModeDropdown && (
+                <div
+                  ref={summaryModeDropdownRef}
+                  style={{
+                    position: 'absolute',
+                    left: '0',
+                    right: '0',
+                    bottom: '100%',
+                    marginBottom: '4px',
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+                    zIndex: 10000,
+                  }}
+                >
+                  {(['bullets', 'paragraph', 'brief'] as const).map((modeOption, index, arr) => (
+                    <button
+                      key={modeOption}
+                      onClick={() => {
+                        setMode(modeOption);
+                        setShowSummaryModeDropdown(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: 'none',
+                        background: mode === modeOption ? 'var(--surface-2)' : 'transparent',
+                        color: 'var(--text)',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        fontSize: 'var(--fs-sm)',
+                        textTransform: 'capitalize',
+                        borderRadius: index === 0 ? 'var(--radius-md) var(--radius-md) 0 0' : 
+                                     index === arr.length - 1 ? '0 0 var(--radius-md) var(--radius-md)' : '0',
+                      }}
+                    >
+                      {modeOption}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Reading Level dropdown */}
+            <div style={{ position: 'relative', flex: 1 }}>
+              <button
+                className="flint-btn ghost"
+                onClick={() => !isProcessing && setShowReadingLevelDropdown(!showReadingLevelDropdown)}
+                disabled={isProcessing}
+                aria-label={`Reading level: ${readingLevel}`}
+                aria-expanded={showReadingLevelDropdown}
+                aria-haspopup="true"
+                title="Reading level"
+                style={{
+                  width: '100%',
+                  height: '36px',
+                  padding: '0 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  textTransform: 'capitalize',
+                }}
+              >
+                <span>{readingLevel}</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              
+              {showReadingLevelDropdown && (
+                <div
+                  ref={readingLevelDropdownRef}
+                  style={{
+                    position: 'absolute',
+                    left: '0',
+                    right: '0',
+                    bottom: '100%',
+                    marginBottom: '4px',
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+                    zIndex: 10000,
+                  }}
+                >
+                  {(['simple', 'moderate', 'detailed', 'complex'] as ReadingLevel[]).map((level, index, arr) => (
+                    <button
+                      key={level}
+                      onClick={() => {
+                        setReadingLevel(level);
+                        setShowReadingLevelDropdown(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: 'none',
+                        background: readingLevel === level ? 'var(--surface-2)' : 'transparent',
+                        color: 'var(--text)',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        fontSize: 'var(--fs-sm)',
+                        textTransform: 'capitalize',
+                        borderRadius: index === 0 ? 'var(--radius-md) var(--radius-md) 0 0' : 
+                                     index === arr.length - 1 ? '0 0 var(--radius-md) var(--radius-md)' : '0',
+                      }}
+                    >
+                      {level}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Prompt input with inline controls */}
+          <div style={{ position: 'relative' }}>
+            <input
+              ref={summaryPromptInputRef}
+              type="text"
+              className="flint-input"
+              placeholder="Summarise"
+              value={summaryPrompt}
+              onChange={(e) => setSummaryPrompt(e.target.value)}
+              disabled={isProcessing}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSummarize();
+                }
+              }}
+              style={{
+                width: '100%',
+                height: '48px',
+                padding: '0 180px 0 12px',
+              }}
+            />
+            
+            {/* Inline buttons */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                right: '8px',
+                transform: 'translateY(-50%)',
+                display: 'flex',
+                gap: '4px',
+              }}
+            >
+              {/* Length dropdown */}
+              <button
+                className="flint-btn ghost"
+                onClick={() => !isProcessing && setShowSummaryLengthDropdown(!showSummaryLengthDropdown)}
+                disabled={isProcessing}
+                aria-label={`Length: ${summaryLength}`}
+                aria-expanded={showSummaryLengthDropdown}
+                aria-haspopup="true"
+                title={`Length: ${summaryLength}`}
+                style={{
+                  width: 'auto',
+                  minWidth: '50px',
+                  height: '36px',
+                  padding: '0 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: 'none',
+                  boxShadow: 'none',
+                  background: 'transparent',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  textTransform: 'capitalize',
+                }}
+              >
+                {summaryLength}
+              </button>
+              
+              {showSummaryLengthDropdown && (
+                <div
+                  ref={summaryLengthDropdownRef}
+                  style={{
+                    position: 'absolute',
+                    right: '90px',
+                    bottom: '100%',
+                    marginBottom: '4px',
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+                    zIndex: 10000,
+                    minWidth: '100px',
+                  }}
+                >
+                  {(['short', 'medium', 'long'] as const).map((length, index, arr) => (
+                    <button
+                      key={length}
+                      onClick={() => {
+                        setSummaryLength(length);
+                        setShowSummaryLengthDropdown(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: 'none',
+                        background: summaryLength === length ? 'var(--surface-2)' : 'transparent',
+                        color: 'var(--text)',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        fontSize: 'var(--fs-sm)',
+                        textTransform: 'capitalize',
+                        borderRadius: index === 0 ? 'var(--radius-md) var(--radius-md) 0 0' : 
+                                     index === arr.length - 1 ? '0 0 var(--radius-md) var(--radius-md)' : '0',
+                      }}
+                    >
+                      {length}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Voice recording button */}
+              <button
+                className={`flint-btn ${isSummarizeRecording ? 'recording' : 'ghost'}`}
+                onClick={() => handleVoiceToggle('summarize')}
+                disabled={isProcessing}
+                aria-label={isSummarizeRecording ? 'Stop recording' : 'Start voice input'}
+                title={isSummarizeRecording ? 'Stop recording' : 'Voice input'}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  padding: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: isSummarizeRecording ? undefined : 'none',
+                  boxShadow: isSummarizeRecording ? undefined : 'none',
+                  background: isSummarizeRecording ? undefined : 'transparent',
+                }}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
+                </svg>
+              </button>
+
+              {/* Summarize button */}
+              <button
+                className="flint-btn primary"
+                onClick={isProcessing ? handleStop : handleSummarize}
+                aria-label={isProcessing ? 'Stop' : 'Summarize'}
+                aria-busy={isProcessing}
+                title={isProcessing ? 'Stop summarizing' : 'Summarize'}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  padding: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {isProcessing ? (
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <rect x="6" y="6" width="12" height="12" rx="1" />
+                  </svg>
+                ) : (
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <line x1="8" y1="6" x2="21" y2="6" />
+                    <line x1="8" y1="12" x2="21" y2="12" />
+                    <line x1="8" y1="18" x2="21" y2="18" />
+                    <line x1="3" y1="6" x2="3.01" y2="6" />
+                    <line x1="3" y1="12" x2="3.01" y2="12" />
+                    <line x1="3" y1="18" x2="3.01" y2="18" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -12,7 +12,6 @@ import { ensureSpacing } from '../utils/textSelection';
 import { simulateStreaming } from '../utils/streamingEffect';
 import { ProjectManager } from '../components/ProjectManager';
 import { HistoryPanel } from '../components/HistoryPanel';
-import { LoadingSpinner } from '../components/LoadingSpinner';
 import { StorageService, Project, Snapshot } from '../services/storage';
 import { exportProject, autoFormatText, type ExportFormat } from '../utils/export';
 
@@ -1028,34 +1027,6 @@ function PanelContent() {
       )}
 
       <div className={`content-area ${state.activeTab ? 'expanded' : ''}`}>
-        {/* Small loading indicator in top-right during AI operations */}
-        {state.isProcessing && (
-          <div
-            style={{
-              position: 'fixed',
-              top: '16px',
-              right: '88px',
-              zIndex: 1000,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 12px',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: 'var(--shadow-soft)',
-            }}
-          >
-            <LoadingSpinner 
-              size={16} 
-              variant="inline"
-            />
-            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
-              Processing...
-            </span>
-          </div>
-        )}
-
         <ErrorBoundary
           onError={(error, errorInfo) => {
             // Log error details for debugging
@@ -1133,7 +1104,68 @@ function PanelContent() {
                     {currentProject?.title || 'Untitled Project'}
                   </h2>
                 )}
-                <div style={{ display: 'flex', gap: '4px', position: 'relative' }}>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center', position: 'relative' }}>
+                  {/* Processing indicator */}
+                  {state.isProcessing && (
+                    <div
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        border: '2px solid rgba(255, 255, 255, 0.3)',
+                        borderTopColor: '#ffffff',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite',
+                      }}
+                      aria-label="Processing"
+                    />
+                  )}
+                  
+                  {/* Copy button */}
+                  <button
+                    onClick={() => {
+                      if (editorContent) {
+                        navigator.clipboard.writeText(editorContent).then(() => {
+                          console.log('[Panel] Content copied to clipboard');
+                        }).catch((err) => {
+                          console.error('[Panel] Failed to copy:', err);
+                        });
+                      }
+                    }}
+                    disabled={!editorContent}
+                    aria-label="Copy content"
+                    title="Copy content to clipboard"
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'transparent',
+                      border: 'none',
+                      borderRadius: 'var(--radius-sm)',
+                      color: 'var(--text-muted)',
+                      cursor: editorContent ? 'pointer' : 'not-allowed',
+                      opacity: editorContent ? 1 : 0.5,
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (editorContent) {
+                        e.currentTarget.style.background = 'var(--surface-2)';
+                        e.currentTarget.style.color = 'var(--text)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = 'var(--text-muted)';
+                    }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                  </button>
+                  
                   {/* Export button */}
                   <div ref={exportMenuRef} style={{ position: 'relative' }}>
                     <button

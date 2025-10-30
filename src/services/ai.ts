@@ -623,6 +623,11 @@ class MockAIProvider {
   static generate(prompt: string, options: GenerateOptions): string {
     console.warn('[AI] Using mock provider - AI features require Chrome 128+ with Gemini Nano enabled');
 
+    // If prompt is the default "continue writing" prompt, return helpful message
+    if (prompt.toLowerCase().includes('continue writing') || prompt.toLowerCase().includes('extend this content')) {
+      return 'What should we write about? Try adding a prompt to get started!\n\n(Note: This is a mock response. Enable Chrome\'s built-in AI for real generation.)';
+    }
+
     // Generate simple, prompt-relevant response
     const promptLower = prompt.toLowerCase();
     let mockText = '';
