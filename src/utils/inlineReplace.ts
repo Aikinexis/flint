@@ -10,13 +10,15 @@
  * @param newText - The new text to insert
  * @param start - Start position of the selection range
  * @param end - End position of the selection range
+ * @param selectAfterReplace - Whether to select the replaced text (default: true for mini bar)
  * @returns Promise that resolves when replacement and animation are complete
  */
 export async function replaceTextInline(
   textarea: HTMLTextAreaElement,
   newText: string,
   start: number,
-  end: number
+  end: number,
+  selectAfterReplace: boolean = true
 ): Promise<void> {
   // Get current textarea value
   const currentValue = textarea.value;
@@ -36,16 +38,37 @@ export async function replaceTextInline(
   // CRITICAL: Restore focus BEFORE setting selection
   textarea.focus();
 
-  // Set new selection to highlight replaced text
-  const newSelectionStart = start;
-  const newSelectionEnd = start + newText.length;
-  textarea.setSelectionRange(newSelectionStart, newSelectionEnd);
+  if (selectAfterReplace) {
+    // Select the newly inserted text
+    const selectionStart = start;
+    const selectionEnd = start + newText.length;
+    textarea.setSelectionRange(selectionStart, selectionEnd);
+    console.log('[inlineReplace] Selected text:', selectionStart, '-', selectionEnd);
+  } else {
+    // Just move cursor to the end of the newly inserted text
+    const cursorPosition = start + newText.length;
+    textarea.setSelectionRange(cursorPosition, cursorPosition);
+    console.log('[inlineReplace] Cursor at:', cursorPosition);
+  }
+
+  // Scroll to cursor position if needed
+  textarea.scrollTop = textarea.scrollHeight;
 
   // Trigger select event to update indicators and captured state
   const selectEvent = new Event('select', { bubbles: true });
   textarea.dispatchEvent(selectEvent);
 
-  // Add brief highlight animation
+  // Force selection to stay (sometimes it gets cleared)
+  if (selectAfterReplace) {
+    setTimeout(() => {
+      const selectionStart = start;
+      const selectionEnd = start + newText.length;
+      textarea.setSelectionRange(selectionStart, selectionEnd);
+      console.log('[inlineReplace] Re-selected text after timeout');
+    }, 10);
+  }
+
+  // Add brief highlight animation (visual feedback without selection)
   textarea.classList.add('inline-replace-highlight');
 
   // Remove highlight class after animation completes

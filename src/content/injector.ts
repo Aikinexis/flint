@@ -315,6 +315,7 @@ class MiniBarInjectorImpl implements MiniBarInjector {
     this.bar.style.left = `${Math.round(left)}px`;
     this.bar.style.top = `${Math.round(top)}px`;
     this.bar.style.display = 'flex';
+    this.bar.style.pointerEvents = 'auto'; // Ensure pointer events are enabled
 
     console.log('[Flint Minibar] Applied styles:', {
       left: this.bar.style.left,
@@ -331,6 +332,7 @@ class MiniBarInjectorImpl implements MiniBarInjector {
         if (this.bar) {
           this.bar.style.opacity = '1';
           this.bar.style.transform = 'translate3d(0, 0, 0) scale(1)';
+          this.bar.style.pointerEvents = 'auto'; // Ensure pointer events stay enabled
         }
       });
     }, 100);
@@ -452,13 +454,13 @@ class MiniBarInjectorImpl implements MiniBarInjector {
           this.bar.style.pointerEvents = 'none';
 
           // Smooth fade-in and zoom after a small delay (with bounce effect)
-          setTimeout(() => {
+          requestAnimationFrame(() => {
             if (this.bar) {
               this.bar.style.opacity = '1';
               this.bar.style.transform = 'translate3d(0, 0, 0) scale(1)';
               this.bar.style.pointerEvents = 'auto';
             }
-          }, 50);
+          });
         }
       }, 300);
     };

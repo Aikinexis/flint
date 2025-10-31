@@ -27,7 +27,7 @@ export interface UseUndoRedoReturn {
 export function useUndoRedo(maxHistorySize: number = 100): UseUndoRedoReturn {
   // History stack: array of states
   const historyRef = useRef<UndoRedoState[]>([]);
-  
+
   // Current position in history (-1 means no history)
   const currentIndexRef = useRef<number>(-1);
 
@@ -50,7 +50,12 @@ export function useUndoRedo(maxHistorySize: number = 100): UseUndoRedoReturn {
         currentIndexRef.current++;
       }
 
-      console.log('[UndoRedo] Pushed state. History size:', historyRef.current.length, 'Index:', currentIndexRef.current);
+      console.log(
+        '[UndoRedo] Pushed state. History size:',
+        historyRef.current.length,
+        'Index:',
+        currentIndexRef.current
+      );
     },
     [maxHistorySize]
   );

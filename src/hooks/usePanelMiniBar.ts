@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { computePosition, autoUpdate, offset, flip, shift, inline } from '@floating-ui/dom';
+import { useEffect, useState, useCallback } from 'react';
+import { computePosition, offset, flip, shift, inline } from '@floating-ui/dom';
 
 type Anchor = { x: number; y: number; text: string };
 
@@ -12,17 +12,16 @@ type Anchor = { x: number; y: number; text: string };
  */
 export function usePanelMiniBar(toolbarEl: React.RefObject<HTMLElement>) {
   const [anchor, setAnchor] = useState<Anchor | null>(null);
-  const cleanupRef = useRef<(() => void) | undefined>();
 
-  function getSelectionRect(): DOMRect | null {
+  const getSelectionRect = useCallback((): DOMRect | null => {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return null;
     const r = sel.getRangeAt(0);
     const rects = Array.from(r.getClientRects()).filter((rc) => rc.width && rc.height);
     return rects[rects.length - 1] ?? r.getBoundingClientRect(); // last line of the selection
-  }
+  }, []);
 
-  function showForCurrentSelection() {
+  const showForCurrentSelection = useCallback(() => {
     const rect = getSelectionRect();
     const text = window.getSelection()?.toString().trim() || '';
     if (!rect || !text || text.length < 3) {
@@ -30,12 +29,26 @@ export function usePanelMiniBar(toolbarEl: React.RefObject<HTMLElement>) {
       return;
     }
     setAnchor({ x: rect.right, y: rect.top, text });
-  }
+  }, [getSelectionRect]);
+
+  const clear = useCallback(() => {
+    const el = toolbarEl.current;
+    if (el) {
+      el.style.display = 'none';
+      el.style.pointerEvents = 'auto'; // Ensure pointer events are always enabled
+    }
+    setAnchor(null);
+  }, [toolbarEl]);
 
   // Recompute position with Floating UI
   useEffect(() => {
     const el = toolbarEl.current;
-    if (!el || !anchor) return;
+    if (!el || !anchor) {
+      if (el) {
+        el.style.display = 'none';
+      }
+      return;
+    }
 
     // Virtual element that represents the selection
     const virtualRef = {
@@ -52,29 +65,50 @@ export function usePanelMiniBar(toolbarEl: React.RefObject<HTMLElement>) {
       },
     };
 
-    el.style.position = 'fixed'; // compute relative to viewport to avoid title offsets
-    el.style.pointerEvents = 'auto';
-    el.style.zIndex = '2147483647';
+    // Function to update position
+    const updatePosition = async () => {
+      if (!el) return;
 
-    cleanupRef.current?.();
-    cleanupRef.current = autoUpdate(virtualRef as any, el, async () => {
-      const { x, y } = await computePosition(virtualRef as any, el, {
-        placement: 'top',
-        strategy: 'fixed',
-        middleware: [
-          inline(), // anchor to the actual inline line box
-          offset(8), // 8px above
-          flip(), // keep onscreen
-          shift({ padding: 8 }),
-        ],
-      });
-      el.style.left = `${Math.round(x)}px`;
-      el.style.top = `${Math.round(y)}px`;
-      el.style.display = 'flex';
-    });
+      try {
+        const { x, y } = await computePosition(virtualRef as any, el, {
+          placement: 'top',
+          strategy: 'fixed',
+          middleware: [
+            inline(), // anchor to the actual inline line box
+            offset(8), // 8px above
+            flip(), // keep onscreen
+            shift({ padding: 8 }),
+          ],
+        });
 
-    return () => cleanupRef.current?.();
-  }, [anchor, toolbarEl]);
+        // Set styles
+        el.style.position = 'fixed';
+        el.style.left = `${Math.round(x)}px`;
+        el.style.top = `${Math.round(y)}px`;
+        el.style.display = 'flex';
+        el.style.pointerEvents = 'auto';
+        el.style.zIndex = '2147483647';
+      } catch (error) {
+        console.error('[usePanelMiniBar] Position update error:', error);
+      }
+    };
+
+    // Initial position
+    updatePosition();
+
+    // Update on scroll/resize (but not continuously)
+    const handleUpdate = () => {
+      requestAnimationFrame(updatePosition);
+    };
+
+    window.addEventListener('scroll', handleUpdate, { passive: true });
+    window.addEventListener('resize', handleUpdate, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleUpdate);
+      window.removeEventListener('resize', handleUpdate);
+    };
+  }, [anchor, toolbarEl, getSelectionRect]);
 
   // Show or hide based on user actions
   useEffect(() => {
@@ -82,26 +116,25 @@ export function usePanelMiniBar(toolbarEl: React.RefObject<HTMLElement>) {
     const onKey = () => requestAnimationFrame(showForCurrentSelection);
     const onSel = () => {
       const s = window.getSelection();
-      if (!s || !s.toString().trim()) setAnchor(null);
+      if (!s || !s.toString().trim()) {
+        setAnchor(null);
+      }
     };
-    document.addEventListener('mouseup', onUp);
-    document.addEventListener('keyup', onKey);
-    document.addEventListener('selectionchange', onSel);
+
+    document.addEventListener('mouseup', onUp, { passive: true });
+    document.addEventListener('keyup', onKey, { passive: true });
+    document.addEventListener('selectionchange', onSel, { passive: true });
+
     return () => {
       document.removeEventListener('mouseup', onUp);
       document.removeEventListener('keyup', onKey);
       document.removeEventListener('selectionchange', onSel);
     };
-  }, []);
+  }, [showForCurrentSelection]);
 
   return {
     anchor,
-    clear: () => {
-      if (toolbarEl.current) {
-        toolbarEl.current.style.display = 'none';
-      }
-      setAnchor(null);
-    },
+    clear,
     refresh: showForCurrentSelection,
   };
 }

@@ -59,12 +59,18 @@ export interface GenerateOptions {
 }
 
 /**
+ * Download progress callback type
+ */
+export type DownloadProgressCallback = (progress: number) => void;
+
+/**
  * AI Service class
  */
 export class AIService {
   private static availabilityCache: AIAvailability | null = null;
   private static cacheTimestamp = 0;
   private static readonly CACHE_DURATION = 60000; // 1 minute
+  private static downloadProgressCallback: DownloadProgressCallback | null = null;
 
   /**
    * Checks availability of all AI APIs
@@ -219,6 +225,109 @@ export class AIService {
   }
 
   /**
+   * Sets a callback for download progress updates
+   * @param callback - Function to call with progress (0-1)
+   */
+  static setDownloadProgressCallback(callback: DownloadProgressCallback | null): void {
+    this.downloadProgressCallback = callback;
+  }
+
+  /**
+   * Pre-warms AI models by actually creating sessions to load them into memory
+   * This eliminates the slow first-use after app restart
+   * Call this early (e.g., on app init) to warm up models in the background
+   * @returns Promise resolving to availability status
+   */
+  static async prewarmModels(): Promise<AIAvailability> {
+    console.log('[AI] Pre-warming models (loading into memory)...');
+    const availability = await this.checkAvailability();
+
+    // Track which models were warmed up
+    const warmedModels: string[] = [];
+    const failedModels: string[] = [];
+
+    // Warm up Summarizer if available
+    if (availability.summarizerAPI === 'available') {
+      try {
+        console.log('[AI] Warming up Summarizer...');
+        const summarizer = await (self as any).Summarizer.create({
+          type: 'key-points',
+          format: 'plain-text',
+          length: 'short',
+          outputLanguage: 'en',
+        });
+        // Destroy session immediately - we just wanted to load the model
+        if (summarizer.destroy) summarizer.destroy();
+        warmedModels.push('Summarizer');
+        console.log('[AI] ✓ Summarizer warmed up');
+      } catch (error) {
+        console.warn('[AI] Failed to warm up Summarizer:', error);
+        failedModels.push('Summarizer');
+      }
+    }
+
+    // Warm up Rewriter if available
+    if (availability.rewriterAPI === 'available') {
+      try {
+        console.log('[AI] Warming up Rewriter...');
+        const rewriter = await (self as any).Rewriter.create({
+          tone: 'as-is',
+          format: 'plain-text',
+          length: 'as-is',
+          outputLanguage: 'en',
+        });
+        // Destroy session immediately
+        if (rewriter.destroy) rewriter.destroy();
+        warmedModels.push('Rewriter');
+        console.log('[AI] ✓ Rewriter warmed up');
+      } catch (error) {
+        console.warn('[AI] Failed to warm up Rewriter:', error);
+        failedModels.push('Rewriter');
+      }
+    }
+
+    // Warm up Writer if available
+    if (availability.writerAPI === 'available') {
+      try {
+        console.log('[AI] Warming up Writer...');
+        const writer = await (self as any).Writer.create({
+          tone: 'neutral',
+          format: 'plain-text',
+          length: 'short',
+          outputLanguage: 'en',
+        });
+        // Destroy session immediately
+        if (writer.destroy) writer.destroy();
+        warmedModels.push('Writer');
+        console.log('[AI] ✓ Writer warmed up');
+      } catch (error) {
+        console.warn('[AI] Failed to warm up Writer:', error);
+        failedModels.push('Writer');
+      }
+    }
+
+    // Log summary
+    if (warmedModels.length > 0) {
+      console.log(`[AI] ✓ Pre-warming complete! Warmed up: ${warmedModels.join(', ')}`);
+    }
+    if (failedModels.length > 0) {
+      console.log(`[AI] ⚠ Some models failed to warm up: ${failedModels.join(', ')}`);
+    }
+
+    // Check for models that need download
+    const needsDownload = Object.entries(availability)
+      .filter(([_, status]) => status === 'after-download')
+      .map(([api]) => api);
+
+    if (needsDownload.length > 0) {
+      console.log('[AI] Models need download:', needsDownload.join(', '));
+      console.log('[AI] Models will download on first use. This may take 1-2 minutes.');
+    }
+
+    return availability;
+  }
+
+  /**
    * Generates text using the Prompt API
    * @param prompt - The prompt text
    * @returns Promise resolving to generated text
@@ -316,6 +425,15 @@ export class AIService {
         length: summaryLength,
         sharedContext,
         outputLanguage: 'en', // Required for optimal output quality and safety
+        monitor(m: any) {
+          m.addEventListener('downloadprogress', (e: any) => {
+            const progress = e.loaded || 0;
+            console.log(`[AI] Summarizer download progress: ${Math.round(progress * 100)}%`);
+            if (AIService.downloadProgressCallback) {
+              AIService.downloadProgressCallback(progress);
+            }
+          });
+        },
       });
 
       const result = await Promise.race([
@@ -369,6 +487,15 @@ export class AIService {
           length: 'as-is',
           sharedContext: context,
           outputLanguage: 'en',
+          monitor(m: any) {
+            m.addEventListener('downloadprogress', (e: any) => {
+              const progress = e.loaded || 0;
+              console.log(`[AI] Rewriter download progress: ${Math.round(progress * 100)}%`);
+              if (AIService.downloadProgressCallback) {
+                AIService.downloadProgressCallback(progress);
+              }
+            });
+          },
         });
 
         const result = await Promise.race([
@@ -480,6 +607,15 @@ CRITICAL INSTRUCTIONS:
           length: options.length || 'medium',
           sharedContext,
           outputLanguage: 'en',
+          monitor(m: any) {
+            m.addEventListener('downloadprogress', (e: any) => {
+              const progress = e.loaded || 0;
+              console.log(`[AI] Writer download progress: ${Math.round(progress * 100)}%`);
+              if (AIService.downloadProgressCallback) {
+                AIService.downloadProgressCallback(progress);
+              }
+            });
+          },
         });
 
         const result = await Promise.race([

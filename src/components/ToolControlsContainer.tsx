@@ -405,12 +405,12 @@ export function ToolControlsContainer({
         // Select all text
         textarea.focus();
         textarea.setSelectionRange(0, content.length);
-        
+
         // Update captured selection in editor ref
         if (editorRef?.current) {
           editorRef.current.updateCapturedSelection(0, content.length);
         }
-        
+
         console.log('[ToolControls] No selection - selected all text. Press again to rewrite.');
         return;
       } else {
@@ -467,7 +467,8 @@ export function ToolControlsContainer({
   const handleSummarize = async () => {
     // CRITICAL: Get captured selection from editor ref (not from prop which is cleared)
     const capturedSelection = editorRef?.current?.getCapturedSelection();
-    console.log('[ToolControls] Summarize - captured selection from ref:', capturedSelection);
+    // Reduced logging
+    // console.log('[ToolControls] Summarize - captured selection from ref:', capturedSelection);
 
     // Validate captured selection exists
     if (!capturedSelection) {
@@ -492,12 +493,12 @@ export function ToolControlsContainer({
         // Select all text
         textarea.focus();
         textarea.setSelectionRange(0, content.length);
-        
+
         // Update captured selection in editor ref
         if (editorRef?.current) {
           editorRef.current.updateCapturedSelection(0, content.length);
         }
-        
+
         console.log('[ToolControls] No selection - selected all text. Press again to summarize.');
         return;
       } else {
@@ -667,12 +668,12 @@ export function ToolControlsContainer({
                 if (formattedText.length > 0) {
                   formattedText = formattedText.charAt(0).toUpperCase() + formattedText.slice(1);
                 }
-                editorRef.current.insertAtCursor(formattedText, true, true); // selectAfterInsert = true, replaceSelection = true
+                editorRef.current.insertAtCursor(formattedText, false, true); // selectAfterInsert = false (cursor to end), replaceSelection = true
               } else {
                 // Insert at cursor with smart formatting
                 const cursorPos = textarea.selectionStart;
                 const formattedText = formatTranscript(finalTranscript, content, cursorPos);
-                editorRef.current.insertAtCursor(formattedText, true, false); // selectAfterInsert = true
+                editorRef.current.insertAtCursor(formattedText, false, false); // selectAfterInsert = false (cursor to end)
               }
               accumulatedTranscript = '';
             }
@@ -971,7 +972,7 @@ export function ToolControlsContainer({
                 zIndex: 10000,
               }}
             >
-              {(['short', 'medium', 'long'] as const).map((length) => (
+              {(['short', 'medium', 'long'] as const).map((length, index, arr) => (
                 <button
                   key={length}
                   onClick={() => {
@@ -986,6 +987,12 @@ export function ToolControlsContainer({
                     border: 'none',
                     color: 'var(--text)',
                     cursor: 'pointer',
+                    borderRadius:
+                      index === 0
+                        ? 'var(--radius-md) var(--radius-md) 0 0'
+                        : index === arr.length - 1
+                          ? '0 0 var(--radius-md) var(--radius-md)'
+                          : '0',
                   }}
                 >
                   {length.charAt(0).toUpperCase() + length.slice(1)}

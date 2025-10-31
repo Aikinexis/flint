@@ -147,15 +147,25 @@ export const MiniBar: React.FC<Props> = ({
         boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
         zIndex: 2147483647,
         pointerEvents: 'auto',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
       }}
       onMouseDown={(e) => {
         // Prevent the minibar from stealing focus from the textarea
         e.preventDefault();
         e.stopPropagation();
       }}
+      onClick={(e) => {
+        // Ensure clicks are not blocked
+        e.stopPropagation();
+      }}
     >
       <button
-        onMouseDown={handleSummarize}
+        onClick={handleSummarize}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
         disabled={isProcessing}
         aria-label="Summarize"
         style={{
@@ -170,6 +180,7 @@ export const MiniBar: React.FC<Props> = ({
           color: '#F4F6FA',
           transition: 'background 0.12s ease',
           opacity: isProcessing ? 0.5 : 1,
+          pointerEvents: isProcessing ? 'none' : 'auto',
         }}
         onMouseEnter={(e) => {
           if (!isProcessing) {
@@ -220,7 +231,11 @@ export const MiniBar: React.FC<Props> = ({
         )}
       </button>
       <button
-        onMouseDown={handleRewrite}
+        onClick={handleRewrite}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
         disabled={isProcessing}
         aria-label="Rewrite"
         title="Rewrite"
@@ -236,6 +251,7 @@ export const MiniBar: React.FC<Props> = ({
           color: '#F4F6FA',
           transition: 'background 0.12s ease',
           opacity: isProcessing ? 0.5 : 1,
+          pointerEvents: isProcessing ? 'none' : 'auto',
         }}
         onMouseEnter={(e) => {
           if (!isProcessing) {
@@ -282,10 +298,14 @@ export const MiniBar: React.FC<Props> = ({
         )}
       </button>
       <button
-        onMouseDown={(e) => {
+        onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
           onClose();
+        }}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
         }}
         aria-label="Close"
         title="Close"
@@ -300,6 +320,7 @@ export const MiniBar: React.FC<Props> = ({
           borderRadius: '6px',
           color: '#F4F6FA',
           transition: 'background 0.12s ease',
+          pointerEvents: 'auto',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';

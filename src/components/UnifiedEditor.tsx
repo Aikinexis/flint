@@ -50,6 +50,11 @@ export interface UnifiedEditorProps {
    * Whether the editor is read-only
    */
   readOnly?: boolean;
+
+  /**
+   * Maximum number of undo steps to keep (default: 50)
+   */
+  undoHistoryLimit?: number;
 }
 
 /**
@@ -85,6 +90,7 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
       placeholder = 'Start typing or paste text here...',
       disabled = false,
       readOnly = false,
+      undoHistoryLimit = 10,
     },
     ref
   ) {
@@ -105,25 +111,28 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
     const capturedSelectionRef = useRef<SelectionRange>({ start: 0, end: 0 });
 
     // Custom undo/redo system
-    const undoRedo = useUndoRedo(100);
-    
+    const undoRedo = useUndoRedo(undoHistoryLimit || 10);
+
     // Store undoRedo in a ref so it's stable across renders
     const undoRedoRef = useRef(undoRedo);
     undoRedoRef.current = undoRedo;
-    
+
     // Flag to prevent pushing state during undo/redo operations
     const isUndoRedoOperationRef = useRef(false);
-    
+
     // Debounce timer for pushing states to history
     const pushStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    
+
     // Track if we've initialized the history
     const hasInitializedRef = useRef(false);
 
     // Initialize history with initial content
     useEffect(() => {
       if (!hasInitializedRef.current && content) {
-        console.log('[UnifiedEditor] Initializing undo history with content:', content.substring(0, 50));
+        console.log(
+          '[UnifiedEditor] Initializing undo history with content:',
+          content.substring(0, 50)
+        );
         undoRedoRef.current.pushState({
           content,
           selectionStart: 0,
@@ -289,7 +298,7 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
               start: insertStart,
               end: insertEnd,
             });
-            
+
             // Push to undo history (AI operation completed)
             undoRedoRef.current.pushState({
               content: newContent,
@@ -300,7 +309,7 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
             // Just move cursor to end of inserted text
             const newCursorPos = startPos + textToInsert.length;
             textarea.setSelectionRange(newCursorPos, newCursorPos);
-            
+
             // Push to undo history (AI operation completed)
             undoRedoRef.current.pushState({
               content: newContent,
@@ -318,19 +327,24 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newContent = e.target.value;
       onContentChange(newContent);
-      
+
       // Push to undo history (debounced to avoid too many states during typing)
       if (!isUndoRedoOperationRef.current) {
         if (pushStateTimeoutRef.current) {
           clearTimeout(pushStateTimeoutRef.current);
         }
-        
+
         console.log('[UnifiedEditor] Content changed, will push state in 300ms');
         pushStateTimeoutRef.current = setTimeout(() => {
           if (textareaRef.current) {
-            console.log('[UnifiedEditor] Pushing state to history:', newContent.substring(0, 50));
+            // Get current content from textarea (not from closure)
+            const currentContent = textareaRef.current.value;
+            console.log(
+              '[UnifiedEditor] Pushing state to history:',
+              currentContent.substring(0, 50)
+            );
             undoRedoRef.current.pushState({
-              content: newContent,
+              content: currentContent,
               selectionStart: textareaRef.current.selectionStart,
               selectionEnd: textareaRef.current.selectionEnd,
             });
@@ -410,11 +424,8 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
       selectionRef.current = { start, end };
       capturedSelectionRef.current = { start, end };
 
-      console.log('[UnifiedEditor] 🔵 CAPTURED SELECTION:', {
-        start,
-        end,
-        capturedRef: capturedSelectionRef.current,
-      });
+      // Reduced logging - only log when debugging selection issues
+      // console.log('[UnifiedEditor] Captured selection:', { start, end });
 
       // Check if text is selected
       const hasSelection = start !== end;
@@ -452,10 +463,8 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
 
         // Hide overlay locally but DON'T notify parent (preserves shared selection across tools)
         setShowSelectionOverlay(false);
-        console.log('[UnifiedEditor] ✓ Cursor position captured (no selection, hiding overlay):', {
-          start,
-          end,
-        });
+        // Reduced logging
+        // console.log('[UnifiedEditor] Cursor position captured:', { start, end });
       }
     };
 
@@ -483,11 +492,11 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
       capturedSelectionRef.current = { start, end };
       setCapturedSelection({ start, end }); // Update state to trigger re-render
 
-      console.log('[UnifiedEditor] 🔵 BLUR - CAPTURED SELECTION:', {
-        start,
-        end,
-        capturedRef: capturedSelectionRef.current,
-      });
+      // Reduced logging
+      // console.log('[UnifiedEditor] Blur - captured selection:', {
+      //   start,
+      //   end,
+      // });
 
       // Only notify parent if there's an actual selection (not just cursor position)
       const hasSelection = start !== end;

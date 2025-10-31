@@ -434,8 +434,6 @@ export function Settings({
 
   return (
     <div className="flint-section flex flex-col h-full overflow-y-auto">
-      <h2 className="flint-section-header">Settings</h2>
-
       {/* AI Availability Banner */}
       <AIAvailabilityBanner availability={aiAvailability} />
 
@@ -474,7 +472,7 @@ export function Settings({
               letterSpacing: '0.05em',
             }}
           >
-            Appearance
+            Theme
           </h3>
           <svg
             width="16"
@@ -1041,7 +1039,7 @@ export function Settings({
               letterSpacing: '0.05em',
             }}
           >
-            Voice Recognition
+            Transcribe
           </h3>
           <svg
             width="16"
@@ -1234,7 +1232,7 @@ export function Settings({
               margin: 0,
             }}
           >
-            Keyboard Shortcuts
+            Undo/Redo
           </h3>
           <svg
             width="16"
@@ -1257,6 +1255,78 @@ export function Settings({
 
         {expandedSections.shortcuts && (
           <div id="shortcuts-content">
+            {/* Undo History Limit */}
+            <div style={{ marginBottom: '24px' }}>
+              <label
+                htmlFor="undo-history-limit"
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--fs-base)',
+                  fontWeight: 500,
+                  color: 'var(--text)',
+                  marginBottom: '8px',
+                }}
+              >
+                Undo History Limit
+              </label>
+              <p
+                style={{
+                  fontSize: 'var(--fs-sm)',
+                  color: 'var(--text-muted)',
+                  margin: '0 0 12px 0',
+                }}
+              >
+                Maximum number of undo steps to keep (5-200). Higher values use more memory.
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <input
+                  id="undo-history-limit"
+                  type="number"
+                  min="5"
+                  max="200"
+                  value={settings.undoHistoryLimit || 10}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    if (!isNaN(value) && value >= 5 && value <= 200) {
+                      updateSetting('undoHistoryLimit', value);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // Ensure valid value on blur
+                    const value = parseInt(e.target.value);
+                    if (isNaN(value) || value < 5) {
+                      updateSetting('undoHistoryLimit', 5);
+                    } else if (value > 200) {
+                      updateSetting('undoHistoryLimit', 200);
+                    }
+                  }}
+                  style={{
+                    width: '100px',
+                    padding: '8px 12px',
+                    fontSize: 'var(--fs-base)',
+                    color: 'var(--text)',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-sm)',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  className="flint-btn ghost"
+                  onClick={() => {
+                    updateSetting('undoHistoryLimit', 10);
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: 'var(--fs-sm)',
+                  }}
+                >
+                  Reset to 10
+                </button>
+              </div>
+            </div>
+
+            {/* Keyboard Shortcuts */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}

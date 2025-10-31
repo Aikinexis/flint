@@ -89,6 +89,7 @@ export interface Settings {
   historyMigrated?: boolean; // Flag to track if history has been migrated to snapshots
   autoCorrectEnabled?: boolean; // Auto-correct spelling and grammar after typing pause
   autoCorrectDelay?: number; // Delay in milliseconds before auto-correct triggers (default 3000)
+  undoHistoryLimit?: number; // Maximum number of undo steps to keep (default 50)
 }
 
 /**
@@ -101,6 +102,7 @@ const DEFAULT_SETTINGS: Settings = {
   accentHue: 255, // Default blue hue
   autoCorrectEnabled: false, // Off by default
   autoCorrectDelay: 3000, // 3 seconds
+  undoHistoryLimit: 10, // Default 10 undo steps
 };
 
 /**
