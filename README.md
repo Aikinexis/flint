@@ -55,6 +55,12 @@ All AI processing happens locally on your device. No data leaves your browser, n
 - Gemini Nano enabled (for AI features)
 - ~500 MB disk space for AI model
 
+
+### Install
+Download the `dist.zip` file from the release page and load it via chrome://extensions/
+
+or
+
 ## Installation
 
 ### Development
