@@ -52,8 +52,14 @@ All AI processing happens locally on your device. No data leaves your browser, n
 ## Requirements
 
 - Chrome 128 or later
-- Gemini Nano enabled (for AI features)
-- ~500 MB disk space for AI model
+- Gemini Nano enabled (chrome://components → Optimization Guide On-Device Model)
+- https://developer.chrome.com/docs/ai/get-started
+- Operating system: Windows 10 or 11; macOS 13+ (Ventura and onwards); Linux; or ChromeOS (from Platform 16389.0.0 and onwards) on Chromebook Plus devices. Chrome for Android, iOS, and ChromeOS on non-Chromebook Plus devices are not yet supported by the APIs which use Gemini Nano.
+- Storage: At least 22 GB of free space on the volume that contains your Chrome profile.
+- GPU or CPU: Built-in models can run with GPU or CPU.
+- GPU: Strictly more than 4 GB of VRAM.
+- CPU: 16 GB of RAM or more and 4 CPU cores or more.
+- Network: Unlimited data or an unmetered connection
 
 
 ### Install
