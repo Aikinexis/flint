@@ -246,65 +246,77 @@ export class AIService {
     const warmedModels: string[] = [];
     const failedModels: string[] = [];
 
+    // Create warmup promises for all available models (run in parallel)
+    const warmupPromises: Promise<void>[] = [];
+
     // Warm up Summarizer if available
     if (availability.summarizerAPI === 'available') {
-      try {
-        console.log('[AI] Warming up Summarizer...');
-        const summarizer = await (self as any).Summarizer.create({
-          type: 'key-points',
-          format: 'plain-text',
-          length: 'short',
-          outputLanguage: 'en',
-        });
-        // Destroy session immediately - we just wanted to load the model
-        if (summarizer.destroy) summarizer.destroy();
-        warmedModels.push('Summarizer');
-        console.log('[AI] ✓ Summarizer warmed up');
-      } catch (error) {
-        console.warn('[AI] Failed to warm up Summarizer:', error);
-        failedModels.push('Summarizer');
-      }
+      warmupPromises.push(
+        (async () => {
+          try {
+            console.log('[AI] Warming up Summarizer...');
+            await (self as any).Summarizer.create({
+              type: 'key-points',
+              format: 'plain-text',
+              length: 'short',
+              outputLanguage: 'en',
+            });
+            warmedModels.push('Summarizer');
+            console.log('[AI] ✓ Summarizer warmed up');
+          } catch (error) {
+            console.warn('[AI] Failed to warm up Summarizer:', error);
+            failedModels.push('Summarizer');
+          }
+        })()
+      );
     }
 
     // Warm up Rewriter if available
     if (availability.rewriterAPI === 'available') {
-      try {
-        console.log('[AI] Warming up Rewriter...');
-        const rewriter = await (self as any).Rewriter.create({
-          tone: 'as-is',
-          format: 'plain-text',
-          length: 'as-is',
-          outputLanguage: 'en',
-        });
-        // Destroy session immediately
-        if (rewriter.destroy) rewriter.destroy();
-        warmedModels.push('Rewriter');
-        console.log('[AI] ✓ Rewriter warmed up');
-      } catch (error) {
-        console.warn('[AI] Failed to warm up Rewriter:', error);
-        failedModels.push('Rewriter');
-      }
+      warmupPromises.push(
+        (async () => {
+          try {
+            console.log('[AI] Warming up Rewriter...');
+            await (self as any).Rewriter.create({
+              tone: 'as-is',
+              format: 'plain-text',
+              length: 'as-is',
+              outputLanguage: 'en',
+            });
+            warmedModels.push('Rewriter');
+            console.log('[AI] ✓ Rewriter warmed up');
+          } catch (error) {
+            console.warn('[AI] Failed to warm up Rewriter:', error);
+            failedModels.push('Rewriter');
+          }
+        })()
+      );
     }
 
     // Warm up Writer if available
     if (availability.writerAPI === 'available') {
-      try {
-        console.log('[AI] Warming up Writer...');
-        const writer = await (self as any).Writer.create({
-          tone: 'neutral',
-          format: 'plain-text',
-          length: 'short',
-          outputLanguage: 'en',
-        });
-        // Destroy session immediately
-        if (writer.destroy) writer.destroy();
-        warmedModels.push('Writer');
-        console.log('[AI] ✓ Writer warmed up');
-      } catch (error) {
-        console.warn('[AI] Failed to warm up Writer:', error);
-        failedModels.push('Writer');
-      }
+      warmupPromises.push(
+        (async () => {
+          try {
+            console.log('[AI] Warming up Writer...');
+            await (self as any).Writer.create({
+              tone: 'neutral',
+              format: 'plain-text',
+              length: 'short',
+              outputLanguage: 'en',
+            });
+            warmedModels.push('Writer');
+            console.log('[AI] ✓ Writer warmed up');
+          } catch (error) {
+            console.warn('[AI] Failed to warm up Writer:', error);
+            failedModels.push('Writer');
+          }
+        })()
+      );
     }
+
+    // Wait for all warmup operations to complete in parallel
+    await Promise.allSettled(warmupPromises);
 
     // Log summary
     if (warmedModels.length > 0) {

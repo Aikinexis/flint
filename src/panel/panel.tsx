@@ -966,7 +966,7 @@ function PanelContent() {
       if (isInitializedRef.current) return;
       isInitializedRef.current = true;
 
-      // Pre-warm AI models in the background
+      // Set up download progress callback for models that need downloading
       AIService.setDownloadProgressCallback((progress) => {
         setAiDownloadProgress(progress);
         if (progress >= 1) {
@@ -974,9 +974,28 @@ function PanelContent() {
           setTimeout(() => setAiDownloadProgress(null), 2000);
         }
       });
-      AIService.prewarmModels().catch((error) => {
-        console.error('[Panel] AI pre-warm failed:', error);
-      });
+
+      // Pre-warm AI models for faster first use (runs in parallel)
+      AIService.checkAvailability()
+        .then((availability) => {
+          const needsDownload =
+            availability.summarizerAPI === 'after-download' ||
+            availability.rewriterAPI === 'after-download' ||
+            availability.writerAPI === 'after-download';
+
+          if (needsDownload) {
+            console.log('[Panel] AI models need download, pre-warming with progress...');
+            return AIService.prewarmModels();
+          } else {
+            console.log('[Panel] AI models available, pre-warming silently...');
+            // Clear progress callback for silent warmup
+            AIService.setDownloadProgressCallback(null);
+            return AIService.prewarmModels();
+          }
+        })
+        .catch((error) => {
+          console.error('[Panel] AI warmup failed:', error);
+        });
 
       await loadProjects();
 
@@ -1241,66 +1260,85 @@ function PanelContent() {
         />
       )}
 
-      {/* AI Download Progress indicator */}
+      {/* AI Download Progress indicator - centered modal */}
       {aiDownloadProgress !== null && aiDownloadProgress < 1 && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '16px',
-            right: '16px',
-            zIndex: 1000,
-            padding: '12px 16px',
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--bg-muted)',
-            border: '1px solid var(--border)',
-            color: 'var(--text)',
-            fontSize: 'var(--fs-sm)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            boxShadow: 'var(--shadow-soft)',
-            minWidth: '200px',
-          }}
-          role="status"
-          aria-live="polite"
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            <span>Downloading AI model...</span>
-          </div>
+        <>
+          {/* Backdrop */}
           <div
             style={{
-              width: '100%',
-              height: '4px',
-              background: 'var(--bg-light)',
-              borderRadius: '2px',
-              overflow: 'hidden',
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 9999,
             }}
+          />
+          {/* Modal */}
+          <div
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 10000,
+              padding: '24px',
+              borderRadius: 'var(--radius-lg)',
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              color: 'var(--text)',
+              fontSize: 'var(--fs-sm)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+              minWidth: '300px',
+              maxWidth: '400px',
+            }}
+            role="status"
+            aria-live="polite"
           >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span style={{ fontWeight: 500, fontSize: 'var(--fs-md)' }}>
+                Downloading AI model...
+              </span>
+            </div>
             <div
               style={{
-                width: `${Math.round(aiDownloadProgress * 100)}%`,
-                height: '100%',
-                background: 'var(--accent)',
-                transition: 'width 0.3s ease',
+                width: '100%',
+                height: '6px',
+                background: 'var(--surface-2)',
+                borderRadius: '3px',
+                overflow: 'hidden',
               }}
-            />
+            >
+              <div
+                style={{
+                  width: `${Math.round(aiDownloadProgress * 100)}%`,
+                  height: '100%',
+                  background: 'var(--accent)',
+                  transition: 'width 0.3s ease',
+                }}
+              />
+            </div>
+            <span style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, textAlign: 'center' }}>
+              {Math.round(aiDownloadProgress * 100)}% - First use only, ~1-2 min
+            </span>
           </div>
-          <span style={{ fontSize: 'var(--fs-xs)', opacity: 0.7 }}>
-            {Math.round(aiDownloadProgress * 100)}% - First use only, ~1-2 min
-          </span>
-        </div>
+        </>
       )}
 
       {/* Save indicator removed - now shown as icon in editor header */}
@@ -1328,283 +1366,236 @@ function PanelContent() {
           {(visitedTabs.has('generate') ||
             visitedTabs.has('rewrite') ||
             visitedTabs.has('summary')) && (
-            <div
-              style={{
-                display: ['generate', 'rewrite', 'summary'].includes(state.activeTab)
-                  ? 'flex'
-                  : 'none',
-                height: '100%',
-                flexDirection: 'column',
-                padding: '24px 14px 24px 14px', // Reduced right padding
-                paddingRight: '8px', // Less space on right side
-              }}
-            >
-              {/* Shared Editor Toolbar */}
               <div
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '12px',
+                  display: ['generate', 'rewrite', 'summary'].includes(state.activeTab)
+                    ? 'flex'
+                    : 'none',
+                  height: '100%',
+                  flexDirection: 'column',
+                  padding: '24px 14px 24px 14px', // Reduced right padding
+                  paddingRight: '8px', // Less space on right side
                 }}
               >
-                {isEditingTitle ? (
-                  <input
-                    type="text"
-                    value={editingTitle}
-                    onChange={(e) => setEditingTitle(e.target.value)}
-                    onBlur={handleTitleSave}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleTitleSave();
-                      } else if (e.key === 'Escape') {
-                        setIsEditingTitle(false);
-                      }
-                    }}
-                    autoFocus
-                    style={{
-                      fontSize: 'var(--fs-lg)',
-                      fontWeight: 600,
-                      color: 'var(--text)',
-                      background: 'var(--surface-2)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-sm)',
-                      padding: '4px 8px',
-                      outline: 'none',
-                      flex: 1,
-                      maxWidth: '400px',
-                    }}
-                  />
-                ) : (
-                  <h2
-                    onClick={handleTitleEditStart}
-                    style={{
-                      fontSize: 'var(--fs-lg)',
-                      fontWeight: 600,
-                      color: 'var(--text)',
-                      margin: 0,
-                      cursor: 'pointer',
-                      padding: '4px 12px',
-                      borderRadius: 'var(--radius-sm)',
-                      overflow: 'auto',
-                      maxWidth: '400px',
-                      whiteSpace: 'nowrap',
-                    }}
-                    title="Click to edit project name"
-                  >
-                    {currentProject?.title || 'Untitled Project'}
-                  </h2>
-                )}
+                {/* Shared Editor Toolbar */}
                 <div
                   style={{
                     display: 'flex',
-                    gap: '4px',
+                    justifyContent: 'space-between',
                     alignItems: 'center',
-                    position: 'relative',
+                    marginBottom: '12px',
                   }}
                 >
-                  {/* Processing indicator */}
-                  {state.isProcessing && (
-                    <div
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        border: '2px solid var(--border)',
-                        borderTopColor: 'var(--text)',
-                        borderRadius: '50%',
-                        animation: 'spin 0.8s linear infinite',
-                      }}
-                      aria-label="Processing"
-                    />
-                  )}
-
-                  {/* Save button */}
-                  <button
-                    onClick={async () => {
-                      if (currentProject && editorContent) {
-                        // Clear existing timeout
-                        if (autoSaveTimeoutRef.current) {
-                          clearTimeout(autoSaveTimeoutRef.current);
+                  {isEditingTitle ? (
+                    <input
+                      type="text"
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      onBlur={handleTitleSave}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleTitleSave();
+                        } else if (e.key === 'Escape') {
+                          setIsEditingTitle(false);
                         }
-                        // Save immediately
-                        await autoSaveProject(currentProject.id, editorContent);
-                      }
-                    }}
-                    disabled={!currentProject || isSaving}
-                    aria-label={
-                      isSaving
-                        ? 'Saving...'
-                        : justSaved
-                          ? 'Saved!'
-                          : saveError
-                            ? 'Save failed'
-                            : 'Save'
-                    }
-                    title={
-                      isSaving
-                        ? 'Saving...'
-                        : justSaved
-                          ? 'Saved!'
-                          : saveError
-                            ? saveError
-                            : 'Save project'
-                    }
+                      }}
+                      autoFocus
+                      style={{
+                        fontSize: 'var(--fs-lg)',
+                        fontWeight: 600,
+                        color: 'var(--text)',
+                        background: 'var(--surface-2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '4px 8px',
+                        outline: 'none',
+                        flex: 1,
+                        maxWidth: '400px',
+                      }}
+                    />
+                  ) : (
+                    <h2
+                      onClick={handleTitleEditStart}
+                      style={{
+                        fontSize: 'var(--fs-lg)',
+                        fontWeight: 600,
+                        color: 'var(--text)',
+                        margin: 0,
+                        cursor: 'pointer',
+                        padding: '4px 12px',
+                        borderRadius: 'var(--radius-sm)',
+                        overflow: 'auto',
+                        maxWidth: '400px',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title="Click to edit project name"
+                    >
+                      {currentProject?.title || 'Untitled Project'}
+                    </h2>
+                  )}
+                  <div
                     style={{
-                      width: '32px',
-                      height: '32px',
-                      padding: 0,
                       display: 'flex',
+                      gap: '4px',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      background: 'transparent',
-                      border: 'none',
-                      borderRadius: 'var(--radius-sm)',
-                      color: saveError
-                        ? 'var(--error)'
-                        : justSaved
-                          ? 'var(--success, #10b981)'
-                          : 'var(--text-muted)',
-                      cursor: currentProject && !isSaving ? 'pointer' : 'not-allowed',
-                      opacity: currentProject ? 1 : 0.5,
-                      transition: 'all 0.2s ease',
                       position: 'relative',
                     }}
-                    onMouseEnter={(e) => {
-                      if (currentProject && !isSaving && !justSaved) {
-                        e.currentTarget.style.background = 'var(--surface-2)';
-                        e.currentTarget.style.color = saveError ? 'var(--error)' : 'var(--text)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.color = saveError
-                        ? 'var(--error)'
-                        : justSaved
-                          ? 'var(--success, #10b981)'
-                          : 'var(--text-muted)';
-                    }}
                   >
-                    {isSaving ? (
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        style={{ animation: 'spin 1s linear infinite' }}
-                      >
-                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                      </svg>
-                    ) : justSaved ? (
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    ) : (
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                        <polyline points="17 21 17 13 7 13 7 21" />
-                        <polyline points="7 3 7 8 15 8" />
-                      </svg>
+                    {/* Processing indicator */}
+                    {state.isProcessing && (
+                      <div
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          border: '2px solid var(--border)',
+                          borderTopColor: 'var(--text)',
+                          borderRadius: '50%',
+                          animation: 'spin 0.8s linear infinite',
+                        }}
+                        aria-label="Processing"
+                      />
                     )}
-                  </button>
 
-                  {/* Copy button */}
-                  <button
-                    onClick={() => {
-                      // Get textarea and check for selection
-                      const textarea = unifiedEditorRef.current?.getTextarea();
-                      const selection = unifiedEditorRef.current?.getCapturedSelection();
-
-                      let textToCopy = editorContent;
-
-                      // If there's a selection, copy only the selected text
-                      if (textarea && selection && selection.start !== selection.end) {
-                        textToCopy = editorContent.substring(selection.start, selection.end);
-                        console.log('[Panel] Copying selected text');
-                      } else {
-                        console.log('[Panel] Copying all content');
-                      }
-
-                      if (textToCopy) {
-                        navigator.clipboard
-                          .writeText(textToCopy)
-                          .then(() => {
-                            console.log('[Panel] Content copied to clipboard');
-                          })
-                          .catch((err) => {
-                            console.error('[Panel] Failed to copy:', err);
-                          });
-                      }
-                    }}
-                    disabled={!editorContent}
-                    aria-label="Copy content"
-                    title="Copy selected text (or all if nothing selected)"
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      padding: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: 'transparent',
-                      border: 'none',
-                      borderRadius: 'var(--radius-sm)',
-                      color: 'var(--text-muted)',
-                      cursor: editorContent ? 'pointer' : 'not-allowed',
-                      opacity: editorContent ? 1 : 0.5,
-                      transition: 'all 0.2s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (editorContent) {
-                        e.currentTarget.style.background = 'var(--surface-2)';
-                        e.currentTarget.style.color = 'var(--text)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.color = 'var(--text-muted)';
-                    }}
-                  >
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                    </svg>
-                  </button>
-
-                  {/* Export button */}
-                  <div ref={exportMenuRef} style={{ position: 'relative' }}>
+                    {/* Save button */}
                     <button
-                      onClick={() => setShowExportMenu(!showExportMenu)}
-                      disabled={!currentProject}
-                      aria-label="Export project"
-                      aria-expanded={showExportMenu}
-                      title="Export (auto-formats on export)"
+                      onClick={async () => {
+                        if (currentProject && editorContent) {
+                          // Clear existing timeout
+                          if (autoSaveTimeoutRef.current) {
+                            clearTimeout(autoSaveTimeoutRef.current);
+                          }
+                          // Save immediately
+                          await autoSaveProject(currentProject.id, editorContent);
+                        }
+                      }}
+                      disabled={!currentProject || isSaving}
+                      aria-label={
+                        isSaving
+                          ? 'Saving...'
+                          : justSaved
+                            ? 'Saved!'
+                            : saveError
+                              ? 'Save failed'
+                              : 'Save'
+                      }
+                      title={
+                        isSaving
+                          ? 'Saving...'
+                          : justSaved
+                            ? 'Saved!'
+                            : saveError
+                              ? saveError
+                              : 'Save project'
+                      }
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        color: saveError
+                          ? 'var(--error)'
+                          : justSaved
+                            ? 'var(--success, #10b981)'
+                            : 'var(--text-muted)',
+                        cursor: currentProject && !isSaving ? 'pointer' : 'not-allowed',
+                        opacity: currentProject ? 1 : 0.5,
+                        transition: 'all 0.2s ease',
+                        position: 'relative',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (currentProject && !isSaving && !justSaved) {
+                          e.currentTarget.style.background = 'var(--surface-2)';
+                          e.currentTarget.style.color = saveError ? 'var(--error)' : 'var(--text)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = saveError
+                          ? 'var(--error)'
+                          : justSaved
+                            ? 'var(--success, #10b981)'
+                            : 'var(--text-muted)';
+                      }}
+                    >
+                      {isSaving ? (
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{ animation: 'spin 1s linear infinite' }}
+                        >
+                          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                        </svg>
+                      ) : justSaved ? (
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                          <polyline points="17 21 17 13 7 13 7 21" />
+                          <polyline points="7 3 7 8 15 8" />
+                        </svg>
+                      )}
+                    </button>
+
+                    {/* Copy button */}
+                    <button
+                      onClick={() => {
+                        // Get textarea and check for selection
+                        const textarea = unifiedEditorRef.current?.getTextarea();
+                        const selection = unifiedEditorRef.current?.getCapturedSelection();
+
+                        let textToCopy = editorContent;
+
+                        // If there's a selection, copy only the selected text
+                        if (textarea && selection && selection.start !== selection.end) {
+                          textToCopy = editorContent.substring(selection.start, selection.end);
+                          console.log('[Panel] Copying selected text');
+                        } else {
+                          console.log('[Panel] Copying all content');
+                        }
+
+                        if (textToCopy) {
+                          navigator.clipboard
+                            .writeText(textToCopy)
+                            .then(() => {
+                              console.log('[Panel] Content copied to clipboard');
+                            })
+                            .catch((err) => {
+                              console.error('[Panel] Failed to copy:', err);
+                            });
+                        }
+                      }}
+                      disabled={!editorContent}
+                      aria-label="Copy content"
+                      title="Copy selected text (or all if nothing selected)"
                       style={{
                         width: '32px',
                         height: '32px',
@@ -1616,12 +1607,12 @@ function PanelContent() {
                         border: 'none',
                         borderRadius: 'var(--radius-sm)',
                         color: 'var(--text-muted)',
-                        cursor: currentProject ? 'pointer' : 'not-allowed',
-                        opacity: currentProject ? 1 : 0.5,
+                        cursor: editorContent ? 'pointer' : 'not-allowed',
+                        opacity: editorContent ? 1 : 0.5,
                         transition: 'all 0.2s ease',
                       }}
                       onMouseEnter={(e) => {
-                        if (currentProject) {
+                        if (editorContent) {
                           e.currentTarget.style.background = 'var(--surface-2)';
                           e.currentTarget.style.color = 'var(--text)';
                         }
@@ -1639,176 +1630,223 @@ function PanelContent() {
                         stroke="currentColor"
                         strokeWidth="2"
                       >
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="17 8 12 3 7 8" />
-                        <line x1="12" y1="3" x2="12" y2="15" />
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                       </svg>
                     </button>
 
-                    {showExportMenu && (
-                      <div
+                    {/* Export button */}
+                    <div ref={exportMenuRef} style={{ position: 'relative' }}>
+                      <button
+                        onClick={() => setShowExportMenu(!showExportMenu)}
+                        disabled={!currentProject}
+                        aria-label="Export project"
+                        aria-expanded={showExportMenu}
+                        title="Export (auto-formats on export)"
                         style={{
-                          position: 'absolute',
-                          top: 'calc(100% + 4px)',
-                          right: 0,
-                          minWidth: '160px',
-                          background: 'var(--surface-2)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--radius-md)',
-                          boxShadow: 'var(--shadow-soft)',
-                          padding: '4px',
-                          zIndex: 100,
+                          width: '32px',
+                          height: '32px',
+                          padding: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'transparent',
+                          border: 'none',
+                          borderRadius: 'var(--radius-sm)',
+                          color: 'var(--text-muted)',
+                          cursor: currentProject ? 'pointer' : 'not-allowed',
+                          opacity: currentProject ? 1 : 0.5,
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (currentProject) {
+                            e.currentTarget.style.background = 'var(--surface-2)';
+                            e.currentTarget.style.color = 'var(--text)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = 'var(--text-muted)';
                         }}
                       >
-                        <button
-                          onClick={() => handleExport('txt')}
-                          style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text)',
-                            fontSize: 'var(--fs-sm)',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            borderRadius: 'var(--radius-sm)',
-                            transition: 'background 0.2s',
-                          }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background = 'var(--surface-3)')
-                          }
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
                         >
-                          Plain Text (.txt)
-                        </button>
-                        <button
-                          onClick={() => handleExport('md')}
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                      </button>
+
+                      {showExportMenu && (
+                        <div
                           style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text)',
-                            fontSize: 'var(--fs-sm)',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            borderRadius: 'var(--radius-sm)',
-                            transition: 'background 0.2s',
+                            position: 'absolute',
+                            top: 'calc(100% + 4px)',
+                            right: 0,
+                            minWidth: '160px',
+                            background: 'var(--surface-2)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--radius-md)',
+                            boxShadow: 'var(--shadow-soft)',
+                            padding: '4px',
+                            zIndex: 100,
                           }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background = 'var(--surface-3)')
-                          }
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                         >
-                          Markdown (.md)
-                        </button>
-                        <button
-                          onClick={() => handleExport('html')}
-                          style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text)',
-                            fontSize: 'var(--fs-sm)',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            borderRadius: 'var(--radius-sm)',
-                            transition: 'background 0.2s',
-                          }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background = 'var(--surface-3)')
-                          }
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                        >
-                          HTML (.html)
-                        </button>
-                        <button
-                          onClick={() => handleExport('docx')}
-                          style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text)',
-                            fontSize: 'var(--fs-sm)',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            borderRadius: 'var(--radius-sm)',
-                            transition: 'background 0.2s',
-                          }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background = 'var(--surface-3)')
-                          }
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                        >
-                          Docs (.doc)
-                        </button>
-                      </div>
-                    )}
+                          <button
+                            onClick={() => handleExport('txt')}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text)',
+                              fontSize: 'var(--fs-sm)',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              borderRadius: 'var(--radius-sm)',
+                              transition: 'background 0.2s',
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.background = 'var(--surface-3)')
+                            }
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            Plain Text (.txt)
+                          </button>
+                          <button
+                            onClick={() => handleExport('md')}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text)',
+                              fontSize: 'var(--fs-sm)',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              borderRadius: 'var(--radius-sm)',
+                              transition: 'background 0.2s',
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.background = 'var(--surface-3)')
+                            }
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            Markdown (.md)
+                          </button>
+                          <button
+                            onClick={() => handleExport('html')}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text)',
+                              fontSize: 'var(--fs-sm)',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              borderRadius: 'var(--radius-sm)',
+                              transition: 'background 0.2s',
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.background = 'var(--surface-3)')
+                            }
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            HTML (.html)
+                          </button>
+                          <button
+                            onClick={() => handleExport('docx')}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text)',
+                              fontSize: 'var(--fs-sm)',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              borderRadius: 'var(--radius-sm)',
+                              transition: 'background 0.2s',
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.background = 'var(--surface-3)')
+                            }
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            Docs (.doc)
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
+
+                {/* Single Unified Editor - shared across all tools */}
+                <UnifiedEditor
+                  ref={unifiedEditorRef}
+                  content={editorContent}
+                  onContentChange={handleEditorContentChange}
+                  activeTool={state.activeTab as 'generate' | 'rewrite' | 'summarize'}
+                  onSelectionChange={handleEditorSelectionChange}
+                  placeholder="Let's start writing!"
+                  disabled={isProcessing}
+                  undoHistoryLimit={state.settings.undoHistoryLimit || 10}
+                />
+
+                {/* Tool-specific controls - only one visible at a time */}
+                {state.activeTab === 'generate' && (
+                  <ToolControlsContainer
+                    activeTool="generate"
+                    pinnedNotes={state.pinnedNotes}
+                    content={editorContent}
+                    selection={editorSelection}
+                    editorRef={unifiedEditorRef}
+                    generatePrompt={generatePrompt}
+                    onGeneratePromptChange={setGeneratePrompt}
+                    onOperationStart={handleOperationStart}
+                    onOperationComplete={handleOperationComplete}
+                    onOperationError={handleOperationError}
+                  />
+                )}
+
+                {state.activeTab === 'rewrite' && (
+                  <ToolControlsContainer
+                    activeTool="rewrite"
+                    pinnedNotes={state.pinnedNotes}
+                    content={editorContent}
+                    selection={editorSelection}
+                    editorRef={unifiedEditorRef}
+                    rewritePrompt={rewritePrompt}
+                    onRewritePromptChange={setRewritePrompt}
+                    onOperationStart={handleOperationStart}
+                    onOperationComplete={handleOperationComplete}
+                    onOperationError={handleOperationError}
+                  />
+                )}
+
+                {state.activeTab === 'summary' && (
+                  <ToolControlsContainer
+                    activeTool="summarize"
+                    pinnedNotes={state.pinnedNotes}
+                    content={editorContent}
+                    selection={editorSelection}
+                    editorRef={unifiedEditorRef}
+                    summarizePrompt={summarizePrompt}
+                    onSummarizePromptChange={setSummarizePrompt}
+                    onOperationStart={handleOperationStart}
+                    onOperationComplete={handleOperationComplete}
+                    onOperationError={handleOperationError}
+                  />
+                )}
               </div>
-
-              {/* Single Unified Editor - shared across all tools */}
-              <UnifiedEditor
-                ref={unifiedEditorRef}
-                content={editorContent}
-                onContentChange={handleEditorContentChange}
-                activeTool={state.activeTab as 'generate' | 'rewrite' | 'summarize'}
-                onSelectionChange={handleEditorSelectionChange}
-                placeholder="Let's start writing!"
-                disabled={isProcessing}
-                undoHistoryLimit={state.settings.undoHistoryLimit || 10}
-              />
-
-              {/* Tool-specific controls - only one visible at a time */}
-              {state.activeTab === 'generate' && (
-                <ToolControlsContainer
-                  activeTool="generate"
-                  pinnedNotes={state.pinnedNotes}
-                  content={editorContent}
-                  selection={editorSelection}
-                  editorRef={unifiedEditorRef}
-                  generatePrompt={generatePrompt}
-                  onGeneratePromptChange={setGeneratePrompt}
-                  onOperationStart={handleOperationStart}
-                  onOperationComplete={handleOperationComplete}
-                  onOperationError={handleOperationError}
-                />
-              )}
-
-              {state.activeTab === 'rewrite' && (
-                <ToolControlsContainer
-                  activeTool="rewrite"
-                  pinnedNotes={state.pinnedNotes}
-                  content={editorContent}
-                  selection={editorSelection}
-                  editorRef={unifiedEditorRef}
-                  rewritePrompt={rewritePrompt}
-                  onRewritePromptChange={setRewritePrompt}
-                  onOperationStart={handleOperationStart}
-                  onOperationComplete={handleOperationComplete}
-                  onOperationError={handleOperationError}
-                />
-              )}
-
-              {state.activeTab === 'summary' && (
-                <ToolControlsContainer
-                  activeTool="summarize"
-                  pinnedNotes={state.pinnedNotes}
-                  content={editorContent}
-                  selection={editorSelection}
-                  editorRef={unifiedEditorRef}
-                  summarizePrompt={summarizePrompt}
-                  onSummarizePromptChange={setSummarizePrompt}
-                  onOperationStart={handleOperationStart}
-                  onOperationComplete={handleOperationComplete}
-                  onOperationError={handleOperationError}
-                />
-              )}
-            </div>
-          )}
+            )}
 
           {/* Old separate tab divs removed - now using single unified editor above */}
 
