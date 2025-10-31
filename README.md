@@ -21,33 +21,30 @@ Flint is a Chrome extension that provides a unified writing environment with AI-
 - **Summarize**: Extract key points, create paragraphs, or generate outlines
 - **Proofread**: Fix spelling and grammar errors
 
-### Privacy & Performance
+### Performance
 - **Local-First**: All AI processing happens on your device using Chrome's built-in Gemini Nano
 - **No External Servers**: No accounts, no tracking, no data leaves your browser
 - **Fast & Responsive**: Instant AI operations with no network latency
 
 ## Key Features
 
-### 🎯 Unified Editor
-Work in a single persistent editor across all AI tools. No more switching between panels or losing your place.
+### Unified Editor  
+Work in a single persistent editor across all AI tools. No more switching between panels or losing your place.  
 
-### 🔄 Inline Operations
-AI results appear directly in your editor - no compare views or extra steps. Select text, apply AI, done.
+### Inline Operations  
+AI results appear directly in your editor with no compare views or extra steps. Select text, apply AI, and you’re done.  
 
-### 📁 Project Management
-Organize multiple writing projects. Each project maintains its own content and version history.
+### Project Management  
+Organize multiple writing projects. Each project maintains its own content and version history.  
 
-### 📸 Version Snapshots
-Every AI operation creates an automatic snapshot. Review changes, restore previous versions, or track your writing evolution.
+### Version Snapshots  
+Every AI operation creates an automatic snapshot. Review changes, restore previous versions, or track your writing progress.  
 
-### 🧠 Context-Aware AI
-Generate text that flows naturally with what you've already written. The AI understands surrounding context for better continuity.
+### Context-Aware AI  
+Generate text that flows naturally with what you’ve already written. The AI understands surrounding context for better continuity.  
 
-### 🎨 Pinned Notes
-Add audience descriptions or style guidelines that influence all AI operations. Perfect for maintaining consistent tone.
-
-### 🔒 Privacy-First
-All AI processing happens locally on your device. No data leaves your browser, no accounts required.
+### Pinned Notes  
+Add audience descriptions or style guidelines that influence all AI operations. Ideal for maintaining a consistent tone.  
 
 ## Requirements
 
