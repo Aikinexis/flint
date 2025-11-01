@@ -4,6 +4,13 @@
  * https://docs.google.com/document/d/1VG8HIyz361zGduWgNG7R_R8Xkv0OOJ8b5C9QKeCjU0c
  */
 
+import {
+  assembleContext,
+  formatContextForPrompt,
+  getNearestHeading,
+  type ContextEngineOptions,
+} from '../utils/contextEngine';
+
 /**
  * AI availability status
  * Maps Chrome API responses to consistent internal format
@@ -56,6 +63,9 @@ export interface GenerateOptions {
   length?: 'short' | 'medium' | 'long';
   lengthHint?: number;
   context?: string;
+  projectTitle?: string;
+  smartInstructions?: string;
+  documentType?: 'email' | 'letter' | 'article' | 'list' | 'code' | 'general';
 }
 
 /**
@@ -419,16 +429,20 @@ export class AIService {
           ? 'Each bullet point must be extremely brief - just the key point in 3-5 words maximum, like a headline.'
           : '';
 
-      // Merge pinned notes, word count guidance, and bullet guidance into shared context
-      let sharedContext = '';
+      // Add current date/time context
+      const now = new Date();
+      const dateTimeContext = `Current date: ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+
+      // Merge date/time, pinned notes, word count guidance, and bullet guidance into shared context
+      let sharedContext = dateTimeContext;
       if (options.pinnedNotes?.length) {
-        sharedContext = `Audience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`;
+        sharedContext += `\n\nAudience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`;
       }
       if (wordCountGuidance[summaryLength]) {
-        sharedContext += (sharedContext ? '\n\n' : '') + wordCountGuidance[summaryLength];
+        sharedContext += '\n\n' + wordCountGuidance[summaryLength];
       }
       if (bulletGuidance) {
-        sharedContext += (sharedContext ? '\n\n' : '') + bulletGuidance;
+        sharedContext += '\n\n' + bulletGuidance;
       }
 
       const summarizer = await (self as any).Summarizer.create({
@@ -478,26 +492,32 @@ export class AIService {
       return MockAIProvider.rewrite(text, options);
     }
 
-    // Merge pinned notes into context
-    const sharedContext = options.pinnedNotes?.length
-      ? `Audience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`
-      : '';
+    // Add current date/time context
+    const now = new Date();
+    const dateTimeContext = `Current date: ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
 
-    // Try Rewriter API first (preferred for extension contexts)
+    // Merge date/time and pinned notes into context
+    let sharedContext = dateTimeContext;
+    if (options.pinnedNotes?.length) {
+      sharedContext += `\n\nAudience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`;
+    }
+
+    // Use Prompt API for custom prompts (Rewriter API doesn't always respect custom instructions)
+    if (options.customPrompt && availability.promptAPI === 'available') {
+      const prompt = sharedContext
+        ? `${sharedContext}\n\nUser's rewrite instruction: ${options.customPrompt}\n\nText to rewrite:\n${text}\n\nIMPORTANT: Follow the user's instruction exactly. Output ONLY the rewritten text, no explanations.`
+        : `User's rewrite instruction: ${options.customPrompt}\n\nText to rewrite:\n${text}\n\nIMPORTANT: Follow the user's instruction exactly. Output ONLY the rewritten text, no explanations.`;
+      return this.prompt(prompt);
+    }
+
+    // Try Rewriter API for preset tones (when no custom prompt)
     if (availability.rewriterAPI === 'available') {
       try {
-        // For custom prompts, use sharedContext to pass the instructions
-        const context = options.customPrompt
-          ? sharedContext
-            ? `${sharedContext}\n\n${options.customPrompt}`
-            : options.customPrompt
-          : sharedContext;
-
         const rewriter = await (self as any).Rewriter.create({
           tone: options.tone || 'as-is',
           format: 'plain-text',
           length: 'as-is',
-          sharedContext: context,
+          sharedContext,
           outputLanguage: 'en',
           monitor(m: any) {
             m.addEventListener('downloadprogress', (e: any) => {
@@ -524,21 +544,23 @@ export class AIService {
       }
     }
 
-    // Fallback to Prompt API if Rewriter unavailable or failed
-    if (availability.promptAPI === 'available' && options.customPrompt) {
+    // Final fallback to Prompt API
+    if (availability.promptAPI === 'available') {
+      const instruction = options.customPrompt || 'Rewrite this text to improve clarity and flow';
       const prompt = sharedContext
-        ? `${sharedContext}\n\n${options.customPrompt}\n\nText to rewrite:\n${text}`
-        : `${options.customPrompt}\n\nText to rewrite:\n${text}`;
+        ? `${sharedContext}\n\nUser's rewrite instruction: ${instruction}\n\nText to rewrite:\n${text}\n\nIMPORTANT: Follow the user's instruction exactly. Output ONLY the rewritten text, no explanations.`
+        : `User's rewrite instruction: ${instruction}\n\nText to rewrite:\n${text}\n\nIMPORTANT: Follow the user's instruction exactly. Output ONLY the rewritten text, no explanations.`;
       return this.prompt(prompt);
     }
 
     // If we get here, no API is available
-    throw new Error('Please provide rewrite instructions');
+    throw new Error('AI features not available. Please enable Chrome AI.');
   }
 
   /**
    * Generates text using the Writer API or Prompt API fallback
    * Intelligently constructs prompts based on surrounding context to ensure generated text flows naturally
+   * Uses lightweight context engine for better document understanding
    * @param prompt - The generation prompt
    * @param options - Generation options including context, length, and pinned notes
    * @returns Promise resolving to generated text
@@ -553,17 +575,39 @@ export class AIService {
       return MockAIProvider.generate(prompt, options);
     }
 
-    // Build context-aware prompt
+    // Build context-aware prompt with smart instructions
     let fullPrompt = '';
+
+    // Add current date/time context
+    const now = new Date();
+    const dateTimeContext = `CURRENT DATE AND TIME: ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}\n`;
+
+    // Add project title context if available and relevant
+    let projectContext = '';
+    if (options.projectTitle) {
+      projectContext = `DOCUMENT TITLE: "${options.projectTitle}"\n`;
+    }
 
     if (options.context) {
       // Extract text before and after cursor for better context
       const contextLines = options.context.split('\n');
-      const beforeContext = contextLines.slice(0, -1).join('\n').slice(-500); // Last 500 chars before
-      const afterContext = contextLines.slice(-1).join('\n').slice(0, 500); // First 500 chars after
+      const beforeContext = contextLines.slice(0, -1).join('\n').slice(-1500); // Increased to 1500 chars
+      const afterContext = contextLines.slice(-1).join('\n').slice(0, 1500); // Increased to 1500 chars
 
-      // Build intelligent prompt based on context
-      fullPrompt = `You are a writing assistant. The user is writing a document and needs you to generate text at their cursor position.
+      // Build intelligent prompt based on context and document type
+      const docTypeDesc =
+        options.documentType === 'email'
+          ? 'an email'
+          : options.documentType === 'letter'
+            ? 'a letter'
+            : options.documentType === 'article'
+              ? 'an article'
+              : 'a document';
+
+      fullPrompt = `CRITICAL RULE: NEVER USE SQUARE BRACKETS [] FOR PLACEHOLDERS. NO [Name], [Date], [Company], [Boss's Name], [Your Name], or ANY [] placeholders. If you don't know a specific name or date, just omit it - do NOT make up fake names.
+
+${dateTimeContext}
+You are a writing assistant. The user is writing ${docTypeDesc}${options.projectTitle ? ` titled "${options.projectTitle}"` : ''} and needs you to generate text at their cursor position.
 
 CONTEXT BEFORE CURSOR:
 ${beforeContext || '[Start of document]'}
@@ -573,25 +617,32 @@ ${afterContext || '[End of document]'}
 
 USER'S INSTRUCTION: ${prompt}
 
-CRITICAL RULES:
-- Generate ONLY new text that fits at the cursor position
-- Do NOT repeat, quote, or paraphrase any of the context text shown above
-- Do NOT use ellipsis (...) or placeholder text
-- Match the writing style, tone, and format of the surrounding text
-- Ensure the generated text flows naturally with what comes before and after
-- Output ONLY the new text itself - no explanations, no meta-commentary
-- Do NOT say things like "Here's the text:" or "Based on the context..."
-- Start directly with the actual content`;
+${options.smartInstructions ? `SPECIFIC INSTRUCTIONS FOR THIS CONTEXT:\n- ${options.smartInstructions}\n\n` : ''}
+RULES:
+1. Generate ONLY new text that fits at the cursor position
+2. Do NOT repeat, quote, or paraphrase any of the context text shown above - add NEW information only
+3. If the user asks to "talk more about" or "expand on" something, provide NEW details, examples, or perspectives - do NOT restate what's already written
+4. Match the writing style, tone, and format of the surrounding text
+5. Ensure the generated text flows naturally with what comes before and after
+6. Output ONLY the new text itself - no explanations, no meta-commentary
+7. Do NOT say things like "Here's the text:" or "Based on the context..."
+8. Start directly with the actual content
+
+ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it completely.`;
     } else {
       // No context - standalone generation
-      fullPrompt = `${prompt}
+      fullPrompt = `CRITICAL RULE: NEVER USE SQUARE BRACKETS [] FOR PLACEHOLDERS. NO [Name], [Date], [Company], or ANY [] placeholders. If you don't know a specific name or date, just omit it - do NOT make up fake names.
 
-CRITICAL INSTRUCTIONS:
+${dateTimeContext}${projectContext}${prompt}
+
+${options.smartInstructions ? `SPECIFIC INSTRUCTIONS:\n- ${options.smartInstructions}\n\n` : ''}
+INSTRUCTIONS:
 - Output ONLY the generated text itself
 - Do NOT include any meta-commentary, explanations, or acknowledgments
 - Do NOT say things like "Here's the text:" or "I will generate..."
-- Do NOT use ellipsis (...) or placeholder text
-- Start directly with the requested content`;
+- Start directly with the requested content
+
+ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it completely.`;
     }
 
     // Add word count target if specified
@@ -662,6 +713,344 @@ CRITICAL INSTRUCTIONS:
       return text;
     }
     return '...' + text.slice(-300).trim();
+  }
+
+  /**
+   * Generates text with enhanced context awareness using the lightweight context engine
+   * Provides better document understanding by including relevant sections from the entire document
+   * @param prompt - The generation prompt
+   * @param fullDocument - Complete document text
+   * @param cursorPos - Current cursor position
+   * @param options - Generation options
+   * @param contextOptions - Context engine options
+   * @returns Promise resolving to generated text
+   */
+  static async generateWithEnhancedContext(
+    prompt: string,
+    fullDocument: string,
+    cursorPos: number,
+    options: GenerateOptions = {},
+    contextOptions: ContextEngineOptions = {}
+  ): Promise<string> {
+    this.ensureUserActivation();
+
+    const availability = await this.checkAvailability();
+
+    // Use mock provider if all APIs unavailable
+    if (availability.writerAPI === 'unavailable' && availability.promptAPI === 'unavailable') {
+      return MockAIProvider.generate(prompt, options);
+    }
+
+    // Assemble intelligent context using the context engine
+    const assembledContext = assembleContext(fullDocument, cursorPos, {
+      localWindow: 1500, // 1500 chars around cursor
+      maxRelatedSections: 3, // Include 3 most relevant sections
+      enableRelevanceScoring: true,
+      enableDeduplication: true,
+      ...contextOptions,
+    });
+
+    console.log('[AI] Enhanced context assembled:', {
+      localChars: assembledContext.localContext.length,
+      relatedSections: assembledContext.relatedSections.length,
+      totalChars: assembledContext.totalChars,
+    });
+
+    // Format context for prompt
+    const formattedContext = formatContextForPrompt(assembledContext, true);
+
+    // Get nearest heading for additional context
+    const nearestHeading = getNearestHeading(fullDocument, cursorPos);
+
+    // Build enhanced prompt
+    const now = new Date();
+    const dateTimeContext = `CURRENT DATE AND TIME: ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}\n`;
+
+    let projectContext = '';
+    if (options.projectTitle) {
+      projectContext = `DOCUMENT TITLE: "${options.projectTitle}"\n`;
+    }
+
+    if (nearestHeading) {
+      projectContext += `CURRENT SECTION: "${nearestHeading}"\n`;
+    }
+
+    const docTypeDesc =
+      options.documentType === 'email'
+        ? 'an email'
+        : options.documentType === 'letter'
+          ? 'a letter'
+          : options.documentType === 'article'
+            ? 'an article'
+            : 'a document';
+
+    const fullPrompt = `CRITICAL RULE: NEVER USE SQUARE BRACKETS [] FOR PLACEHOLDERS. NO [Name], [Date], [Company], or ANY [] placeholders. If you don't know a specific name or date, just omit it.
+
+${dateTimeContext}${projectContext}
+You are a writing assistant. The user is writing ${docTypeDesc} and needs you to generate text at their cursor position.
+
+${formattedContext}
+
+USER'S INSTRUCTION: ${prompt}
+
+${options.smartInstructions ? `SPECIFIC INSTRUCTIONS FOR THIS CONTEXT:\n- ${options.smartInstructions}\n\n` : ''}
+RULES:
+1. Generate ONLY new text that fits at the cursor position
+2. Do NOT repeat any of the context text shown above - add NEW information only
+3. If the user asks to "talk more about" or "expand on" something, provide NEW details, examples, or perspectives - do NOT restate what's already written
+4. Match the writing style, tone, and format of the surrounding text
+5. Use information from related sections to maintain consistency
+6. Ensure the generated text flows naturally with what comes before and after
+7. Output ONLY the new text itself - no explanations, no meta-commentary
+8. Start directly with the actual content
+
+ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it completely.`;
+
+    // Add word count target
+    let finalPrompt = fullPrompt;
+    if (options.lengthHint) {
+      finalPrompt += `\n- Generate approximately ${options.lengthHint} words`;
+    } else if (options.length === 'long') {
+      finalPrompt += `\n- Generate a detailed response (around 200 words)`;
+    } else if (options.length === 'short') {
+      finalPrompt += `\n- Generate a very brief response (around 25 words)`;
+    } else {
+      finalPrompt += `\n- Generate a moderate response (around 50 words)`;
+    }
+
+    // Merge pinned notes into context
+    const sharedContext = options.pinnedNotes?.length
+      ? `Audience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`
+      : '';
+
+    // Try Writer API first
+    if (availability.writerAPI === 'available') {
+      try {
+        const writer = await (self as any).Writer.create({
+          tone: 'neutral',
+          format: 'plain-text',
+          length: options.length || 'medium',
+          sharedContext,
+          outputLanguage: 'en',
+          monitor(m: any) {
+            m.addEventListener('downloadprogress', (e: any) => {
+              const progress = e.loaded || 0;
+              console.log(`[AI] Writer download progress: ${Math.round(progress * 100)}%`);
+              if (AIService.downloadProgressCallback) {
+                AIService.downloadProgressCallback(progress);
+              }
+            });
+          },
+        });
+
+        const result = await Promise.race([
+          writer.write(finalPrompt),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Operation timed out')), 30000)
+          ),
+        ]);
+
+        return result;
+      } catch (error) {
+        console.error('[AI] Writer API failed, falling back to Prompt API:', error);
+      }
+    }
+
+    // Fallback to Prompt API
+    const promptWithContext = sharedContext ? `${sharedContext}\n\n${finalPrompt}` : finalPrompt;
+
+    return this.prompt(promptWithContext);
+  }
+
+  /**
+   * Rewrites text with enhanced context awareness
+   * Includes surrounding document context to maintain consistency
+   * @param text - Text to rewrite
+   * @param fullDocument - Complete document text
+   * @param selectionStart - Start position of selection
+   * @param options - Rewrite options
+   * @returns Promise resolving to rewritten text
+   */
+  static async rewriteWithContext(
+    text: string,
+    fullDocument: string,
+    selectionStart: number,
+    options: RewriteOptions
+  ): Promise<string> {
+    this.ensureUserActivation();
+
+    const availability = await this.checkAvailability();
+
+    // Use mock provider if all APIs unavailable
+    if (availability.rewriterAPI === 'unavailable' && availability.promptAPI === 'unavailable') {
+      return MockAIProvider.rewrite(text, options);
+    }
+
+    // Get surrounding context (500 chars before and after)
+    const beforeContext = fullDocument.substring(Math.max(0, selectionStart - 500), selectionStart);
+    const afterContext = fullDocument.substring(
+      selectionStart + text.length,
+      Math.min(fullDocument.length, selectionStart + text.length + 500)
+    );
+
+    // Add current date/time context
+    const now = new Date();
+    const dateTimeContext = `Current date: ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+
+    // Build context-aware prompt
+    let contextPrompt = dateTimeContext;
+
+    if (beforeContext.trim() || afterContext.trim()) {
+      contextPrompt += '\n\nSurrounding context for style matching:';
+      if (beforeContext.trim()) {
+        contextPrompt += `\nBefore: "${beforeContext.trim().slice(-200)}"`;
+      }
+      if (afterContext.trim()) {
+        contextPrompt += `\nAfter: "${afterContext.trim().slice(0, 200)}"`;
+      }
+      contextPrompt +=
+        '\n\nEnsure the rewritten text flows naturally with the surrounding context.';
+    }
+
+    // Merge with pinned notes
+    if (options.pinnedNotes?.length) {
+      contextPrompt += `\n\nAudience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`;
+    }
+
+    // Use Prompt API for custom prompts (Rewriter API doesn't always respect custom instructions)
+    if (options.customPrompt && availability.promptAPI === 'available') {
+      const prompt = `${contextPrompt}\n\nUser's rewrite instruction: ${options.customPrompt}\n\nText to rewrite:\n${text}\n\nIMPORTANT: Follow the user's instruction exactly. Output ONLY the rewritten text, no explanations.`;
+      return this.prompt(prompt);
+    }
+
+    // Try Rewriter API for preset tones (when no custom prompt)
+    if (availability.rewriterAPI === 'available') {
+      try {
+        const rewriter = await (self as any).Rewriter.create({
+          tone: options.tone || 'as-is',
+          format: 'plain-text',
+          length: 'as-is',
+          sharedContext: contextPrompt,
+          outputLanguage: 'en',
+          monitor(m: any) {
+            m.addEventListener('downloadprogress', (e: any) => {
+              const progress = e.loaded || 0;
+              console.log(`[AI] Rewriter download progress: ${Math.round(progress * 100)}%`);
+              if (AIService.downloadProgressCallback) {
+                AIService.downloadProgressCallback(progress);
+              }
+            });
+          },
+        });
+
+        const result = await Promise.race([
+          rewriter.rewrite(text),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Operation timed out')), 30000)
+          ),
+        ]);
+
+        return result;
+      } catch (error) {
+        console.error('[AI] Rewriter API failed, falling back to Prompt API:', error);
+        // Fall through to Prompt API fallback
+      }
+    }
+
+    // Final fallback to Prompt API
+    if (availability.promptAPI === 'available') {
+      const instruction = options.customPrompt || 'Rewrite this text to improve clarity and flow';
+      const prompt = `${contextPrompt}\n\nUser's rewrite instruction: ${instruction}\n\nText to rewrite:\n${text}\n\nIMPORTANT: Follow the user's instruction exactly. Output ONLY the rewritten text, no explanations.`;
+      return this.prompt(prompt);
+    }
+
+    throw new Error('AI features not available. Please enable Chrome AI.');
+  }
+
+  /**
+   * Generates a smart title for a document based on user prompt only
+   * Called BEFORE content generation to create a contextual title
+   * Uses Summarizer API in 'headline' mode for ultra-concise titles
+   * @param userPrompt - The original user prompt/instruction
+   * @returns Promise resolving to a concise title (max 50 chars)
+   * @throws Error if API is unavailable or user activation is missing
+   */
+  static async generateTitle(userPrompt: string): Promise<string> {
+    this.ensureUserActivation();
+
+    const availability = await this.checkAvailability();
+
+    // Use mock provider if all APIs unavailable
+    if (availability.summarizerAPI === 'unavailable' && availability.promptAPI === 'unavailable') {
+      // Fallback to simple title from prompt
+      const words = userPrompt.split(' ').slice(0, 6).join(' ');
+      return words.slice(0, 50);
+    }
+
+    try {
+      // Add current date/time context
+      const now = new Date();
+      const dateTimeContext = `Current date: ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+
+      // Try Summarizer API first with 'headline' type for ultra-brief titles
+      if (availability.summarizerAPI === 'available') {
+        const summarizer = await (self as any).Summarizer.create({
+          type: 'headline', // Ultra-brief, perfect for titles
+          format: 'plain-text',
+          length: 'short',
+          sharedContext: `${dateTimeContext}\n\nCreate an extremely brief title using ONLY 4-5 words maximum. Be concise and descriptive.`,
+          outputLanguage: 'en',
+        });
+
+        const title = await Promise.race([
+          summarizer.summarize(userPrompt),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Operation timed out')), 10000)
+          ),
+        ]);
+
+        // Clean up and truncate
+        const cleanTitle = title
+          .trim()
+          .replace(/^(Title:|Document:|Here's the title:)\s*/i, '')
+          .replace(/^["']|["']$/g, '')
+          .replace(/\.$/, '') // Remove trailing period
+          .trim();
+
+        return cleanTitle.slice(0, 50) || 'Untitled';
+      }
+
+      // Fallback to Prompt API
+      const prompt = `${dateTimeContext}
+
+Create a brief title using ONLY 4-5 words maximum for a document based on this request:
+
+"${userPrompt}"
+
+Output ONLY the title text. Use 4-5 words maximum. Be extremely concise.`;
+
+      const result = await this.prompt(prompt);
+
+      // Clean up the response
+      let title = result
+        .trim()
+        .replace(/^(Title:|Document:|Here's the title:)\s*/i, '')
+        .replace(/^["']|["']$/g, '')
+        .replace(/\.$/, '')
+        .trim();
+
+      // Truncate if too long
+      if (title.length > 50) {
+        title = title.slice(0, 47) + '...';
+      }
+
+      return title || 'Untitled';
+    } catch (error) {
+      console.error('[AI] Title generation failed:', error);
+      // Fallback to simple title from prompt
+      const words = userPrompt.split(' ').slice(0, 6).join(' ');
+      return words.slice(0, 50) || 'Untitled';
+    }
   }
 
   /**

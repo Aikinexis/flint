@@ -19,6 +19,11 @@ export interface SettingsProps {
   pinnedNotes?: PinnedNote[];
 
   /**
+   * IDs of currently active (enabled) pinned notes
+   */
+  activePinnedNoteIds?: string[];
+
+  /**
    * Callback when settings change (optional)
    */
   onSettingsChange?: (settings: SettingsType) => void;
@@ -27,6 +32,11 @@ export interface SettingsProps {
    * Callback when pinned notes change (optional)
    */
   onPinnedNotesChange?: (notes: PinnedNote[]) => void;
+
+  /**
+   * Callback when active pinned note IDs change (optional)
+   */
+  onActivePinnedNoteIdsChange?: (ids: string[]) => void;
 }
 
 /**
@@ -41,8 +51,10 @@ type DialogMode = 'add' | 'edit' | 'delete' | null;
 export function Settings({
   settings: propSettings,
   pinnedNotes: propPinnedNotes,
+  activePinnedNoteIds: propActivePinnedNoteIds,
   onSettingsChange,
   onPinnedNotesChange,
+  onActivePinnedNoteIdsChange,
 }: SettingsProps) {
   // Get AI availability from app state
   const { state } = useAppState();
@@ -376,6 +388,11 @@ export function Settings({
       } else {
         // Add new note
         setPinnedNotes((prev) => [savedNote, ...prev]);
+        
+        // Auto-enable the new note
+        if (onActivePinnedNoteIdsChange && propActivePinnedNoteIds) {
+          onActivePinnedNoteIdsChange([...propActivePinnedNoteIds, savedNote.id]);
+        }
       }
 
       // Notify parent if callback provided
@@ -1901,12 +1918,12 @@ export function Settings({
             position: 'fixed',
             top: 0,
             left: 0,
-            right: 0,
+            right: '72px',
             bottom: 0,
             background: 'rgba(0, 0, 0, 0.85)',
             display: 'flex',
             alignItems: 'stretch',
-            justifyContent: 'center',
+            justifyContent: 'flex-end',
             zIndex: 1000,
             padding: '0',
           }}
@@ -1924,6 +1941,7 @@ export function Settings({
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
+              borderLeft: '1px solid var(--border)',
             }}
             onClick={(e) => e.stopPropagation()}
           >

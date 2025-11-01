@@ -2,6 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import type { PinnedNote, PromptHistoryItem, GenerateSettings } from '../services/storage';
 import { StorageService } from '../services/storage';
 import { AIService } from '../services/ai';
+import {
+  detectDocumentType,
+  analyzeCursorContext,
+  buildContextInstructions,
+} from '../utils/documentAnalysis';
 
 /**
  * Tool type for the active tool
@@ -36,6 +41,11 @@ export interface ToolControlsProps {
    * Current editor content (for operations)
    */
   content: string;
+
+  /**
+   * Current project title (for context)
+   */
+  projectTitle?: string;
 
   /**
    * Current selection range in editor
@@ -78,7 +88,7 @@ export interface ToolControlsProps {
   /**
    * Callback when an operation completes successfully
    */
-  onOperationComplete?: (result: string, operationType: ToolType) => void;
+  onOperationComplete?: (result: string, operationType: ToolType, userPrompt?: string) => void;
 
   /**
    * Callback when an operation fails
@@ -95,6 +105,7 @@ export function ToolControlsContainer({
   activeTool,
   pinnedNotes = [],
   content,
+  projectTitle,
   selection: _selection,
   editorRef,
   generatePrompt: generatePromptProp = '',
@@ -298,15 +309,39 @@ export function ToolControlsContainer({
    * Handles generate operation
    */
   const handleGenerate = async () => {
-    // Use default intro prompt ONLY if both prompt and editor are empty
-    const effectivePrompt =
-      prompt.trim() ||
-      (content.trim()
-        ? 'Continue writing and extend this content naturally'
-        : "Introduce Flint, a Chrome extension for AI-powered writing. Explain how it can help users generate, rewrite, and summarize text using Chrome's built-in AI. Keep it friendly and concise.");
-
     // Get captured selection for cursor position
     const capturedSelection = editorRef?.current?.getCapturedSelection();
+
+    // Analyze document type and cursor context for smart generation
+    const docType = detectDocumentType(content);
+    const cursorContext = capturedSelection
+      ? analyzeCursorContext(content, capturedSelection.start)
+      : {
+          isInSubjectLine: false,
+          isInHeading: false,
+          isInList: false,
+          isInCodeBlock: false,
+          isAfterSalutation: false,
+          isBeforeSignature: false,
+          indentLevel: 0,
+        };
+
+    console.log('[Generate] Document type:', docType);
+    console.log('[Generate] Cursor context:', cursorContext);
+
+    // Build smart context instructions
+    const smartInstructions = buildContextInstructions(docType, cursorContext);
+
+    // Use default intro prompt ONLY if both prompt and editor are empty
+    let effectivePrompt = prompt.trim();
+    if (!effectivePrompt) {
+      if (content.trim()) {
+        effectivePrompt = 'Continue writing and extend this content naturally';
+      } else {
+        effectivePrompt =
+          "Introduce Flint, a Chrome extension for AI-powered writing. Explain how it can help users generate, rewrite, and summarize text using Chrome's built-in AI. Keep it friendly and concise.";
+      }
+    }
 
     // Show cursor indicator BEFORE starting operation
     editorRef?.current?.showCursorIndicator();
@@ -327,32 +362,74 @@ export function ToolControlsContainer({
       if (selectedLength === 'short') lengthHint = settings.shortLength;
       else if (selectedLength === 'medium') lengthHint = settings.mediumLength;
 
-      // Get surrounding context based on cursor position
-      // Format: text before cursor, then newline, then text after cursor
-      let surroundingContext: string | undefined;
+      // Use enhanced context-aware generation if enabled
+      let result: string;
       if (capturedSelection && settings.contextAwarenessEnabled && content.trim()) {
         const cursorPos = capturedSelection.start;
-        const contextLength = 1000; // Characters to include before/after cursor
 
-        // Get text before and after cursor
-        const textBefore = content.substring(Math.max(0, cursorPos - contextLength), cursorPos);
-        const textAfter = content.substring(
+        console.log('[Generate] Using enhanced context engine');
+        result = await AIService.generateWithEnhancedContext(
+          effectivePrompt,
+          content,
           cursorPos,
-          Math.min(content.length, cursorPos + contextLength)
+          {
+            pinnedNotes: pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
+            length: selectedLength,
+            lengthHint,
+            projectTitle:
+              projectTitle &&
+              projectTitle !== 'Untitled' &&
+              projectTitle !== 'My first project' &&
+              projectTitle !== 'My project'
+                ? projectTitle
+                : undefined,
+            smartInstructions: smartInstructions || undefined,
+            documentType: docType.type,
+          },
+          {
+            localWindow: 1500, // 1500 chars around cursor
+            maxRelatedSections: 3, // Include 3 most relevant sections
+            enableRelevanceScoring: true,
+            enableDeduplication: true,
+          }
         );
+      } else {
+        // Fallback to basic generation without enhanced context
+        console.log('[Generate] Using basic generation (context disabled or empty document)');
 
-        // Format as: before\nafter (AI service will split on last newline)
-        if (textBefore.trim() || textAfter.trim()) {
-          surroundingContext = `${textBefore}\n${textAfter}`;
+        // Get basic surrounding context for backward compatibility
+        let surroundingContext: string | undefined;
+        if (capturedSelection && content.trim()) {
+          const cursorPos = capturedSelection.start;
+          const contextLength = 1500;
+
+          const textBefore = content.substring(Math.max(0, cursorPos - contextLength), cursorPos);
+          const textAfter = content.substring(
+            cursorPos,
+            Math.min(content.length, cursorPos + contextLength)
+          );
+
+          if (textBefore.trim() || textAfter.trim()) {
+            surroundingContext = `${textBefore}\n${textAfter}`;
+          }
         }
-      }
 
-      const result = await AIService.generate(effectivePrompt, {
-        pinnedNotes: pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
-        length: selectedLength,
-        lengthHint,
-        context: surroundingContext,
-      });
+        result = await AIService.generate(effectivePrompt, {
+          pinnedNotes: pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
+          length: selectedLength,
+          lengthHint,
+          context: surroundingContext,
+          projectTitle:
+            projectTitle &&
+            projectTitle !== 'Untitled' &&
+            projectTitle !== 'My first project' &&
+            projectTitle !== 'My project'
+              ? projectTitle
+              : undefined,
+          smartInstructions: smartInstructions || undefined,
+          documentType: docType.type,
+        });
+      }
 
       // Only save to history if user provided a custom prompt (not from history)
       if (prompt.trim() && !isPromptFromHistory) {
@@ -362,9 +439,10 @@ export function ToolControlsContainer({
         setPromptHistory(updatedHistory);
       }
 
+      const userPrompt = prompt; // Save prompt before clearing
       setPrompt('');
       setIsPromptFromHistory(false); // Reset flag
-      onOperationComplete?.(result, 'generate');
+      onOperationComplete?.(result, 'generate', userPrompt);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Generation failed';
       onOperationError?.(message);
@@ -444,14 +522,39 @@ export function ToolControlsContainer({
       const enhancedPrompt =
         effectivePrompt === 'Simplify' ? 'Simplify and make it shorter' : effectivePrompt;
 
-      console.log('[ToolControls] Calling AIService.rewrite...');
-      const result = await AIService.rewrite(textToRewrite, {
-        customPrompt: enhancedPrompt,
-        pinnedNotes: pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
-      });
+      console.log('[ToolControls] Calling AIService.rewriteWithContext...');
+
+      // Use context-aware rewriting if context awareness is enabled
+      const settings = generateSettings || {
+        shortLength: 100,
+        mediumLength: 300,
+        contextAwarenessEnabled: true,
+      };
+
+      let result: string;
+      if (settings.contextAwarenessEnabled && content.trim().length > textToRewrite.length) {
+        // Use enhanced context-aware rewriting
+        console.log('[ToolControls] Using context-aware rewriting');
+        result = await AIService.rewriteWithContext(
+          textToRewrite,
+          content,
+          capturedSelection.start,
+          {
+            customPrompt: enhancedPrompt,
+            pinnedNotes: pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
+          }
+        );
+      } else {
+        // Fallback to basic rewriting
+        console.log('[ToolControls] Using basic rewriting (context disabled or selection is entire document)');
+        result = await AIService.rewrite(textToRewrite, {
+          customPrompt: enhancedPrompt,
+          pinnedNotes: pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
+        });
+      }
 
       console.log('[ToolControls] Rewrite complete, result length:', result.length);
-      onOperationComplete?.(result, 'rewrite');
+      onOperationComplete?.(result, 'rewrite', enhancedPrompt);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Rewrite failed';
       console.error('[ToolControls] Rewrite error:', error);
@@ -535,7 +638,9 @@ export function ToolControlsContainer({
         .replace(/^-\s*/gm, '• ') // - with any amount of space (including none)
         .replace(/^•\s*\*/gm, '• '); // Remove * after bullet point
 
-      onOperationComplete?.(formattedResult, 'summarize');
+      // For summarize, the "prompt" is the mode description
+      const summaryPrompt = `Summarize in ${mode} mode (${readingLevel} reading level)`;
+      onOperationComplete?.(formattedResult, 'summarize', summaryPrompt);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Summarize failed';
       onOperationError?.(message);
@@ -1734,37 +1839,7 @@ export function ToolControlsContainer({
         </div>
       )}
 
-      {/* Pinned notes indicator */}
-      {pinnedNotes.length > 0 && (
-        <div
-          style={{
-            marginTop: '16px',
-            padding: '8px 12px',
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border-muted)',
-            fontSize: 'var(--fs-xs)',
-            color: 'var(--text-muted)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M12 17V3" />
-            <path d="m6 11 6 6 6-6" />
-            <path d="M19 21H5" />
-          </svg>
-          {pinnedNotes.length} pinned {pinnedNotes.length === 1 ? 'note' : 'notes'} will be included
-        </div>
-      )}
+      {/* Pinned notes indicator removed - now shown in collapsible PinnedNotesPanel */}
     </div>
   );
 }

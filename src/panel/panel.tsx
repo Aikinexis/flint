@@ -12,9 +12,11 @@ import { ensureSpacing } from '../utils/textSelection';
 import { simulateStreaming } from '../utils/streamingEffect';
 import { ProjectManager } from '../components/ProjectManager';
 import { HistoryPanel } from '../components/HistoryPanel';
-import { StorageService, Project, Snapshot } from '../services/storage';
+import { PinnedNotesPanel } from '../components/PinnedNotesPanel';
+import { StorageService, Project, Snapshot, PinnedNote } from '../services/storage';
 import { exportProject, autoFormatText, type ExportFormat } from '../utils/export';
 import { AIService } from '../services/ai';
+import { generateSmartTitle } from '../utils/documentAnalysis';
 
 import type { Tab } from '../state/store';
 
@@ -61,6 +63,11 @@ function PanelContent() {
   // History panel state
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [activeSnapshotId, setActiveSnapshotId] = useState<string | null>(null);
+
+  // Pinned notes panel state
+  const [pinnedNotes, setPinnedNotes] = useState<PinnedNote[]>([]);
+  const [activePinnedNoteIds, setActivePinnedNoteIds] = useState<string[]>([]);
+  const [isPinnedNotesPanelOpen, setIsPinnedNotesPanelOpen] = useState(false);
 
   // Export menu state
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -432,12 +439,15 @@ function PanelContent() {
         if (!projectToSave && content.trim()) {
           try {
             console.log('[Panel] No project selected, auto-creating new project');
-            const newProject = await StorageService.createProject('Untitled Project', content);
+            // Get appropriate default title
+            const allProjects = await StorageService.getProjects();
+            const defaultTitle = allProjects.length === 0 ? 'My first project' : 'My project';
+            const newProject = await StorageService.createProject(defaultTitle, content);
             setCurrentProject(newProject);
             currentProjectRef.current = newProject;
             setProjects((prev) => [newProject, ...prev]);
             projectToSave = newProject;
-            console.log('[Panel] Auto-created project:', newProject.id);
+            console.log('[Panel] Auto-created project:', newProject.id, 'with title:', defaultTitle);
           } catch (error) {
             console.error('[Panel] Failed to auto-create project:', error);
             return;
@@ -447,12 +457,18 @@ function PanelContent() {
         if (projectToSave) {
           try {
             setIsSaving(true);
+            
+            // Note: Title auto-generation is now handled explicitly after AI operations
+            // (see handleOperationComplete callbacks for generate/rewrite/summarize)
+            // We don't auto-update titles during manual typing to avoid overwriting AI-generated titles
+            
             // Reduced logging verbosity - only log on errors
             const updatedProject = await StorageService.updateProject(projectToSave.id, {
               content,
             });
             if (updatedProject) {
               setCurrentProject(updatedProject);
+              currentProjectRef.current = updatedProject;
               // Also update the projects list so export from project card has latest content
               setProjects((prev) =>
                 prev.map((p) => (p.id === updatedProject.id ? updatedProject : p))
@@ -579,10 +595,13 @@ function PanelContent() {
    * Handle operation complete from tool controls
    */
   const handleOperationComplete = useCallback(
-    async (result: string, operationType: ToolType) => {
+    async (result: string, operationType: ToolType, userPrompt?: string) => {
       actions.setIsProcessing(false);
       setIsProcessing(false); // Re-enable editor after processing
       actions.setCurrentResult(result);
+
+      // Auto-generate title will happen after content is updated
+      // (moved to after streaming completes)
 
       // Create snapshot before replacement if we have a current project
       if (currentProject) {
@@ -711,6 +730,49 @@ function PanelContent() {
                 // Trigger auto-save/auto-create by calling handleEditorContentChange
                 handleEditorContentChange(finalContent);
 
+                // Auto-generate title using AI if project title is default (not customized)
+                if (currentProject && isDefaultTitle(currentProject.title) && userPrompt) {
+                  setTimeout(async () => {
+                    try {
+                      // Use AI to generate a smart title based on prompt only
+                      const smartTitle = await AIService.generateTitle(userPrompt);
+                      if (smartTitle && smartTitle !== 'Untitled') {
+                        console.log('[Panel] AI-generated title:', smartTitle);
+                        const updatedProject = await StorageService.updateProject(
+                          currentProject.id,
+                          {
+                            title: smartTitle,
+                          }
+                        );
+                        if (updatedProject) {
+                          setCurrentProject(updatedProject);
+                          currentProjectRef.current = updatedProject;
+                          await loadProjects();
+                        }
+                      }
+                    } catch (error) {
+                      console.error('[Panel] Failed to AI-generate title, falling back to simple extraction:', error);
+                      // Fallback to simple title extraction
+                      const fallbackTitle = generateSmartTitle(finalContent);
+                      if (fallbackTitle && fallbackTitle !== 'Untitled') {
+                        try {
+                          const updatedProject = await StorageService.updateProject(
+                            currentProject.id,
+                            { title: fallbackTitle }
+                          );
+                          if (updatedProject) {
+                            setCurrentProject(updatedProject);
+                            currentProjectRef.current = updatedProject;
+                            await loadProjects();
+                          }
+                        } catch (e) {
+                          console.error('[Panel] Fallback title update failed:', e);
+                        }
+                      }
+                    }
+                  }, 500);
+                }
+
                 // Reset AI flag after streaming completes
                 isAIGeneratedRef.current = false;
               }
@@ -794,6 +856,45 @@ function PanelContent() {
 
               // Trigger auto-save/auto-create by calling handleEditorContentChange
               handleEditorContentChange(finalContent);
+
+              // Auto-generate title using AI if project title is default (not customized)
+              if (currentProject && isDefaultTitle(currentProject.title) && userPrompt) {
+                setTimeout(async () => {
+                  try {
+                    // Use AI to generate a smart title based on prompt only
+                    const smartTitle = await AIService.generateTitle(userPrompt);
+                    if (smartTitle && smartTitle !== 'Untitled') {
+                      console.log('[Panel] AI-generated title:', smartTitle);
+                      const updatedProject = await StorageService.updateProject(currentProject.id, {
+                        title: smartTitle,
+                      });
+                      if (updatedProject) {
+                        setCurrentProject(updatedProject);
+                        currentProjectRef.current = updatedProject;
+                        await loadProjects();
+                      }
+                    }
+                  } catch (error) {
+                    console.error('[Panel] Failed to AI-generate title, falling back to simple extraction:', error);
+                    // Fallback to simple title extraction
+                    const fallbackTitle = generateSmartTitle(finalContent);
+                    if (fallbackTitle && fallbackTitle !== 'Untitled') {
+                      try {
+                        const updatedProject = await StorageService.updateProject(currentProject.id, {
+                          title: fallbackTitle,
+                        });
+                        if (updatedProject) {
+                          setCurrentProject(updatedProject);
+                          currentProjectRef.current = updatedProject;
+                          await loadProjects();
+                        }
+                      } catch (e) {
+                        console.error('[Panel] Fallback title update failed:', e);
+                      }
+                    }
+                  }
+                }, 500);
+              }
             }
           );
 
@@ -855,6 +956,25 @@ function PanelContent() {
   }, []); // No dependencies - use refs for stable reference
 
   /**
+   * Load pinned notes from storage
+   */
+  const loadPinnedNotes = useCallback(async () => {
+    try {
+      const notes = await StorageService.getPinnedNotes();
+      setPinnedNotes(notes);
+    } catch (error) {
+      console.error('[Panel] Failed to load pinned notes:', error);
+    }
+  }, []);
+
+  /**
+   * Reload pinned notes when switching tabs (to sync with Settings changes)
+   */
+  useEffect(() => {
+    loadPinnedNotes();
+  }, [state.activeTab, loadPinnedNotes]);
+
+  /**
    * Handle project selection
    */
   const handleProjectSelect = useCallback(
@@ -894,6 +1014,26 @@ function PanelContent() {
   );
 
   /**
+   * Gets the default title for a new project
+   * First project: "My first project"
+   * Subsequent projects: "My project"
+   */
+  const getDefaultProjectTitle = useCallback(async (): Promise<string> => {
+    const allProjects = await StorageService.getProjects();
+    // Check if this is the first project (excluding current one if it exists)
+    const existingProjects = allProjects.filter((p) => p.id !== currentProject?.id);
+    return existingProjects.length === 0 ? 'My first project' : 'My project';
+  }, [currentProject]);
+
+  /**
+   * Checks if a title is a default title that can be auto-replaced
+   */
+  const isDefaultTitle = (title: string): boolean => {
+    const defaultTitles = ['Untitled', 'Untitled Project', 'My project', 'My first project', 'My First Project'];
+    return defaultTitles.includes(title);
+  };
+
+  /**
    * Handle new project creation
    */
   const handleProjectCreate = useCallback(async () => {
@@ -904,8 +1044,11 @@ function PanelContent() {
         await autoSaveProject(currentProject.id, editorContent);
       }
 
-      // Create new project with default title
-      const newProject = await StorageService.createProject('Untitled Project', '');
+      // Get appropriate default title
+      const defaultTitle = await getDefaultProjectTitle();
+
+      // Create new project with smart default title
+      const newProject = await StorageService.createProject(defaultTitle, '');
       setCurrentProject(newProject);
       setEditorContent('');
       actions.setCurrentText('');
@@ -923,12 +1066,19 @@ function PanelContent() {
       // Reload projects list
       await loadProjects();
 
-      console.log('[Panel] Created new project:', newProject.id);
+      console.log('[Panel] Created new project:', newProject.id, 'with title:', defaultTitle);
     } catch (error) {
       console.error('[Panel] Failed to create project:', error);
       alert('Failed to create project. Please try again.');
     }
-  }, [currentProject, editorContent, autoSaveProject, actions, loadProjects]);
+  }, [
+    currentProject,
+    editorContent,
+    autoSaveProject,
+    actions,
+    loadProjects,
+    getDefaultProjectTitle,
+  ]);
 
   /**
    * Handle project deletion
@@ -998,6 +1148,7 @@ function PanelContent() {
         });
 
       await loadProjects();
+      await loadPinnedNotes();
 
       // Try to load the last used project
       const lastProjectId = await StorageService.getLastProjectId();
@@ -1149,6 +1300,16 @@ function PanelContent() {
   }, [state.activeTab, state.isHistoryPanelOpen, actions]);
 
   /**
+   * Auto-close pinned notes panel when switching to non-editor tabs
+   */
+  useEffect(() => {
+    const nonEditorTabs = ['settings', 'projects', 'home'];
+    if (nonEditorTabs.includes(state.activeTab) && isPinnedNotesPanelOpen) {
+      setIsPinnedNotesPanelOpen(false);
+    }
+  }, [state.activeTab, isPinnedNotesPanelOpen]);
+
+  /**
    * Handle export in specified format (with auto-format)
    */
   const handleExport = useCallback(
@@ -1248,7 +1409,8 @@ function PanelContent() {
           hideToggle={
             state.activeTab === 'settings' ||
             state.activeTab === 'projects' ||
-            state.activeTab === 'home'
+            state.activeTab === 'home' ||
+            isPinnedNotesPanelOpen
           }
           onSnapshotsChange={async () => {
             // Reload snapshots when they're modified (e.g., liked/unliked)
@@ -1259,6 +1421,31 @@ function PanelContent() {
           }}
         />
       )}
+
+      {/* Pinned Notes Panel */}
+      <PinnedNotesPanel
+        pinnedNotes={pinnedNotes}
+        activePinnedNoteIds={activePinnedNoteIds}
+        onToggleNote={(noteId) => {
+          setActivePinnedNoteIds((prev) =>
+            prev.includes(noteId) ? prev.filter((id) => id !== noteId) : [...prev, noteId]
+          );
+        }}
+        onToggleAll={() => {
+          setActivePinnedNoteIds(pinnedNotes.map((note) => note.id));
+        }}
+        onToggleNone={() => {
+          setActivePinnedNoteIds([]);
+        }}
+        isOpen={isPinnedNotesPanelOpen}
+        onToggle={() => setIsPinnedNotesPanelOpen(!isPinnedNotesPanelOpen)}
+        hideToggle={
+          state.activeTab === 'settings' ||
+          state.activeTab === 'projects' ||
+          state.activeTab === 'home' ||
+          state.isHistoryPanelOpen
+        }
+      />
 
       {/* AI Download Progress indicator - centered modal */}
       {aiDownloadProgress !== null && aiDownloadProgress < 1 && (
@@ -1804,8 +1991,9 @@ function PanelContent() {
                 {state.activeTab === 'generate' && (
                   <ToolControlsContainer
                     activeTool="generate"
-                    pinnedNotes={state.pinnedNotes}
+                    pinnedNotes={pinnedNotes.filter((note) => activePinnedNoteIds.includes(note.id))}
                     content={editorContent}
+                    projectTitle={currentProject?.title}
                     selection={editorSelection}
                     editorRef={unifiedEditorRef}
                     generatePrompt={generatePrompt}
@@ -1819,8 +2007,9 @@ function PanelContent() {
                 {state.activeTab === 'rewrite' && (
                   <ToolControlsContainer
                     activeTool="rewrite"
-                    pinnedNotes={state.pinnedNotes}
+                    pinnedNotes={pinnedNotes.filter((note) => activePinnedNoteIds.includes(note.id))}
                     content={editorContent}
+                    projectTitle={currentProject?.title}
                     selection={editorSelection}
                     editorRef={unifiedEditorRef}
                     rewritePrompt={rewritePrompt}
@@ -1834,8 +2023,9 @@ function PanelContent() {
                 {state.activeTab === 'summary' && (
                   <ToolControlsContainer
                     activeTool="summarize"
-                    pinnedNotes={state.pinnedNotes}
+                    pinnedNotes={pinnedNotes.filter((note) => activePinnedNoteIds.includes(note.id))}
                     content={editorContent}
+                    projectTitle={currentProject?.title}
                     selection={editorSelection}
                     editorRef={unifiedEditorRef}
                     summarizePrompt={summarizePrompt}
@@ -1875,8 +2065,10 @@ function PanelContent() {
               <Settings
                 settings={state.settings}
                 pinnedNotes={state.pinnedNotes}
+                activePinnedNoteIds={activePinnedNoteIds}
                 onSettingsChange={actions.setSettings}
                 onPinnedNotesChange={actions.setPinnedNotes}
+                onActivePinnedNoteIdsChange={setActivePinnedNoteIds}
               />
             </div>
           )}
