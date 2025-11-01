@@ -362,9 +362,31 @@ export function ToolControlsContainer({
       if (selectedLength === 'short') lengthHint = settings.shortLength;
       else if (selectedLength === 'medium') lengthHint = settings.mediumLength;
 
-      // Use enhanced context-aware generation if enabled
+      // Check if user has selected text and wants to modify it (not generate new text)
+      const hasSelection = capturedSelection && capturedSelection.start !== capturedSelection.end;
+      const selectedText = hasSelection ? content.substring(capturedSelection.start, capturedSelection.end) : '';
+      
+      // Detect modification keywords in prompt
+      const modificationKeywords = /\b(change|modify|update|replace|edit|fix|correct|adjust|revise|alter)\b/i;
+      const isModificationRequest = hasSelection && modificationKeywords.test(effectivePrompt);
+
       let result: string;
-      if (capturedSelection && settings.contextAwarenessEnabled && content.trim()) {
+      
+      // If user selected text and prompt suggests modification, use rewrite instead
+      if (isModificationRequest) {
+        console.log('[Generate] Detected modification request on selection, using rewrite logic');
+        result = await AIService.rewriteWithContext(
+          selectedText,
+          content,
+          capturedSelection!.start,
+          {
+            customPrompt: effectivePrompt,
+            pinnedNotes: pinnedNotesContent.length > 0 ? pinnedNotesContent : undefined,
+          }
+        );
+      }
+      // Use enhanced context-aware generation if enabled
+      else if (capturedSelection && settings.contextAwarenessEnabled && content.trim()) {
         const cursorPos = capturedSelection.start;
 
         console.log('[Generate] Using enhanced context engine');

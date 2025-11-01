@@ -364,7 +364,7 @@ function PanelContent() {
       loadProjects();
     }
 
-    // When switching to Generate tab, move cursor to end
+    // When switching to Generate tab, move cursor to end (but can be overridden by manual click)
     if (newTab === 'generate') {
       setTimeout(() => {
         const textarea = unifiedEditorRef.current?.getTextarea();
@@ -373,6 +373,13 @@ function PanelContent() {
           textarea.setSelectionRange(endPos, endPos);
           textarea.focus();
           console.log('[Panel] Switched to Generate - cursor at end:', endPos);
+          
+          // Listen for manual cursor repositioning
+          const handleClick = () => {
+            console.log('[Panel] User manually repositioned cursor');
+            textarea.removeEventListener('click', handleClick);
+          };
+          textarea.addEventListener('click', handleClick, { once: true });
         }
       }, 100);
     }

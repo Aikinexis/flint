@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Context Ordering Test - Flint</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+    h1 {
+      color: #60a5fa;
+      border-bottom: 2px solid #374151;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #93c5fd;
+      margin-top: 30px;
+    }
+    .test-case {
+      background: #262626;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 10px;
+    }
+    .status.pass {
+      background: #10b981;
+      color: white;
+    }
+    .status.fail {
+      background: #ef4444;
+      color: white;
+    }
+    .status.pending {
+      background: #f59e0b;
+      color: white;
+    }
+    pre {
+      background: #1a1a1a;
+      border: 1px solid #374151;
+      border-radius: 4px;
+      padding: 15px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    code {
+      color: #93c5fd;
+    }
+    .priority-order {
+      background: #1e293b;
+      border-left: 4px solid #60a5fa;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    .priority-item {
+      padding: 8px 0;
+      border-bottom: 1px solid #374151;
+    }
+    .priority-item:last-child {
+      border-bottom: none;
+    }
+    .priority-number {
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      background: #60a5fa;
+      color: white;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 30px;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    button {
+      background: #60a5fa;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      margin: 5px;
+    }
+    button:hover {
+      background: #3b82f6;
+    }
+    button:disabled {
+      background: #4b5563;
+      cursor: not-allowed;
+    }
+    .log {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 4px;
+      padding: 10px;
+      margin: 10px 0;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+    }
+    .log-entry {
+      padding: 4px 0;
+      border-bottom: 1px solid #1e293b;
+    }
+    .log-entry.info { color: #93c5fd; }
+    .log-entry.success { color: #10b981; }
+    .log-entry.error { color: #ef4444; }
+    .log-entry.warning { color: #f59e0b; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Context Ordering Test</h1>
+  <p>This test verifies that context is assembled in the correct priority order for all AI operations.</p>
+
+  <div class="priority-order">
+    <h3>Expected Context Priority Order</h3>
+    <div class="priority-item">
+      <span class="priority-number">1</span>
+      <strong>CURRENT DATE AND TIME</strong> - Temporal context (highest priority)
+    </div>
+    <div class="priority-item">
+      <span class="priority-number">2</span>
+      <strong>DOCUMENT TITLE / PROJECT CONTEXT</strong> - Document structure
+    </div>
+    <div class="priority-item">
+      <span class="priority-number">3</span>
+      <strong>DOCUMENT CONTENT / CONTEXT</strong> - Surrounding text, related sections
+    </div>
+    <div class="priority-item">
+      <span class="priority-number">4</span>
+      <strong>AUDIENCE AND TONE GUIDANCE</strong> - Pinned notes
+    </div>
+    <div class="priority-item">
+      <span class="priority-number">5</span>
+      <strong>USER'S INSTRUCTION</strong> - Specific directive (most specific)
+    </div>
+  </div>
+
+  <h2>Test Cases</h2>
+
+  <div class="test-case">
+    <h3>Test 1: Standard Generate (No Context) <span class="status pending">MANUAL</span></h3>
+    <p><strong>Purpose:</strong> Verify context ordering in standalone generation</p>
+    <p><strong>Expected Order:</strong> Date/Time → Project Title → Pinned Notes → User Instruction</p>
+    
+    <h4>Steps:</h4>
+    <ol>
+      <li>Open Flint extension panel</li>
+      <li>Go to Generate tab</li>
+      <li>Add a pinned note (e.g., "Write in a professional tone")</li>
+      <li>Enter prompt: "Write a brief introduction"</li>
+      <li>Click Generate</li>
+      <li>Open browser console and check AI service logs</li>
+    </ol>
+    
+    <h4>Verification:</h4>
+    <p>In console logs, look for the prompt sent to AI. It should contain:</p>
+    <pre><code>CURRENT DATE AND TIME: [current date]
+AUDIENCE AND TONE GUIDANCE:
+Write in a professional tone
+
+USER'S INSTRUCTION: Write a brief introduction</code></pre>
+    
+    <button onclick="logTest('Test 1', 'Check console logs for context order')">Mark as Tested</button>
+  </div>
+
+  <div class="test-case">
+    <h3>Test 2: Generate with Document Context <span class="status pending">MANUAL</span></h3>
+    <p><strong>Purpose:</strong> Verify context ordering when generating within a document</p>
+    <p><strong>Expected Order:</strong> Date/Time → Project Title → Document Context → Pinned Notes → User Instruction</p>
+    
+    <h4>Steps:</h4>
+    <ol>
+      <li>Open a project in Flint</li>
+      <li>Type some text in the editor</li>
+      <li>Place cursor in the middle of the text</li>
+      <li>Add a pinned note</li>
+      <li>Use the Generate tool from the toolbar</li>
+      <li>Check console logs</li>
+    </ol>
+    
+    <h4>Verification:</h4>
+    <p>Console logs should show:</p>
+    <pre><code>CURRENT DATE AND TIME: [date]
+DOCUMENT TITLE: "[project title]"
+You are a writing assistant...
+
+CONTEXT BEFORE CURSOR:
+[text before]
+
+CONTEXT AFTER CURSOR:
+[text after]
+
+AUDIENCE AND TONE GUIDANCE:
+[pinned notes]
+
+USER'S INSTRUCTION: [prompt]</code></pre>
+    
+    <button onclick="logTest('Test 2', 'Check console logs for context order with document')">Mark as Tested</button>
+  </div>
+
+  <div class="test-case">
+    <h3>Test 3: Rewrite with Context <span class="status pending">MANUAL</span></h3>
+    <p><strong>Purpose:</strong> Verify context ordering in rewrite operations</p>
+    <p><strong>Expected Order:</strong> Date/Time → Document Context → Pinned Notes</p>
+    
+    <h4>Steps:</h4>
+    <ol>
+      <li>Open a project with some text</li>
+      <li>Select a portion of text</li>
+      <li>Add a pinned note</li>
+      <li>Click Rewrite from toolbar</li>
+      <li>Choose a preset or custom instruction</li>
+      <li>Check console logs</li>
+    </ol>
+    
+    <h4>Verification:</h4>
+    <p>Console logs should show context in order:</p>
+    <pre><code>Current date: [date]
+
+Surrounding context for style matching:
+Before: "[text before]"
+After: "[text after]"
+
+Audience and tone guidance:
+[pinned notes]</code></pre>
+    
+    <button onclick="logTest('Test 3', 'Check console logs for rewrite context order')">Mark as Tested</button>
+  </div>
+
+  <div class="test-case">
+    <h3>Test 4: No Duplicate Pinned Notes <span class="status pending">MANUAL</span></h3>
+    <p><strong>Purpose:</strong> Verify pinned notes are not duplicated in prompts</p>
+    
+    <h4>Steps:</h4>
+    <ol>
+      <li>Add a distinctive pinned note (e.g., "UNIQUE_TEST_NOTE_12345")</li>
+      <li>Generate text</li>
+      <li>Search console logs for "UNIQUE_TEST_NOTE_12345"</li>
+    </ol>
+    
+    <h4>Verification:</h4>
+    <p>The unique note should appear EXACTLY ONCE in the prompt sent to AI.</p>
+    
+    <button onclick="logTest('Test 4', 'Verified no duplication')">Mark as Tested</button>
+  </div>
+
+  <div class="test-case">
+    <h3>Test 5: Date/Time Always First <span class="status pending">MANUAL</span></h3>
+    <p><strong>Purpose:</strong> Verify date/time context is always at the top</p>
+    
+    <h4>Steps:</h4>
+    <ol>
+      <li>Perform any AI operation (generate, rewrite, summarize)</li>
+      <li>Check console logs for the prompt</li>
+    </ol>
+    
+    <h4>Verification:</h4>
+    <p>Every prompt should start with:</p>
+    <pre><code>CURRENT DATE AND TIME: [weekday], [month] [day], [year] at [time]</code></pre>
+    <p>Or for some operations:</p>
+    <pre><code>Current date: [weekday], [month] [day], [year] at [time]</code></pre>
+    
+    <button onclick="logTest('Test 5', 'Verified date/time is first')">Mark as Tested</button>
+  </div>
+
+  <h2>Test Log</h2>
+  <div id="testLog" class="log">
+    <div class="log-entry info">Ready to test. Click "Mark as Tested" buttons after verifying each test case.</div>
+  </div>
+
+  <script>
+    function logTest(testName, message) {
+      const log = document.getElementById('testLog');
+      const entry = document.createElement('div');
+      entry.className = 'log-entry success';
+      const timestamp = new Date().toLocaleTimeString();
+      entry.textContent = `[${timestamp}] ${testName}: ${message}`;
+      log.appendChild(entry);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('testLog');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      const timestamp = new Date().toLocaleTimeString();
+      entry.textContent = `[${timestamp}] ${message}`;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    // Log initial state
+    log('Context ordering test page loaded', 'info');
+    log('Open browser console (F12) to see AI service logs during tests', 'warning');
+  </script>
+</body>
+</html>

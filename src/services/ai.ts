@@ -366,6 +366,9 @@ export class AIService {
     }
 
     try {
+      // Log the full prompt for debugging
+      console.log('[AI] Prompt API - Full prompt being sent:', prompt.substring(0, 500) + (prompt.length > 500 ? '...' : ''));
+      
       const session = await (window as any).ai.createTextSession();
       const result = await Promise.race([
         session.prompt(prompt),
@@ -477,7 +480,8 @@ export class AIService {
   }
 
   /**
-   * Rewrites text using the Rewriter API or Prompt API fallback
+   * Rewrites text using specialized APIs with proper fallback order
+   * Priority: Rewriter API → Writer API → Prompt API
    * @param text - The text to rewrite
    * @param options - Rewrite options
    * @returns Promise resolving to rewritten text
@@ -488,7 +492,11 @@ export class AIService {
     const availability = await this.checkAvailability();
 
     // Use mock provider if all APIs unavailable
-    if (availability.rewriterAPI === 'unavailable' && availability.promptAPI === 'unavailable') {
+    if (
+      availability.rewriterAPI === 'unavailable' &&
+      availability.writerAPI === 'unavailable' &&
+      availability.promptAPI === 'unavailable'
+    ) {
       return MockAIProvider.rewrite(text, options);
     }
 
@@ -502,17 +510,10 @@ export class AIService {
       sharedContext += `\n\nAudience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`;
     }
 
-    // Use Prompt API for custom prompts (Rewriter API doesn't always respect custom instructions)
-    if (options.customPrompt && availability.promptAPI === 'available') {
-      const prompt = sharedContext
-        ? `${sharedContext}\n\nUser's rewrite instruction: ${options.customPrompt}\n\nText to rewrite:\n${text}\n\nIMPORTANT: Follow the user's instruction exactly. Output ONLY the rewritten text, no explanations.`
-        : `User's rewrite instruction: ${options.customPrompt}\n\nText to rewrite:\n${text}\n\nIMPORTANT: Follow the user's instruction exactly. Output ONLY the rewritten text, no explanations.`;
-      return this.prompt(prompt);
-    }
-
-    // Try Rewriter API for preset tones (when no custom prompt)
-    if (availability.rewriterAPI === 'available') {
+    // PRIORITY 1: Try Rewriter API for preset tones (most specialized)
+    if (!options.customPrompt && availability.rewriterAPI === 'available') {
       try {
+        console.log('[AI] Rewrite - Using Rewriter API (preset tone)');
         const rewriter = await (self as any).Rewriter.create({
           tone: options.tone || 'as-is',
           format: 'plain-text',
@@ -539,18 +540,71 @@ export class AIService {
 
         return result;
       } catch (error) {
-        console.error('[AI] Rewriter API failed, falling back to Prompt API:', error);
-        // Fall through to Prompt API fallback
+        console.error('[AI] Rewriter API failed, trying Writer API:', error);
+        // Fall through to Writer API
       }
     }
 
-    // Final fallback to Prompt API
+    // PRIORITY 2: Try Writer API for custom prompts (second most specialized)
+    if (options.customPrompt && availability.writerAPI === 'available') {
+      try {
+        console.log('[AI] Rewrite - Using Writer API for custom prompt');
+
+        const writerPrompt = `You are a text editor. Your ONLY job is to make a small edit to existing text.
+
+ORIGINAL TEXT (do NOT change anything except what the instruction asks):
+${text}
+
+EDIT INSTRUCTION:
+${options.customPrompt}
+
+CRITICAL: Output ONLY the edited version of the ORIGINAL TEXT above. Do NOT write a new email or letter. Do NOT add greetings, signatures, or extra sentences. Just make the requested edit to the original text.`;
+
+        const writer = await (self as any).Writer.create({
+          tone: 'neutral',
+          format: 'plain-text',
+          length: 'medium', // Writer API doesn't support 'as-is'
+          sharedContext,
+          outputLanguage: 'en',
+        });
+
+        const result = await Promise.race([
+          writer.write(writerPrompt),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Operation timed out')), 30000)
+          ),
+        ]);
+
+        console.log('[AI] Rewrite - Writer API returned:', result);
+        return result;
+      } catch (error) {
+        console.error('[AI] Writer API failed, trying Prompt API:', error);
+        // Fall through to Prompt API
+      }
+    }
+
+    // PRIORITY 3: Final fallback to Prompt API (most generic)
     if (availability.promptAPI === 'available') {
+      console.log('[AI] Rewrite - Using Prompt API as fallback');
       const instruction = options.customPrompt || 'Rewrite this text to improve clarity and flow';
-      const prompt = sharedContext
-        ? `${sharedContext}\n\nUser's rewrite instruction: ${instruction}\n\nText to rewrite:\n${text}\n\nIMPORTANT: Follow the user's instruction exactly. Output ONLY the rewritten text, no explanations.`
-        : `User's rewrite instruction: ${instruction}\n\nText to rewrite:\n${text}\n\nIMPORTANT: Follow the user's instruction exactly. Output ONLY the rewritten text, no explanations.`;
-      return this.prompt(prompt);
+      const prompt = `Task: Edit the following text according to the instruction.
+
+Text: "${text}"
+
+Instruction: ${instruction}
+
+Rules:
+1. Start with the exact text shown in quotes above
+2. Make ONLY the change requested in the instruction
+3. Output the result with NO explanations, NO quotes, NO extra text
+
+Output:`;
+
+      console.log('[AI] Rewrite fallback - Original text:', text);
+      console.log('[AI] Rewrite fallback - Instruction:', instruction);
+      const result = await this.prompt(prompt);
+      console.log('[AI] Rewrite fallback - AI returned:', result);
+      return result;
     }
 
     // If we get here, no API is available
@@ -604,17 +658,18 @@ export class AIService {
               ? 'an article'
               : 'a document';
 
+      // Build context in priority order: date/time → project title → document context → pinned notes → user instruction
       fullPrompt = `CRITICAL RULE: NEVER USE SQUARE BRACKETS [] FOR PLACEHOLDERS. NO [Name], [Date], [Company], [Boss's Name], [Your Name], or ANY [] placeholders. If you don't know a specific name or date, just omit it - do NOT make up fake names.
 
-${dateTimeContext}
-You are a writing assistant. The user is writing ${docTypeDesc}${options.projectTitle ? ` titled "${options.projectTitle}"` : ''} and needs you to generate text at their cursor position.
+${dateTimeContext}${projectContext}
+You are a writing assistant. The user is writing ${docTypeDesc} and needs you to generate text at their cursor position.
 
 CONTEXT BEFORE CURSOR:
 ${beforeContext || '[Start of document]'}
 
 CONTEXT AFTER CURSOR:
 ${afterContext || '[End of document]'}
-
+${options.pinnedNotes?.length ? `\nAUDIENCE AND TONE GUIDANCE:\n${options.pinnedNotes.join('\n')}\n` : ''}
 USER'S INSTRUCTION: ${prompt}
 
 ${options.smartInstructions ? `SPECIFIC INSTRUCTIONS FOR THIS CONTEXT:\n- ${options.smartInstructions}\n\n` : ''}
@@ -631,9 +686,10 @@ RULES:
 ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it completely.`;
     } else {
       // No context - standalone generation
+      // Build context in priority order: date/time → project title → pinned notes → user instruction
       fullPrompt = `CRITICAL RULE: NEVER USE SQUARE BRACKETS [] FOR PLACEHOLDERS. NO [Name], [Date], [Company], or ANY [] placeholders. If you don't know a specific name or date, just omit it - do NOT make up fake names.
 
-${dateTimeContext}${projectContext}${prompt}
+${dateTimeContext}${projectContext}${options.pinnedNotes?.length ? `AUDIENCE AND TONE GUIDANCE:\n${options.pinnedNotes.join('\n')}\n\n` : ''}USER'S INSTRUCTION: ${prompt}
 
 ${options.smartInstructions ? `SPECIFIC INSTRUCTIONS:\n- ${options.smartInstructions}\n\n` : ''}
 INSTRUCTIONS:
@@ -656,10 +712,9 @@ ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it com
       fullPrompt += `\n- Generate a moderate response (around 50 words)`;
     }
 
-    // Merge pinned notes into context
-    const sharedContext = options.pinnedNotes?.length
-      ? `Audience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`
-      : '';
+    // Note: Pinned notes are already included in fullPrompt above in the correct order
+    // For Writer API, we pass empty sharedContext since context is already in the prompt
+    const sharedContext = '';
 
     // Try Writer API first
     if (availability.writerAPI === 'available') {
@@ -694,10 +749,8 @@ ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it com
       }
     }
 
-    // Fallback to Prompt API
-    const promptWithContext = sharedContext ? `${sharedContext}\n\n${fullPrompt}` : fullPrompt;
-
-    return this.prompt(promptWithContext);
+    // Fallback to Prompt API - fullPrompt already contains all context in correct order
+    return this.prompt(fullPrompt);
   }
 
   /**
@@ -784,13 +837,14 @@ ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it com
             ? 'an article'
             : 'a document';
 
+    // Build context in priority order: date/time → project title → document context → pinned notes → user instruction
     const fullPrompt = `CRITICAL RULE: NEVER USE SQUARE BRACKETS [] FOR PLACEHOLDERS. NO [Name], [Date], [Company], or ANY [] placeholders. If you don't know a specific name or date, just omit it.
 
 ${dateTimeContext}${projectContext}
 You are a writing assistant. The user is writing ${docTypeDesc} and needs you to generate text at their cursor position.
 
 ${formattedContext}
-
+${options.pinnedNotes?.length ? `\nAUDIENCE AND TONE GUIDANCE:\n${options.pinnedNotes.join('\n')}\n` : ''}
 USER'S INSTRUCTION: ${prompt}
 
 ${options.smartInstructions ? `SPECIFIC INSTRUCTIONS FOR THIS CONTEXT:\n- ${options.smartInstructions}\n\n` : ''}
@@ -897,7 +951,7 @@ ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it com
     const now = new Date();
     const dateTimeContext = `Current date: ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
 
-    // Build context-aware prompt
+    // Build context-aware prompt in priority order: date/time → document context → pinned notes
     let contextPrompt = dateTimeContext;
 
     if (beforeContext.trim() || afterContext.trim()) {
@@ -912,20 +966,21 @@ ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it com
         '\n\nEnsure the rewritten text flows naturally with the surrounding context.';
     }
 
-    // Merge with pinned notes
+    // Add pinned notes for audience and tone guidance
     if (options.pinnedNotes?.length) {
       contextPrompt += `\n\nAudience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`;
     }
 
-    // Use Prompt API for custom prompts (Rewriter API doesn't always respect custom instructions)
-    if (options.customPrompt && availability.promptAPI === 'available') {
-      const prompt = `${contextPrompt}\n\nUser's rewrite instruction: ${options.customPrompt}\n\nText to rewrite:\n${text}\n\nIMPORTANT: Follow the user's instruction exactly. Output ONLY the rewritten text, no explanations.`;
-      return this.prompt(prompt);
-    }
+    // Debug logging
+    console.log('[AI] RewriteWithContext - customPrompt:', options.customPrompt);
+    console.log('[AI] RewriteWithContext - rewriterAPI availability:', availability.rewriterAPI);
+    console.log('[AI] RewriteWithContext - writerAPI availability:', availability.writerAPI);
+    console.log('[AI] RewriteWithContext - promptAPI availability:', availability.promptAPI);
 
-    // Try Rewriter API for preset tones (when no custom prompt)
-    if (availability.rewriterAPI === 'available') {
+    // PRIORITY 1: Try Rewriter API for preset tones (most specialized)
+    if (!options.customPrompt && availability.rewriterAPI === 'available') {
       try {
+        console.log('[AI] RewriteWithContext - Using Rewriter API (preset tone)');
         const rewriter = await (self as any).Rewriter.create({
           tone: options.tone || 'as-is',
           format: 'plain-text',
@@ -952,16 +1007,71 @@ ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it com
 
         return result;
       } catch (error) {
-        console.error('[AI] Rewriter API failed, falling back to Prompt API:', error);
-        // Fall through to Prompt API fallback
+        console.error('[AI] Rewriter API failed, trying Writer API:', error);
+        // Fall through to Writer API
       }
     }
 
-    // Final fallback to Prompt API
+    // PRIORITY 2: Try Writer API for custom prompts (second most specialized)
+    if (options.customPrompt && availability.writerAPI === 'available') {
+      try {
+        console.log('[AI] RewriteWithContext - Using Writer API for custom prompt');
+
+        const writerPrompt = `You are a text editor. Your ONLY job is to make a small edit to existing text.
+
+ORIGINAL TEXT (do NOT change anything except what the instruction asks):
+${text}
+
+EDIT INSTRUCTION:
+${options.customPrompt}
+
+CRITICAL: Output ONLY the edited version of the ORIGINAL TEXT above. Do NOT write a new email or letter. Do NOT add greetings, signatures, or extra sentences. Just make the requested edit to the original text.`;
+
+        const writer = await (self as any).Writer.create({
+          tone: 'neutral',
+          format: 'plain-text',
+          length: 'medium', // Writer API doesn't support 'as-is'
+          sharedContext: contextPrompt,
+          outputLanguage: 'en',
+        });
+
+        const result = await Promise.race([
+          writer.write(writerPrompt),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Operation timed out')), 30000)
+          ),
+        ]);
+
+        console.log('[AI] RewriteWithContext - Writer API returned:', result);
+        return result;
+      } catch (error) {
+        console.error('[AI] Writer API failed, trying Prompt API:', error);
+        // Fall through to Prompt API
+      }
+    }
+
+    // PRIORITY 3: Final fallback to Prompt API (most generic)
     if (availability.promptAPI === 'available') {
+      console.log('[AI] RewriteWithContext - Using Prompt API as fallback');
       const instruction = options.customPrompt || 'Rewrite this text to improve clarity and flow';
-      const prompt = `${contextPrompt}\n\nUser's rewrite instruction: ${instruction}\n\nText to rewrite:\n${text}\n\nIMPORTANT: Follow the user's instruction exactly. Output ONLY the rewritten text, no explanations.`;
-      return this.prompt(prompt);
+      const prompt = `Task: Edit the following text according to the instruction.
+
+Text: "${text}"
+
+Instruction: ${instruction}
+
+Rules:
+1. Start with the exact text shown in quotes above
+2. Make ONLY the change requested in the instruction
+3. Output the result with NO explanations, NO quotes, NO extra text
+
+Output:`;
+
+      console.log('[AI] RewriteWithContext fallback - Original text:', text);
+      console.log('[AI] RewriteWithContext fallback - Instruction:', instruction);
+      const result = await this.prompt(prompt);
+      console.log('[AI] RewriteWithContext fallback - AI returned:', result);
+      return result;
     }
 
     throw new Error('AI features not available. Please enable Chrome AI.');
