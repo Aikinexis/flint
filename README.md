@@ -1,6 +1,12 @@
-# Flint Chrome Extension
+# Flint - Unified Editor
 
-Voice-to-text, summarization, and rewriting with local AI for Chrome.
+Flint lets you generate, rewrite, and summarize text. Everything runs on your device.
+
+
+
+https://github.com/user-attachments/assets/8a3a1115-92e1-43cc-86d2-3ac76dee37fd
+
+
 
 ## Overview
 
