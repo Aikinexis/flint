@@ -46,6 +46,25 @@ Generate text that flows naturally with what you’ve already written. The AI un
 ### Pinned Notes  
 Add audience descriptions or style guidelines that influence all AI operations. Ideal for maintaining a consistent tone.  
 
+## 📚 Documentation
+
+- **[Quick Start Guide](docs/context-engine/QUICK_START_CONTEXT_ENGINE.md)** - Get started with Flint's AI features
+- **[Context Engine](docs/context-engine/README.md)** - Enhanced context awareness (NEW!)
+- **[Full Documentation](docs/README.md)** - Complete documentation index
+- **[Changelog](CHANGELOG.md)** - Recent changes and improvements
+
+### What's New: Enhanced Context Engine
+
+Flint now includes a lightweight context engine that dramatically improves AI understanding:
+
+- ✅ **125% more context** - Sees 2250 chars vs 1000 chars before
+- ✅ **Smart section selection** - Includes 3 most relevant sections from entire document
+- ✅ **Better instruction following** - Custom prompts now work correctly
+- ✅ **No repetition** - AI adds new information instead of repeating
+- ✅ **100% local** - Fast (< 20ms), private, no external dependencies
+
+[Learn more →](docs/context-engine/README.md)
+
 ## Requirements
 
 - Chrome 128 or later
