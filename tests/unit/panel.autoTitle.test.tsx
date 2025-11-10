@@ -130,7 +130,7 @@ describe('Panel Auto-Title Generation Logic', () => {
 
       mockGenerateSmartTitle.mockReturnValue('Meeting Tomorrow');
 
-      let titleUpdate: { title?: string } = {};
+      const titleUpdate: { title?: string } = {};
 
       if (isDefaultTitle(projectTitle) && content.trim()) {
         const smartTitle = mockGenerateSmartTitle(content);
@@ -148,7 +148,7 @@ describe('Panel Auto-Title Generation Logic', () => {
 
       mockGenerateSmartTitle.mockReturnValue('Untitled');
 
-      let titleUpdate: { title?: string } = {};
+      const titleUpdate: { title?: string } = {};
 
       if (isDefaultTitle(projectTitle) && content.trim()) {
         const smartTitle = mockGenerateSmartTitle(content);
@@ -166,7 +166,7 @@ describe('Panel Auto-Title Generation Logic', () => {
 
       mockGenerateSmartTitle.mockReturnValue('My project');
 
-      let titleUpdate: { title?: string } = {};
+      const titleUpdate: { title?: string } = {};
 
       if (isDefaultTitle(projectTitle) && content.trim()) {
         const smartTitle = mockGenerateSmartTitle(content);
@@ -184,7 +184,7 @@ describe('Panel Auto-Title Generation Logic', () => {
 
       mockGenerateSmartTitle.mockReturnValue('');
 
-      let titleUpdate: { title?: string } = {};
+      const titleUpdate: { title?: string } = {};
 
       if (isDefaultTitle(projectTitle) && content.trim()) {
         const smartTitle = mockGenerateSmartTitle(content);
@@ -202,7 +202,7 @@ describe('Panel Auto-Title Generation Logic', () => {
 
       mockGenerateSmartTitle.mockReturnValue(null as any);
 
-      let titleUpdate: { title?: string } = {};
+      const titleUpdate: { title?: string } = {};
 
       if (isDefaultTitle(projectTitle) && content.trim()) {
         const smartTitle = mockGenerateSmartTitle(content);
@@ -243,7 +243,7 @@ describe('Panel Auto-Title Generation Logic', () => {
         'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...'
       );
 
-      let titleUpdate: { title?: string } = {};
+      const titleUpdate: { title?: string } = {};
 
       if (isDefaultTitle(projectTitle) && content.trim()) {
         const smartTitle = mockGenerateSmartTitle(content);
@@ -262,7 +262,7 @@ describe('Panel Auto-Title Generation Logic', () => {
 
       mockGenerateSmartTitle.mockReturnValue('Meeting Notes 📝');
 
-      let titleUpdate: { title?: string } = {};
+      const titleUpdate: { title?: string } = {};
 
       if (isDefaultTitle(projectTitle) && content.trim()) {
         const smartTitle = mockGenerateSmartTitle(content);
@@ -280,7 +280,7 @@ describe('Panel Auto-Title Generation Logic', () => {
 
       mockGenerateSmartTitle.mockReturnValue('First');
 
-      let titleUpdate: { title?: string } = {};
+      const titleUpdate: { title?: string } = {};
 
       if (isDefaultTitle(projectTitle) && content.trim()) {
         const smartTitle = mockGenerateSmartTitle(content);
@@ -311,7 +311,7 @@ describe('Panel Auto-Title Generation Logic', () => {
 
       mockGenerateSmartTitle.mockReturnValue('Introduction to AI');
 
-      let titleUpdate: { title?: string } = {};
+      const titleUpdate: { title?: string } = {};
 
       if (isDefaultTitle(projectTitle) && content.trim()) {
         const smartTitle = mockGenerateSmartTitle(content);
@@ -329,7 +329,7 @@ describe('Panel Auto-Title Generation Logic', () => {
 
       mockGenerateSmartTitle.mockReturnValue('Email Draft');
 
-      let titleUpdate: { title?: string } = {};
+      const titleUpdate: { title?: string } = {};
 
       if (isDefaultTitle(projectTitle) && content.trim()) {
         const smartTitle = mockGenerateSmartTitle(content);
@@ -347,7 +347,7 @@ describe('Panel Auto-Title Generation Logic', () => {
 
       mockGenerateSmartTitle.mockReturnValue('First important point about the topic');
 
-      let titleUpdate: { title?: string } = {};
+      const titleUpdate: { title?: string } = {};
 
       if (isDefaultTitle(projectTitle) && content.trim()) {
         const smartTitle = mockGenerateSmartTitle(content);

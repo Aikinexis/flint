@@ -12,11 +12,14 @@ import { ensureSpacing } from '../utils/textSelection';
 import { simulateStreaming } from '../utils/streamingEffect';
 import { ProjectManager } from '../components/ProjectManager';
 import { HistoryPanel } from '../components/HistoryPanel';
+import { formatAIOutput } from '../utils/formatAIOutput';
 import { PinnedNotesPanel } from '../components/PinnedNotesPanel';
 import { StorageService, Project, Snapshot, PinnedNote } from '../services/storage';
 import { exportProject, autoFormatText, type ExportFormat } from '../utils/export';
 import { AIService } from '../services/ai';
-import { generateSmartTitle } from '../utils/documentAnalysis';
+import { generateTitleFromPrompt } from '../utils/documentAnalysis';
+import { fixAllCapitalization } from '../utils/fixAllCapitalization';
+import { fixSpacing } from '../utils/fixSpacing';
 
 import type { Tab } from '../state/store';
 
@@ -364,22 +367,22 @@ function PanelContent() {
       loadProjects();
     }
 
-    // When switching to Generate tab, move cursor to end (but can be overridden by manual click)
+    // When switching to Generate tab, just focus without moving cursor
+    // Let the user position the cursor where they want
     if (newTab === 'generate') {
       setTimeout(() => {
         const textarea = unifiedEditorRef.current?.getTextarea();
         if (textarea) {
-          const endPos = textarea.value.length;
-          textarea.setSelectionRange(endPos, endPos);
+          // Only move to end if cursor is at position 0 (likely first time)
+          const currentPos = textarea.selectionStart;
+          if (currentPos === 0 && textarea.value.length > 0) {
+            const endPos = textarea.value.length;
+            textarea.setSelectionRange(endPos, endPos);
+            console.log('[Panel] Switched to Generate - moved cursor to end (was at 0):', endPos);
+          } else {
+            console.log('[Panel] Switched to Generate - preserving cursor at:', currentPos);
+          }
           textarea.focus();
-          console.log('[Panel] Switched to Generate - cursor at end:', endPos);
-          
-          // Listen for manual cursor repositioning
-          const handleClick = () => {
-            console.log('[Panel] User manually repositioned cursor');
-            textarea.removeEventListener('click', handleClick);
-          };
-          textarea.addEventListener('click', handleClick, { once: true });
         }
       }, 100);
     }
@@ -607,8 +610,35 @@ function PanelContent() {
       setIsProcessing(false); // Re-enable editor after processing
       actions.setCurrentResult(result);
 
-      // Auto-generate title will happen after content is updated
-      // (moved to after streaming completes)
+      // Start AI title generation NOW (while we have user activation)
+      // Store the promise so we can await it later after content is updated
+      let titleGenerationPromise: Promise<string | null> | null = null;
+      
+      if (currentProject && isDefaultTitle(currentProject.title) && userPrompt) {
+        console.log('[Panel] Creating title generation promise...');
+        titleGenerationPromise = (async () => {
+          try {
+            console.log('[Panel] Calling AIService.generateTitle...');
+            const smartTitle = await AIService.generateTitle(userPrompt);
+            console.log('[Panel] AIService.generateTitle returned:', smartTitle);
+            if (smartTitle && smartTitle !== 'Untitled') {
+              console.log('[Panel] ✓ AI-generated title:', smartTitle);
+              return smartTitle;
+            }
+          } catch (error) {
+            console.error('[Panel] AI title generation ERROR:', error);
+            console.warn('[Panel] AI title generation failed, using smart extraction fallback');
+            // Fallback to extracting title from the user prompt
+            const fallbackTitle = generateTitleFromPrompt(userPrompt);
+            if (fallbackTitle && fallbackTitle !== 'Untitled') {
+              console.log('[Panel] ✓ Fallback title:', fallbackTitle);
+              return fallbackTitle;
+            }
+          }
+          return null;
+        })();
+        console.log('[Panel] Title generation promise created');
+      }
 
       // Create snapshot before replacement if we have a current project
       if (currentProject) {
@@ -665,27 +695,51 @@ function PanelContent() {
       if (operationType === 'generate') {
         if (textarea && capturedSelection) {
           try {
+            // Post-process AI output to fix formatting issues (newlines in poetry/songs)
+            const formattedResult = formatAIOutput(result);
+            
             // Check if there's a selection to replace
             const hasSelection = capturedSelection.start !== capturedSelection.end;
             const endPosition = hasSelection ? capturedSelection.end : capturedSelection.start;
 
-            // Check if we need to add a space before the generated text
-            // Add space if cursor is right after a non-whitespace character
+            // Smart spacing logic
             const charBefore =
               capturedSelection.start > 0 ? editorContent[capturedSelection.start - 1] : '';
-            const firstChar = result[0] || '';
-            const needsSpaceBefore =
-              charBefore && !/\s/.test(charBefore) && firstChar && !/\s/.test(firstChar);
-
-            // Check if we need to add a space after the generated text
+            const char2Before =
+              capturedSelection.start > 1 ? editorContent[capturedSelection.start - 2] : '';
+            const firstChar = formattedResult[0] || '';
+            const lastChar = formattedResult[formattedResult.length - 1] || '';
             const charAfter = endPosition < editorContent.length ? editorContent[endPosition] : '';
-            const lastChar = result[result.length - 1] || '';
+            
+            // Check if we need paragraph break (double newline) before generated text
+            // This happens when:
+            // 1. Previous content ends with sentence punctuation (. ! ?)
+            // 2. New content starts with a structural marker like (Verse, (Chorus, etc.
+            const previousContentEndsWithSentence = charBefore ? /[.!?]/.test(charBefore) : false;
+            const newContentStartsWithStructure = /^\s*\(/.test(formattedResult); // Starts with (
+            const needsParagraphBreak = previousContentEndsWithSentence && newContentStartsWithStructure;
+            
+            // Check if we already have newlines before cursor
+            const hasNewlineBefore = charBefore === '\n';
+            const hasDoubleNewlineBefore = charBefore === '\n' && char2Before === '\n';
+            
+            // Determine spacing before
+            let spacingBefore = '';
+            if (needsParagraphBreak && !hasDoubleNewlineBefore) {
+              // Add paragraph break (double newline) for structured content
+              spacingBefore = hasNewlineBefore ? '\n' : '\n\n';
+            } else if (charBefore && !/\s/.test(charBefore) && firstChar && !/\s/.test(firstChar)) {
+              // Add single space if needed
+              spacingBefore = ' ';
+            }
+            
+            // Determine spacing after
             const needsSpaceAfter =
               charAfter && !/\s/.test(charAfter) && lastChar && !/\s/.test(lastChar);
+            const spacingAfter = needsSpaceAfter ? ' ' : '';
 
-            // Add spaces if needed
-            const spacedResult =
-              (needsSpaceBefore ? ' ' : '') + result + (needsSpaceAfter ? ' ' : '');
+            // Add spacing
+            const spacedResult = spacingBefore + formattedResult + spacingAfter;
 
             // Store the content before streaming for undo history
             const contentBeforeGenerate = editorContent;
@@ -703,9 +757,35 @@ function PanelContent() {
                 const newContent = beforeSelection + currentText + afterSelection;
                 setEditorContent(newContent);
               },
-              () => {
-                // On complete, place cursor at end of inserted text OR select the text if replacing
-                const insertEnd = capturedSelection.start + spacedResult.length;
+              (actualInsertEnd) => {
+                // On complete, fix capitalization and spacing
+                let currentContent = textarea.value;
+                
+                // Fix capitalization
+                const fixedCapitalization = fixAllCapitalization(currentContent);
+                if (fixedCapitalization !== currentContent) {
+                  console.log('[Panel] Fixed capitalization after streaming');
+                  currentContent = fixedCapitalization;
+                }
+                
+                // Fix spacing (remove double spaces, etc.)
+                const fixedSpacing = fixSpacing(currentContent);
+                if (fixedSpacing !== currentContent) {
+                  console.log('[Panel] Fixed spacing after streaming');
+                  currentContent = fixedSpacing;
+                }
+                
+                // Update if anything changed
+                let finalContent = currentContent;
+                if (currentContent !== textarea.value) {
+                  textarea.value = currentContent;
+                  setEditorContent(currentContent);
+                  finalContent = currentContent;
+                }
+                
+                // Use actual insert end from smart insertion, or calculate if not provided
+                const insertEnd = actualInsertEnd ?? (capturedSelection.start + spacedResult.length);
+                console.log('[Panel] Insert end position:', insertEnd, 'from smart insertion:', !!actualInsertEnd);
                 textarea.focus();
 
                 if (hasSelection) {
@@ -724,11 +804,7 @@ function PanelContent() {
                   }
                 }
 
-                // Push to undo history AFTER streaming completes
-                const finalContent =
-                  contentBeforeGenerate.substring(0, capturedSelection.start) +
-                  spacedResult +
-                  contentBeforeGenerate.substring(endPosition);
+                // Push to undo history AFTER streaming completes (use fixed content!)
                 if (editorRef?.current) {
                   editorRef.current.pushToHistory(finalContent, insertEnd, insertEnd);
                   console.log('[Panel] Pushed AI generate to undo history');
@@ -737,19 +813,15 @@ function PanelContent() {
                 // Trigger auto-save/auto-create by calling handleEditorContentChange
                 handleEditorContentChange(finalContent);
 
-                // Auto-generate title using AI if project title is default (not customized)
-                if (currentProject && isDefaultTitle(currentProject.title) && userPrompt) {
+                // Apply AI-generated title if available
+                if (titleGenerationPromise) {
                   setTimeout(async () => {
                     try {
-                      // Use AI to generate a smart title based on prompt only
-                      const smartTitle = await AIService.generateTitle(userPrompt);
-                      if (smartTitle && smartTitle !== 'Untitled') {
-                        console.log('[Panel] AI-generated title:', smartTitle);
+                      const newTitle = await titleGenerationPromise;
+                      if (newTitle && currentProject) {
                         const updatedProject = await StorageService.updateProject(
                           currentProject.id,
-                          {
-                            title: smartTitle,
-                          }
+                          { title: newTitle }
                         );
                         if (updatedProject) {
                           setCurrentProject(updatedProject);
@@ -758,24 +830,7 @@ function PanelContent() {
                         }
                       }
                     } catch (error) {
-                      console.error('[Panel] Failed to AI-generate title, falling back to simple extraction:', error);
-                      // Fallback to simple title extraction
-                      const fallbackTitle = generateSmartTitle(finalContent);
-                      if (fallbackTitle && fallbackTitle !== 'Untitled') {
-                        try {
-                          const updatedProject = await StorageService.updateProject(
-                            currentProject.id,
-                            { title: fallbackTitle }
-                          );
-                          if (updatedProject) {
-                            setCurrentProject(updatedProject);
-                            currentProjectRef.current = updatedProject;
-                            await loadProjects();
-                          }
-                        } catch (e) {
-                          console.error('[Panel] Fallback title update failed:', e);
-                        }
-                      }
+                      console.error('[Panel] Failed to update title:', error);
                     }
                   }, 500);
                 }
@@ -841,7 +896,17 @@ function PanelContent() {
               editorRef?.current?.updateCapturedSelection(capturedSelection.start, newEnd);
             },
             () => {
-              // On complete, select the final text
+              // On complete, fix capitalization in the entire document
+              const currentContent = textarea.value;
+              const fixedContent = fixAllCapitalization(currentContent);
+              
+              if (fixedContent !== currentContent) {
+                console.log('[Panel] Fixed capitalization after streaming');
+                textarea.value = fixedContent;
+                setEditorContent(fixedContent);
+              }
+              
+              // Select the final text
               const newEnd = capturedSelection.start + spacedResult.length;
               textarea.focus();
               textarea.setSelectionRange(capturedSelection.start, newEnd);
@@ -851,11 +916,8 @@ function PanelContent() {
                 editorRef.current.updateCapturedSelection(capturedSelection.start, newEnd);
               }
 
-              // Push to undo history AFTER streaming completes
-              const finalContent =
-                contentBeforeRewrite.substring(0, capturedSelection.start) +
-                spacedResult +
-                contentBeforeRewrite.substring(capturedSelection.end);
+              // Push to undo history AFTER streaming completes (use fixed content)
+              const finalContent = fixedContent;
               if (editorRef?.current) {
                 editorRef.current.pushToHistory(finalContent, capturedSelection.start, newEnd);
                 console.log('[Panel] Pushed AI rewrite/summarize to undo history');
@@ -864,16 +926,14 @@ function PanelContent() {
               // Trigger auto-save/auto-create by calling handleEditorContentChange
               handleEditorContentChange(finalContent);
 
-              // Auto-generate title using AI if project title is default (not customized)
-              if (currentProject && isDefaultTitle(currentProject.title) && userPrompt) {
+              // Apply AI-generated title if available
+              if (titleGenerationPromise) {
                 setTimeout(async () => {
                   try {
-                    // Use AI to generate a smart title based on prompt only
-                    const smartTitle = await AIService.generateTitle(userPrompt);
-                    if (smartTitle && smartTitle !== 'Untitled') {
-                      console.log('[Panel] AI-generated title:', smartTitle);
+                    const newTitle = await titleGenerationPromise;
+                    if (newTitle && currentProject) {
                       const updatedProject = await StorageService.updateProject(currentProject.id, {
-                        title: smartTitle,
+                        title: newTitle,
                       });
                       if (updatedProject) {
                         setCurrentProject(updatedProject);
@@ -882,23 +942,7 @@ function PanelContent() {
                       }
                     }
                   } catch (error) {
-                    console.error('[Panel] Failed to AI-generate title, falling back to simple extraction:', error);
-                    // Fallback to simple title extraction
-                    const fallbackTitle = generateSmartTitle(finalContent);
-                    if (fallbackTitle && fallbackTitle !== 'Untitled') {
-                      try {
-                        const updatedProject = await StorageService.updateProject(currentProject.id, {
-                          title: fallbackTitle,
-                        });
-                        if (updatedProject) {
-                          setCurrentProject(updatedProject);
-                          currentProjectRef.current = updatedProject;
-                          await loadProjects();
-                        }
-                      } catch (e) {
-                        console.error('[Panel] Fallback title update failed:', e);
-                      }
-                    }
+                    console.error('[Panel] Failed to update title:', error);
                   }
                 }, 500);
               }

@@ -1,7 +1,7 @@
 {
   "name": "flint-chrome-extension",
   "version": "1.0.0",
-  "description": "Text generation, summarization, and rewriting with local AI for Chrome",
+  "description": "Flint - Local AI Writing Assistant for Chrome. Voice-to-text, smart rewriting, and text summarization using Chrome's built-in AI.",
   "type": "module",
   "scripts": {
     "dev": "vite build --watch --mode development",
@@ -59,10 +59,25 @@
   "keywords": [
     "chrome-extension",
     "ai",
+    "writing-assistant",
     "text-generation",
     "summarization",
-    "rewriting"
+    "rewriting",
+    "voice-to-text",
+    "local-ai",
+    "gemini-nano",
+    "chrome-ai",
+    "privacy",
+    "offline"
   ],
-  "author": "",
-  "license": "MIT"
+  "author": "Flint Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/flint-chrome-extension"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/flint-chrome-extension/issues"
+  },
+  "homepage": "https://github.com/yourusername/flint-chrome-extension#readme"
 }

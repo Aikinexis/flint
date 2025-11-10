@@ -75,6 +75,7 @@ export function Settings({
     dataManagement: true,
     appearance: false,
     voiceRecognition: false,
+    measurements: false,
     shortcuts: false,
     generatePanel: false,
     privacy: false,
@@ -1209,6 +1210,114 @@ export function Settings({
                   />
                 </span>
               </label>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Measurement Unit Section */}
+      <section
+        style={{
+          marginBottom: '24px',
+          paddingBottom: '24px',
+          borderBottom: '1px solid var(--border-muted)',
+        }}
+      >
+        <button
+          onClick={() => toggleSection('measurements')}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            marginBottom: expandedSections.measurements ? '16px' : '0',
+            cursor: 'pointer',
+            color: 'var(--text)',
+          }}
+          aria-expanded={expandedSections.measurements}
+          aria-controls="measurements-content"
+        >
+          <h3
+            style={{
+              fontSize: 'var(--fs-sm)',
+              fontWeight: 600,
+              color: 'var(--text)',
+              margin: 0,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
+            Measurements
+          </h3>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            style={{
+              transform: expandedSections.measurements ? 'rotate(90deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+            }}
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+
+        {expandedSections.measurements && (
+          <div id="measurements-content">
+            {/* Measurement unit selector */}
+            <div style={{ marginBottom: '16px' }}>
+              <label
+                htmlFor="measurement-unit-select"
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--fs-sm)',
+                  color: 'var(--text-muted)',
+                  marginBottom: '8px',
+                  fontWeight: 500,
+                }}
+              >
+                Unit system
+              </label>
+              <select
+                id="measurement-unit-select"
+                className="flint-input"
+                value={settings.measurementUnit || 'metric'}
+                onChange={(e) => updateSetting('measurementUnit', e.target.value as 'metric' | 'imperial')}
+                aria-label="Select measurement unit system"
+                style={{
+                  width: '100%',
+                  height: '48px',
+                  padding: '12px 40px 12px 16px',
+                  cursor: 'pointer',
+                  appearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 16px center',
+                  backgroundSize: '12px',
+                }}
+              >
+                <option value="metric">Metric (km, kg, °C, L)</option>
+                <option value="imperial">Imperial (mi, lb, °F, gal)</option>
+              </select>
+              <p
+                style={{
+                  fontSize: 'var(--fs-xs)',
+                  color: 'var(--text-muted)',
+                  marginTop: '8px',
+                  marginBottom: 0,
+                }}
+              >
+                The AI will use this unit system when generating content with measurements
+              </p>
             </div>
           </div>
         )}

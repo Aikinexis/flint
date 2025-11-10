@@ -3,6 +3,8 @@ import { CursorIndicator } from './CursorIndicator';
 import { SelectionOverlay } from './SelectionOverlay';
 import { expandToWordBoundaries } from '../utils/textSelection';
 import { useUndoRedo } from '../hooks/useUndoRedo';
+import { fixCapitalizationAroundCursor } from '../utils/fixAllCapitalization';
+import { smartInsertAtCursor } from '../utils/smartInsertion';
 
 /**
  * Selection range interface
@@ -253,34 +255,30 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
           endPos = startPos;
         }
 
-        const before = content.substring(0, startPos);
-        const after = content.substring(endPos);
-
         console.log('[UnifiedEditor] Insert/replace position:', startPos, '-', endPos);
         console.log('[UnifiedEditor] Content length before:', content.length);
 
-        // Insert with proper spacing (only if inserting, not replacing)
-        const needsSpaceBefore =
-          !replaceSelection && before.length > 0 && !before.endsWith('\n') && !before.endsWith(' ');
-        const needsSpaceAfter =
-          !replaceSelection &&
-          after.length > 0 &&
-          !after.startsWith('\n') &&
-          !after.startsWith(' ');
+        // Use smart insertion to handle overlaps and word boundaries
+        const { text: smartInsertedText, cursorPos: newCursorPosition } = smartInsertAtCursor(
+          content,
+          startPos,
+          text
+        );
+        
+        console.log('[UnifiedEditor] After smart insertion:', smartInsertedText.substring(0, 200));
+        
+        // Fix capitalization around the insertion point (not the whole document)
+        const newContent = fixCapitalizationAroundCursor(smartInsertedText, newCursorPosition, 500);
 
-        const spaceBefore = needsSpaceBefore ? ' ' : '';
-        const spaceAfter = needsSpaceAfter ? ' ' : '';
-        const textToInsert = spaceBefore + text + spaceAfter;
-        const newContent = before + textToInsert + after;
-
+        console.log('[UnifiedEditor] After capitalization fix:', newContent.substring(0, 200));
         console.log('[UnifiedEditor] New content length:', newContent.length);
 
         // Update content
         onContentChange(newContent);
 
-        // Calculate selection range (excluding added spaces)
-        const insertStart = startPos + spaceBefore.length;
-        const insertEnd = insertStart + text.length;
+        // Calculate selection range based on smart insertion
+        const insertStart = startPos;
+        const insertEnd = newCursorPosition;
 
         setTimeout(() => {
           textarea.focus();
@@ -307,14 +305,13 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
             });
           } else {
             // Just move cursor to end of inserted text
-            const newCursorPos = startPos + textToInsert.length;
-            textarea.setSelectionRange(newCursorPos, newCursorPos);
+            textarea.setSelectionRange(newCursorPosition, newCursorPosition);
 
             // Push to undo history (AI operation completed)
             undoRedoRef.current.pushState({
               content: newContent,
-              selectionStart: newCursorPos,
-              selectionEnd: newCursorPos,
+              selectionStart: newCursorPosition,
+              selectionEnd: newCursorPosition,
             });
           }
         }, 0);
@@ -414,7 +411,7 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
      * Handles selection change in textarea
      * Tracks cursor position and text selection
      */
-    const handleSelect = () => {
+    const handleSelect = async () => {
       if (!textareaRef.current) return;
 
       const start = textareaRef.current.selectionStart;
@@ -463,8 +460,23 @@ export const UnifiedEditor = forwardRef<UnifiedEditorRef, UnifiedEditorProps>(
 
         // Hide overlay locally but DON'T notify parent (preserves shared selection across tools)
         setShowSelectionOverlay(false);
-        // Reduced logging
-        // console.log('[UnifiedEditor] Cursor position captured:', { start, end });
+        
+        // Check if cursor is mid-sentence and show sentence boundary highlight
+        if (activeTool === 'generate' && content.trim()) {
+          const { isMidSentence, findNearestSentenceBoundary } = await import('../utils/sentenceBoundary');
+          if (isMidSentence(content, start)) {
+            const snappedPos = findNearestSentenceBoundary(content, start);
+            // Briefly highlight the sentence boundary
+            setCapturedSelection({ start: Math.max(0, snappedPos - 2), end: snappedPos });
+            setShowSelectionOverlay(true);
+            
+            // After 500ms, hide the highlight and restore cursor position
+            setTimeout(() => {
+              setCapturedSelection({ start, end });
+              setShowSelectionOverlay(false);
+            }, 500);
+          }
+        }
       }
     };
 

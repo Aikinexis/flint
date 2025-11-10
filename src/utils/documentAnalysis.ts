@@ -201,6 +201,37 @@ export function analyzeCursorContext(content: string, cursorPos: number): Cursor
 }
 
 /**
+ * Generates a smart title from a user prompt
+ * Extracts the key topic/subject from instructions like "write a document about X"
+ */
+export function generateTitleFromPrompt(prompt: string): string {
+  if (!prompt.trim()) {
+    return 'Untitled';
+  }
+
+  // Remove common instruction phrases
+  let cleaned = prompt
+    .toLowerCase()
+    .replace(/^(write|create|generate|draft|compose|make)\s+(a|an|the|me|some)?\s*/i, '')
+    .replace(/^(document|article|email|letter|post|blog|essay|report|paper)\s+(about|on|explaining|describing|discussing)?\s*/i, '')
+    .replace(/^(about|on|explaining|describing|discussing)\s+/i, '')
+    .trim();
+
+  // Capitalize first letter of each word
+  cleaned = cleaned
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+  // Limit length
+  if (cleaned.length > 50) {
+    cleaned = cleaned.slice(0, 47) + '...';
+  }
+
+  return cleaned || 'Untitled';
+}
+
+/**
  * Generates a smart title from document content
  * Uses first meaningful line or summarizes first paragraph
  */

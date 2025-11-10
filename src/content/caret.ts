@@ -7,6 +7,9 @@
  * @module content/caret
  */
 
+// NOTE: Capitalization fixes removed from content script to avoid ES module imports
+// Content scripts registered via chrome.scripting.registerContentScripts don't support imports
+
 /**
  * Represents a caret position in an editable element
  */
@@ -235,35 +238,43 @@ class CaretHandlerImpl implements CaretHandler {
         return await this.fallbackToClipboard(text, 'No active element found');
       }
 
+      // Get context for spacing
+      const context = this.getCursorContext(1000);
+      const beforeText = context?.before || '';
+
+      // Add spacing if needed
+      const spacing = beforeText && !beforeText.endsWith(' ') && !beforeText.endsWith('\n') ? ' ' : '';
+      const formattedText = spacing + text;
+
       // Handle textarea and input elements
       if (
         activeElement instanceof HTMLTextAreaElement ||
         activeElement instanceof HTMLInputElement
       ) {
-        const success = this.insertInTextarea(activeElement, text);
+        const success = this.insertInTextarea(activeElement, formattedText);
         if (success) {
           return { success: true, usedClipboard: false };
         }
         console.warn('[Flint] Direct insertion failed in textarea, using clipboard fallback');
-        return await this.fallbackToClipboard(text, 'Direct insertion failed in textarea');
+        return await this.fallbackToClipboard(formattedText, 'Direct insertion failed in textarea');
       }
 
       // Handle contenteditable elements
       if (this.isContentEditable(activeElement)) {
-        const success = this.insertInContentEditable(text);
+        const success = this.insertInContentEditable(formattedText);
         if (success) {
           return { success: true, usedClipboard: false };
         }
         console.warn(
           '[Flint] Direct insertion failed in contenteditable, using clipboard fallback'
         );
-        return await this.fallbackToClipboard(text, 'Direct insertion failed in contenteditable');
+        return await this.fallbackToClipboard(formattedText, 'Direct insertion failed in contenteditable');
       }
 
       // Element doesn't support direct insertion
       console.warn('[Flint] Element does not support direct insertion, using clipboard fallback');
       return await this.fallbackToClipboard(
-        text,
+        formattedText,
         'Unsupported editor type (e.g., Google Docs, complex editors)'
       );
     } catch (error) {

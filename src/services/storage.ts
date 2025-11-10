@@ -79,6 +79,11 @@ export interface GenerateSettings {
 }
 
 /**
+ * Measurement unit system
+ */
+export type MeasurementUnit = 'metric' | 'imperial';
+
+/**
  * Settings interface for user preferences
  */
 export interface Settings {
@@ -90,6 +95,7 @@ export interface Settings {
   autoCorrectEnabled?: boolean; // Auto-correct spelling and grammar after typing pause
   autoCorrectDelay?: number; // Delay in milliseconds before auto-correct triggers (default 3000)
   undoHistoryLimit?: number; // Maximum number of undo steps to keep (default 50)
+  measurementUnit?: MeasurementUnit; // Measurement unit system (metric or imperial)
 }
 
 /**
@@ -103,6 +109,7 @@ const DEFAULT_SETTINGS: Settings = {
   autoCorrectEnabled: false, // Off by default
   autoCorrectDelay: 3000, // 3 seconds
   undoHistoryLimit: 10, // Default 10 undo steps
+  measurementUnit: 'metric', // Default to metric, will be auto-detected on first load
 };
 
 /**
@@ -119,10 +126,26 @@ class StorageServiceBase {
     try {
       const result = await chrome.storage.local.get(this.SETTINGS_KEY);
       if (result[this.SETTINGS_KEY]) {
-        // Merge with defaults to handle new settings added in updates
-        return { ...DEFAULT_SETTINGS, ...result[this.SETTINGS_KEY] };
+        const settings = { ...DEFAULT_SETTINGS, ...result[this.SETTINGS_KEY] };
+        
+        // Auto-detect measurement unit on first load if not set
+        if (!settings.measurementUnit) {
+          const { detectMeasurementUnit } = await import('../utils/location');
+          settings.measurementUnit = detectMeasurementUnit();
+          // Save the detected unit
+          await this.saveSettings(settings);
+        }
+        
+        return settings;
       }
-      return DEFAULT_SETTINGS;
+      
+      // First time setup - detect measurement unit
+      const defaultSettings = { ...DEFAULT_SETTINGS };
+      const { detectMeasurementUnit } = await import('../utils/location');
+      defaultSettings.measurementUnit = detectMeasurementUnit();
+      await this.saveSettings(defaultSettings);
+      
+      return defaultSettings;
     } catch (error) {
       console.error('[Storage] Failed to get settings:', error);
       return DEFAULT_SETTINGS;

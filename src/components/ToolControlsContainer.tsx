@@ -7,6 +7,7 @@ import {
   analyzeCursorContext,
   buildContextInstructions,
 } from '../utils/documentAnalysis';
+import lengthIconUrl from '../assets/sort-amount-up-svgrepo-com.svg';
 
 /**
  * Tool type for the active tool
@@ -280,20 +281,6 @@ export function ToolControlsContainer({
   }, []);
 
   /**
-   * Gets the label for the current length selection
-   */
-  const getLengthLabel = (length: 'short' | 'medium' | 'long'): string => {
-    switch (length) {
-      case 'short':
-        return 'Short';
-      case 'medium':
-        return 'Med';
-      case 'long':
-        return 'Long';
-    }
-  };
-
-  /**
    * Handles stop button click - cancels ongoing AI operation
    */
   const handleStop = () => {
@@ -387,9 +374,38 @@ export function ToolControlsContainer({
       }
       // Use enhanced context-aware generation if enabled
       else if (capturedSelection && settings.contextAwarenessEnabled && content.trim()) {
-        const cursorPos = capturedSelection.start;
+        let cursorPos = capturedSelection.start;
+        
+        // Snap to nearest sentence boundary if mid-sentence
+        const { isMidSentence, findNearestSentenceBoundary } = await import('../utils/sentenceBoundary');
+        if (isMidSentence(content, cursorPos)) {
+          const snappedPos = findNearestSentenceBoundary(content, cursorPos);
+          console.log(`[Generate] Cursor mid-sentence at ${cursorPos}, snapping to sentence boundary at ${snappedPos}`);
+          cursorPos = snappedPos;
+          
+          // Update the captured selection and show visual feedback
+          if (editorRef?.current) {
+            // Highlight the sentence ending punctuation briefly
+            let punctuationPos = snappedPos - 1;
+            while (punctuationPos >= 0 && /\s/.test(content[punctuationPos] || '')) {
+              punctuationPos--;
+            }
+            
+            // Select from punctuation to snapped position to show where we snapped
+            editorRef.current.updateCapturedSelection(Math.max(0, snappedPos - 2), snappedPos);
+            editorRef.current.showSelectionOverlay();
+            
+            // After a brief moment, move cursor to the snapped position
+            setTimeout(() => {
+              if (editorRef?.current) {
+                editorRef.current.updateCapturedSelection(snappedPos, snappedPos);
+                editorRef.current.hideSelectionOverlay();
+              }
+            }, 300);
+          }
+        }
 
-        console.log('[Generate] Using enhanced context engine');
+        console.log('[Generate] Using enhanced context engine at position', cursorPos);
         result = await AIService.generateWithEnhancedContext(
           effectivePrompt,
           content,
@@ -671,6 +687,44 @@ export function ToolControlsContainer({
     }
   };
 
+  // Audio monitoring refs
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioLevelIntervalRef = useRef<number | null>(null);
+
+  /**
+   * Starts audio level monitoring using Web Audio API
+   */
+  const startAudioLevelMonitoring = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioContextRef.current = new AudioContext();
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      source.connect(analyserRef.current);
+      analyserRef.current.fftSize = 256;
+
+      // Audio level monitoring removed - no longer needed
+    } catch (error) {
+      console.error('[ToolControls] Failed to start audio monitoring:', error);
+    }
+  };
+
+  /**
+   * Stops audio level monitoring
+   */
+  const stopAudioLevelMonitoring = () => {
+    if (audioLevelIntervalRef.current !== null) {
+      clearInterval(audioLevelIntervalRef.current);
+      audioLevelIntervalRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+  };
+
   /**
    * Handles voice recording toggle
    * Transcribes into editor if it has focus, otherwise into prompt box
@@ -694,6 +748,7 @@ export function ToolControlsContainer({
         speechRecognitionRef.current.stop();
       }
       setIsRecording(false);
+      stopAudioLevelMonitoring();
     } else {
       const SpeechRecognition =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -702,6 +757,9 @@ export function ToolControlsContainer({
         onOperationError?.('Speech recognition is not supported in this browser');
         return;
       }
+
+      // Start audio monitoring
+      startAudioLevelMonitoring();
 
       const recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
@@ -712,6 +770,7 @@ export function ToolControlsContainer({
       // Track accumulated transcript
       let accumulatedTranscript = '';
       let lastResultTime = Date.now();
+      let lastTarget: 'editor' | 'prompt' | null = null; // Track where we last inserted
 
       recognition.onresult = (event: any) => {
         let finalTranscript = '';
@@ -743,6 +802,25 @@ export function ToolControlsContainer({
         if (finalTranscript) {
           // Check current focus dynamically (allows switching during recording)
           const shouldInsertInEditor = lastFocusedElementRef.current === 'editor';
+          const currentTarget = shouldInsertInEditor ? 'editor' : 'prompt';
+
+          console.log('[Voice] finalTranscript:', finalTranscript);
+          console.log('[Voice] accumulatedTranscript:', accumulatedTranscript);
+          console.log('[Voice] currentTarget:', currentTarget);
+          console.log('[Voice] lastTarget:', lastTarget);
+
+          // Use the full finalTranscript (which is the current phrase)
+          const textToInsert = finalTranscript;
+          
+          // If target changed, reset accumulated transcript
+          if (lastTarget !== null && lastTarget !== currentTarget) {
+            // Reset accumulated transcript when switching targets
+            accumulatedTranscript = '';
+            console.log('[Voice] Target changed! Starting fresh.');
+          }
+
+          lastTarget = currentTarget;
+          console.log('[Voice] textToInsert:', textToInsert);
 
           // Smart formatting helper
           const formatTranscript = (
@@ -791,7 +869,7 @@ export function ToolControlsContainer({
 
               if (hasSelection) {
                 // Replace selection - just capitalize, no extra formatting
-                let formattedText = finalTranscript.trim();
+                let formattedText = textToInsert.trim();
                 if (formattedText.length > 0) {
                   formattedText = formattedText.charAt(0).toUpperCase() + formattedText.slice(1);
                 }
@@ -799,14 +877,15 @@ export function ToolControlsContainer({
               } else {
                 // Insert at cursor with smart formatting
                 const cursorPos = textarea.selectionStart;
-                const formattedText = formatTranscript(finalTranscript, content, cursorPos);
+                const formattedText = formatTranscript(textToInsert, content, cursorPos);
                 editorRef.current.insertAtCursor(formattedText, false, false); // selectAfterInsert = false (cursor to end)
               }
+              // Reset accumulated transcript for editor (each phrase inserted separately)
               accumulatedTranscript = '';
             }
           } else {
-            // Insert into prompt box (simpler formatting)
-            let formattedText = finalTranscript.trim();
+            // Insert into prompt box - use textToInsert (which is just the NEW text)
+            let formattedText = textToInsert.trim();
 
             // Capitalize first letter
             if (formattedText.length > 0) {
@@ -821,15 +900,18 @@ export function ToolControlsContainer({
                   ? customPromptInputRef.current
                   : summaryPromptInputRef.current;
 
-            if (promptInput && promptInput.selectionStart !== promptInput.selectionEnd) {
-              // Replace selected text in prompt box
-              const start = promptInput.selectionStart || 0;
-              const end = promptInput.selectionEnd || 0;
-              const currentValue =
-                tool === 'generate' ? prompt : tool === 'rewrite' ? customPrompt : summaryPrompt;
-              const newValue =
-                currentValue.substring(0, start) + formattedText + currentValue.substring(end);
-
+            // ALWAYS append to prompt (don't check for selection)
+            // This ensures transcription always concatenates
+            {
+              // Get current value from input (not from state which may be stale)
+              const currentValue = promptInput?.value || '';
+              const needsSpace = currentValue.length > 0 && !currentValue.endsWith(' ');
+              const newValue = currentValue + (needsSpace ? ' ' : '') + formattedText;
+              
+              console.log('[Voice] Prompt BEFORE:', currentValue);
+              console.log('[Voice] Prompt AFTER:', newValue);
+              
+              // APPEND to prompt (not replace) - concatenate like in editor
               if (tool === 'generate') {
                 setPrompt(newValue);
               } else if (tool === 'rewrite') {
@@ -838,30 +920,14 @@ export function ToolControlsContainer({
                 setSummaryPrompt(newValue);
               }
 
-              // Set cursor after inserted text
+              // Auto-scroll input to show the newest text (scroll to end)
               setTimeout(() => {
                 if (promptInput) {
-                  promptInput.setSelectionRange(
-                    start + formattedText.length,
-                    start + formattedText.length
-                  );
+                  promptInput.scrollLeft = promptInput.scrollWidth;
                 }
               }, 0);
-            } else {
-              // Append to prompt box
-              if (tool === 'generate') {
-                const needsSpace = prompt.length > 0 && !prompt.endsWith(' ');
-                setPrompt(prompt + (needsSpace ? ' ' : '') + formattedText);
-              } else if (tool === 'rewrite') {
-                const needsSpace = customPrompt.length > 0 && !customPrompt.endsWith(' ');
-                setCustomPrompt(customPrompt + (needsSpace ? ' ' : '') + formattedText);
-              } else {
-                const needsSpace = summaryPrompt.length > 0 && !summaryPrompt.endsWith(' ');
-                setSummaryPrompt(summaryPrompt + (needsSpace ? ' ' : '') + formattedText);
-              }
             }
-
-            // Reset accumulated transcript after insertion
+            // Reset accumulated transcript for prompt bar too (each phrase appended separately)
             accumulatedTranscript = '';
           }
         }
@@ -877,17 +943,6 @@ export function ToolControlsContainer({
 
       recognition.onend = () => {
         setIsRecording(false);
-      };
-
-      // Auto-stop after 30 seconds (increased from default ~5 seconds)
-      const autoStopTimeout = setTimeout(() => {
-        if (speechRecognitionRef.current) {
-          speechRecognitionRef.current.stop();
-        }
-      }, 30000);
-
-      recognition.onstop = () => {
-        clearTimeout(autoStopTimeout);
       };
 
       try {
@@ -1099,7 +1154,7 @@ export function ToolControlsContainer({
                 zIndex: 10000,
               }}
             >
-              {(['short', 'medium', 'long'] as const).map((length, index, arr) => (
+              {(['long', 'medium', 'short'] as const).map((length, index, arr) => (
                 <button
                   key={length}
                   onClick={() => {
@@ -1128,7 +1183,8 @@ export function ToolControlsContainer({
             </div>
           )}
 
-          <input
+          <div style={{ position: 'relative' }}>
+            <input
             ref={promptInputRef}
             type="text"
             className="flint-input"
@@ -1148,9 +1204,10 @@ export function ToolControlsContainer({
             style={{
               width: '100%',
               height: '48px',
-              padding: '0 140px 0 52px',
+              padding: prompt.trim() ? '0 180px 0 52px' : '0 140px 0 52px',
             }}
           />
+          </div>
 
           {/* Inline buttons */}
           <div
@@ -1160,9 +1217,49 @@ export function ToolControlsContainer({
               right: '8px',
               transform: 'translateY(-50%)',
               display: 'flex',
-              gap: '4px',
+              gap: '2px',
+              alignItems: 'center',
             }}
           >
+            {/* Clear button */}
+            {prompt.trim() && (
+              <button
+                className="flint-btn ghost"
+                onClick={() => {
+                  setPrompt('');
+                  promptInputRef.current?.focus();
+                }}
+                disabled={isProcessing}
+                aria-label="Clear prompt"
+                title="Clear"
+                style={{
+                  width: '18px',
+                  height: '18px',
+                  padding: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: 'none',
+                  boxShadow: 'none',
+                  background: 'transparent',
+                }}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+
             <button
               className="flint-btn ghost"
               onClick={() => setShowLengthDropdown(!showLengthDropdown)}
@@ -1172,21 +1269,18 @@ export function ToolControlsContainer({
               aria-haspopup="true"
               title={`Length: ${selectedLength}`}
               style={{
-                width: 'auto',
-                minWidth: '50px',
-                height: '36px',
-                padding: '0 12px',
+                width: '24px',
+                height: '24px',
+                padding: '0',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 border: 'none',
                 boxShadow: 'none',
                 background: 'transparent',
-                fontSize: '13px',
-                fontWeight: 500,
               }}
             >
-              {getLengthLabel(selectedLength)}
+              <img src={lengthIconUrl} alt="" style={{ width: '13.6px', height: '13.6px', filter: 'invert(1)' }} />
             </button>
 
             <button
@@ -1357,26 +1451,42 @@ export function ToolControlsContainer({
             </div>
           )}
 
-          <input
-            ref={customPromptInputRef}
-            type="text"
-            className="flint-input"
-            placeholder="Rewrite"
-            value={customPrompt}
-            onChange={(e) => setCustomPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleRewrite();
-              }
-            }}
-            disabled={isProcessing}
-            style={{
-              width: '100%',
-              height: '48px',
-              padding: '0 100px 0 48px',
-            }}
-          />
+          <div style={{ position: 'relative' }}>
+            {/* Audio Wave Visualizer - shown ON TOP of prompt bar when recording */}
+            {isRewriteRecording && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '100%',
+                  left: 0,
+                  right: 0,
+                  marginBottom: '4px',
+                }}
+              >
+              </div>
+            )}
+
+            <input
+              ref={customPromptInputRef}
+              type="text"
+              className="flint-input"
+              placeholder="Rewrite"
+              value={customPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleRewrite();
+                }
+              }}
+              disabled={isProcessing}
+              style={{
+                width: '100%',
+                height: '48px',
+                padding: customPrompt.trim() ? '0 140px 0 48px' : '0 100px 0 48px',
+              }}
+            />
+          </div>
 
           {/* Inline buttons */}
           <div
@@ -1386,9 +1496,50 @@ export function ToolControlsContainer({
               right: '8px',
               transform: 'translateY(-50%)',
               display: 'flex',
-              gap: '4px',
+              gap: '2px',
+              alignItems: 'center',
             }}
           >
+            {/* Clear button */}
+            {customPrompt.trim() && (
+              <button
+                className="flint-btn ghost"
+                onClick={() => {
+                  setCustomPrompt('');
+                  setSelectedPreset('');
+                  customPromptInputRef.current?.focus();
+                }}
+                disabled={isProcessing}
+                aria-label="Clear prompt"
+                title="Clear"
+                style={{
+                  width: '18px',
+                  height: '18px',
+                  padding: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: 'none',
+                  boxShadow: 'none',
+                  background: 'transparent',
+                }}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+
             <button
               className={`flint-btn ${isRewriteRecording ? 'recording' : 'ghost'}`}
               onClick={() => handleVoiceToggle('rewrite')}
@@ -1477,7 +1628,7 @@ export function ToolControlsContainer({
 
       {/* Summarize Controls */}
       {activeTool === 'summarize' && (
-        <div>
+        <div style={{ position: 'relative' }}>
           {/* Top row: Summary Type and Reading Level dropdowns */}
           <div
             style={{
@@ -1666,8 +1817,23 @@ export function ToolControlsContainer({
 
           {/* Prompt input with inline controls */}
           <div style={{ position: 'relative' }}>
-            <input
-              ref={summaryPromptInputRef}
+            <div style={{ position: 'relative' }}>
+              {/* Audio Wave Visualizer - shown ON TOP of prompt bar when recording */}
+              {isSummarizeRecording && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '100%',
+                    left: 0,
+                    right: 0,
+                    marginBottom: '4px',
+                  }}
+                >
+                </div>
+              )}
+
+              <input
+                ref={summaryPromptInputRef}
               type="text"
               className="flint-input"
               placeholder="Summarise"
@@ -1683,9 +1849,10 @@ export function ToolControlsContainer({
               style={{
                 width: '100%',
                 height: '48px',
-                padding: '0 180px 0 12px',
+                padding: summaryPrompt.trim() ? '0 220px 0 12px' : '0 180px 0 12px',
               }}
             />
+            </div>
 
             {/* Inline buttons */}
             <div
@@ -1695,9 +1862,49 @@ export function ToolControlsContainer({
                 right: '8px',
                 transform: 'translateY(-50%)',
                 display: 'flex',
-                gap: '4px',
+                gap: '2px',
+                alignItems: 'center',
               }}
             >
+              {/* Clear button */}
+              {summaryPrompt.trim() && (
+                <button
+                  className="flint-btn ghost"
+                  onClick={() => {
+                    setSummaryPrompt('');
+                    summaryPromptInputRef.current?.focus();
+                  }}
+                  disabled={isProcessing}
+                  aria-label="Clear prompt"
+                  title="Clear"
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    padding: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: 'none',
+                    boxShadow: 'none',
+                    background: 'transparent',
+                  }}
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
+
               {/* Length dropdown */}
               <button
                 className="flint-btn ghost"
@@ -1710,22 +1917,18 @@ export function ToolControlsContainer({
                 aria-haspopup="true"
                 title={`Length: ${summaryLength}`}
                 style={{
-                  width: 'auto',
-                  minWidth: '50px',
-                  height: '36px',
-                  padding: '0 12px',
+                  width: '24px',
+                  height: '24px',
+                  padding: '0',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   border: 'none',
                   boxShadow: 'none',
                   background: 'transparent',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  textTransform: 'capitalize',
                 }}
               >
-                {summaryLength}
+                <img src={lengthIconUrl} alt="" style={{ width: '13.6px', height: '13.6px', filter: 'invert(1)' }} />
               </button>
 
               {showSummaryLengthDropdown && (
@@ -1744,7 +1947,7 @@ export function ToolControlsContainer({
                     minWidth: '100px',
                   }}
                 >
-                  {(['short', 'medium', 'long'] as const).map((length, index, arr) => (
+                  {(['long', 'medium', 'short'] as const).map((length, index, arr) => (
                     <button
                       key={length}
                       onClick={() => {

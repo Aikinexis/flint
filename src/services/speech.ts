@@ -39,6 +39,10 @@ export class SpeechService {
   private onPartialResultCallback: ((text: string) => void) | null = null;
   private onFinalResultCallback: ((text: string, confidence: number) => void) | null = null;
   private onErrorCallback: ((error: SpeechError, message: string) => void) | null = null;
+  private onAudioLevelCallback: ((level: number) => void) | null = null;
+  
+  // Accumulated transcript
+  private accumulatedTranscript = '';
 
   /**
    * Checks if speech recognition is supported in the browser
@@ -64,6 +68,9 @@ export class SpeechService {
     }
 
     try {
+      // Reset accumulated transcript
+      this.accumulatedTranscript = '';
+      
       // Create recognition instance
       const SpeechRecognition =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -85,6 +92,9 @@ export class SpeechService {
 
       // Set up no-speech timeout
       this.startNoSpeechTimeout();
+      
+      // Start audio level monitoring
+      this.startAudioLevelMonitoring();
     } catch (error) {
       console.error('[Speech] Failed to start recognition:', error);
       this.handleError('unknown', 'Failed to start speech recognition');
@@ -103,6 +113,7 @@ export class SpeechService {
       this.recognition.stop();
       this.isRecording = false;
       this.clearNoSpeechTimeout();
+      this.stopAudioLevelMonitoring();
     } catch (error) {
       console.error('[Speech] Failed to stop recognition:', error);
     }
@@ -141,6 +152,14 @@ export class SpeechService {
   }
 
   /**
+   * Sets callback for audio level updates
+   * @param callback - Function to call with audio level (0-1)
+   */
+  onAudioLevel(callback: (level: number) => void): void {
+    this.onAudioLevelCallback = callback;
+  }
+
+  /**
    * Sets up event handlers for speech recognition
    */
   private setupEventHandlers(): void {
@@ -150,7 +169,10 @@ export class SpeechService {
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
       this.clearNoSpeechTimeout();
 
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      // Build the full transcript from all final results
+      let interimTranscript = '';
+      
+      for (let i = 0; i < event.results.length; i++) {
         const result = event.results[i];
         if (!result || result.length === 0) continue;
 
@@ -158,18 +180,32 @@ export class SpeechService {
         if (!alternative) continue;
 
         const transcript = alternative.transcript;
-        const confidence = alternative.confidence;
 
         if (result.isFinal) {
-          // Final result
-          if (this.onFinalResultCallback) {
-            this.onFinalResultCallback(transcript, confidence);
+          // Accumulate final results
+          if (i >= event.resultIndex) {
+            this.accumulatedTranscript += (this.accumulatedTranscript ? ' ' : '') + transcript;
           }
         } else {
-          // Partial result
-          if (this.onPartialResultCallback) {
-            this.onPartialResultCallback(transcript);
-          }
+          // Collect interim results
+          interimTranscript += transcript;
+        }
+      }
+
+      // Send partial result (accumulated + interim)
+      if (interimTranscript && this.onPartialResultCallback) {
+        const fullPartial = this.accumulatedTranscript 
+          ? this.accumulatedTranscript + ' ' + interimTranscript 
+          : interimTranscript;
+        this.onPartialResultCallback(fullPartial);
+      }
+
+      // Send final result if we have accumulated text
+      const lastResult = event.results[event.results.length - 1];
+      if (this.accumulatedTranscript && lastResult?.isFinal) {
+        if (this.onFinalResultCallback) {
+          const confidence = lastResult[0]?.confidence ?? 0.95;
+          this.onFinalResultCallback(this.accumulatedTranscript, confidence);
         }
       }
 
@@ -281,6 +317,52 @@ export class SpeechService {
   }
 
   /**
+   * Starts audio level monitoring using Web Audio API
+   */
+  private audioContext: AudioContext | null = null;
+  private analyser: AnalyserNode | null = null;
+  private audioLevelInterval: number | null = null;
+
+  private async startAudioLevelMonitoring(): Promise<void> {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.audioContext = new AudioContext();
+      this.analyser = this.audioContext.createAnalyser();
+      const source = this.audioContext.createMediaStreamSource(stream);
+      source.connect(this.analyser);
+      this.analyser.fftSize = 256;
+      
+      const bufferLength = this.analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      
+      this.audioLevelInterval = window.setInterval(() => {
+        if (!this.analyser) return;
+        this.analyser.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((a, b) => a + b) / bufferLength;
+        const level = average / 255; // Normalize to 0-1
+        
+        if (this.onAudioLevelCallback) {
+          this.onAudioLevelCallback(level);
+        }
+      }, 50); // Update every 50ms
+    } catch (error) {
+      console.error('[Speech] Failed to start audio monitoring:', error);
+    }
+  }
+
+  private stopAudioLevelMonitoring(): void {
+    if (this.audioLevelInterval !== null) {
+      clearInterval(this.audioLevelInterval);
+      this.audioLevelInterval = null;
+    }
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+    this.analyser = null;
+  }
+
+  /**
    * Cleans up resources
    */
   cleanup(): void {
@@ -289,6 +371,8 @@ export class SpeechService {
     this.onPartialResultCallback = null;
     this.onFinalResultCallback = null;
     this.onErrorCallback = null;
+    this.onAudioLevelCallback = null;
+    this.accumulatedTranscript = '';
   }
 }
 

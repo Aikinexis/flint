@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Cursor Context Awareness</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+    .test-case { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+    .test-case h3 { margin-top: 0; }
+    .example { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; }
+    .cursor { background: #ff0; padding: 2px 4px; font-weight: bold; }
+    .expected { color: #0a0; }
+    .issue { color: #d00; }
+  </style>
+</head>
+<body>
+  <h1>Cursor Context Awareness Test Cases</h1>
+  
+  <div class="test-case">
+    <h3>Test 1: Cursor in middle of sentence</h3>
+    <div class="example">
+      <strong>Document:</strong><br>
+      "The quick brown fox <span class="cursor">|</span> over the lazy dog."
+    </div>
+    <p><strong>User prompt:</strong> "jumped"</p>
+    <p class="expected"><strong>Expected output:</strong> "jumped"</p>
+    <p><strong>Why:</strong> AI should understand it's completing a sentence and generate a single word that fits grammatically.</p>
+  </div>
+
+  <div class="test-case">
+    <h3>Test 2: Cursor in middle of word</h3>
+    <div class="example">
+      <strong>Document:</strong><br>
+      "The quick brown fox jum<span class="cursor">|</span>ped over the lazy dog."
+    </div>
+    <p><strong>User prompt:</strong> "continue"</p>
+    <p class="expected"><strong>Expected output:</strong> Should recognize the word is already complete and not add anything, or add a space and continue the sentence.</p>
+    <p><strong>Why:</strong> AI needs to see the partial word "jum" before cursor and "ped" after to understand context.</p>
+  </div>
+
+  <div class="test-case">
+    <h3>Test 3: Cursor at end of sentence</h3>
+    <div class="example">
+      <strong>Document:</strong><br>
+      "The quick brown fox jumped over the lazy dog.<span class="cursor">|</span>"
+    </div>
+    <p><strong>User prompt:</strong> "continue"</p>
+    <p class="expected"><strong>Expected output:</strong> Should start a new sentence or add to the paragraph naturally.</p>
+    <p><strong>Why:</strong> AI should see the period before cursor and know to start fresh.</p>
+  </div>
+
+  <div class="test-case">
+    <h3>Test 4: Cursor after comma</h3>
+    <div class="example">
+      <strong>Document:</strong><br>
+      "The quick brown fox jumped,<span class="cursor">|</span> over the lazy dog."
+    </div>
+    <p><strong>User prompt:</strong> "add transition"</p>
+    <p class="expected"><strong>Expected output:</strong> Should add text that flows with the comma (e.g., " and then landed").</p>
+    <p><strong>Why:</strong> AI needs to understand punctuation context.</p>
+  </div>
+
+  <div class="test-case">
+    <h3>Current Issue</h3>
+    <p class="issue">
+      The context engine splits context at the <strong>midpoint</strong> of the local window, not at the actual cursor position.
+      This means the AI doesn't know exactly where to insert text.
+    </p>
+    <p><strong>Example:</strong></p>
+    <div class="example">
+      <strong>Cursor position:</strong> 20 (middle of "fox")<br>
+      <strong>Local context:</strong> "The quick brown fox jumped over the lazy dog" (46 chars)<br>
+      <strong>Current split:</strong> Midpoint at 23<br>
+      - Before: "The quick brown fox jum"<br>
+      - After: "ped over the lazy dog"<br>
+      <br>
+      <strong>Correct split:</strong> At cursor position 20<br>
+      - Before: "The quick brown fo"<br>
+      - After: "x jumped over the lazy dog"
+    </p>
+  </div>
+
+  <div class="test-case">
+    <h3>Solution</h3>
+    <p>Modify <code>formatContextForPrompt</code> to:</p>
+    <ol>
+      <li>Accept the actual cursor position within the local context</li>
+      <li>Split at the exact cursor position, not midpoint</li>
+      <li>Add a clear marker like <code>[CURSOR]</code> or explicit labeling</li>
+      <li>Ensure AI understands text should be inserted at that exact point</li>
+    </ol>
+  </div>
+</body>
+</html>

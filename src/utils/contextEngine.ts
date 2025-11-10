@@ -18,6 +18,7 @@ export interface ContextChunk {
  */
 export interface AssembledContext {
   localContext: string;
+  cursorOffset: number; // Position of cursor within localContext
   relatedSections: string[];
   totalChars: number;
 }
@@ -37,12 +38,18 @@ export interface ContextEngineOptions {
  * @param text - Full document text
  * @param cursor - Cursor position
  * @param window - Characters to extract in each direction (default: 800)
- * @returns Local context string
+ * @returns Object with local context and cursor position within that context
  */
-export function getLocalContext(text: string, cursor: number, window = 800): string {
+export function getLocalContext(
+  text: string,
+  cursor: number,
+  window = 800
+): { text: string; cursorOffset: number } {
   const start = Math.max(0, cursor - window);
   const end = Math.min(text.length, cursor + window);
-  return text.slice(start, end);
+  const contextText = text.slice(start, end);
+  const cursorOffset = cursor - start; // Position of cursor within the extracted context
+  return { text: contextText, cursorOffset };
 }
 
 /**
@@ -201,15 +208,19 @@ export function assembleContext(
     enableDeduplication = true,
   } = options;
 
-  // 1. Extract local context (immediate surroundings)
-  const localContext = getLocalContext(fullText, cursorPos, localWindow);
+  // 1. Extract local context (immediate surroundings) with cursor position
+  const { text: localContextText, cursorOffset } = getLocalContext(
+    fullText,
+    cursorPos,
+    localWindow
+  );
 
   // 2. Get relevant sections from rest of document
   let relatedSections: string[] = [];
 
   if (enableRelevanceScoring && fullText.length > localWindow * 2) {
     // Only do relevance scoring if document is large enough
-    const relevantChunks = getRelevantSections(fullText, localContext, maxRelatedSections * 2);
+    const relevantChunks = getRelevantSections(fullText, localContextText, maxRelatedSections * 2);
 
     // 3. Remove duplicates
     const uniqueChunks = enableDeduplication
@@ -222,10 +233,11 @@ export function assembleContext(
 
   // Calculate total characters
   const totalChars =
-    localContext.length + relatedSections.reduce((sum, s) => sum + s.length, 0);
+    localContextText.length + relatedSections.reduce((sum, s) => sum + s.length, 0);
 
   return {
-    localContext,
+    localContext: localContextText,
+    cursorOffset,
     relatedSections,
     totalChars,
   };
@@ -245,22 +257,31 @@ export function formatContextForPrompt(
 
   // Add local context (always included)
   if (context.localContext.trim()) {
-    // Split into before/after cursor if possible
-    const midpoint = Math.floor(context.localContext.length / 2);
-    const before = context.localContext.slice(0, midpoint).trim();
-    const after = context.localContext.slice(midpoint).trim();
+    // Split at the ACTUAL cursor position, not midpoint
+    const before = context.localContext.slice(0, context.cursorOffset);
+    const after = context.localContext.slice(context.cursorOffset);
 
-    if (before) {
-      formatted += `[CONTEXT BEFORE CURSOR]\n${before}\n\n`;
-    }
-    if (after) {
-      formatted += `[CONTEXT AFTER CURSOR]\n${after}\n\n`;
+    // Get last few words before cursor and first few words after for emphasis
+    const lastWords = before.trim().split(/\s+/).slice(-5).join(' ');
+    const nextWords = after.trim().split(/\s+/).slice(0, 5).join(' ');
+
+    // Always show both before and after, even if one is empty
+    formatted += `CONTEXT BEFORE CURSOR:\n${before || '[Start of document]'}\n\n`;
+    formatted += `CONTEXT AFTER CURSOR:\n${after || '[End of document]'}\n\n`;
+    
+    // Provide algorithmic steps for cursor insertion
+    if (lastWords && nextWords) {
+      formatted += `\nNote: The cursor is at a sentence boundary. Generate new sentences that continue naturally from the context above.\n\n`;
+    } else if (lastWords) {
+      formatted += `⚠️ CURSOR AT END: Your text will continue after "...${lastWords}"\n\n`;
+    } else if (nextWords) {
+      formatted += `⚠️ CURSOR AT START: Your text will come before "${nextWords}..."\n\n`;
     }
   }
 
   // Add related sections if enabled and available
   if (includeRelated && context.relatedSections.length > 0) {
-    formatted += `[RELATED SECTIONS FROM DOCUMENT]\n`;
+    formatted += `RELATED SECTIONS FROM DOCUMENT (for context and consistency):\n`;
     context.relatedSections.forEach((section, i) => {
       formatted += `${i + 1}. ${section.trim()}\n\n`;
     });

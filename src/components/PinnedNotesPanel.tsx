@@ -117,9 +117,7 @@ export function PinnedNotesPanel({
               <path d="m6 11 6 6 6-6" />
               <path d="M19 21H5" />
             </svg>
-            <h3 style={{ margin: 0, fontSize: 'var(--fs-md)', fontWeight: 600 }}>
-              Pinned Notes
-            </h3>
+            <h3 style={{ margin: 0, fontSize: 'var(--fs-md)', fontWeight: 600 }}>Pinned Notes</h3>
             <span
               style={{
                 fontSize: 'var(--fs-xs)',
@@ -208,7 +206,14 @@ export function PinnedNotesPanel({
                 e.currentTarget.style.background = 'transparent';
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <path d="M18 6 6 18" />
                 <path d="m6 6 12 12" />
               </svg>
@@ -245,9 +250,7 @@ export function PinnedNotesPanel({
                 <path d="m6 11 6 6 6-6" />
                 <path d="M19 21H5" />
               </svg>
-              <p style={{ margin: 0, fontSize: 'var(--fs-sm)' }}>
-                No pinned notes yet
-              </p>
+              <p style={{ margin: 0, fontSize: 'var(--fs-sm)' }}>No pinned notes yet</p>
               <p style={{ margin: '8px 0 0', fontSize: 'var(--fs-xs)', opacity: 0.7 }}>
                 Create pinned notes in Settings to provide context for AI operations
               </p>

@@ -10,6 +10,7 @@ import {
   getNearestHeading,
   type ContextEngineOptions,
 } from '../utils/contextEngine';
+import { StorageService } from './storage';
 
 /**
  * AI availability status
@@ -196,6 +197,26 @@ export class AIService {
    */
   static isUserActivationActive(): boolean {
     return navigator.userActivation?.isActive ?? false;
+  }
+
+  /**
+   * Gets measurement unit context string for AI prompts
+   * @returns Context string with measurement unit preference
+   */
+  static async getMeasurementUnitContext(): Promise<string> {
+    try {
+      const settings = await StorageService.getSettings();
+      const unit = settings.measurementUnit || 'metric';
+      
+      if (unit === 'imperial') {
+        return 'Use imperial units (miles, pounds, Fahrenheit, gallons) for all measurements.';
+      } else {
+        return 'Use metric units (kilometers, kilograms, Celsius, liters) for all measurements.';
+      }
+    } catch (error) {
+      console.error('[AI] Failed to get measurement unit context:', error);
+      return 'Use metric units (kilometers, kilograms, Celsius, liters) for all measurements.';
+    }
   }
 
   /**
@@ -436,8 +457,11 @@ export class AIService {
       const now = new Date();
       const dateTimeContext = `Current date: ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
 
-      // Merge date/time, pinned notes, word count guidance, and bullet guidance into shared context
-      let sharedContext = dateTimeContext;
+      // Get measurement unit context
+      const measurementContext = await this.getMeasurementUnitContext();
+
+      // Merge date/time, measurement unit, pinned notes, word count guidance, and bullet guidance into shared context
+      let sharedContext = `${dateTimeContext}\n${measurementContext}`;
       if (options.pinnedNotes?.length) {
         sharedContext += `\n\nAudience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`;
       }
@@ -504,8 +528,11 @@ export class AIService {
     const now = new Date();
     const dateTimeContext = `Current date: ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
 
-    // Merge date/time and pinned notes into context
-    let sharedContext = dateTimeContext;
+    // Get measurement unit context
+    const measurementContext = await this.getMeasurementUnitContext();
+
+    // Merge date/time, measurement unit, and pinned notes into context
+    let sharedContext = `${dateTimeContext}\n${measurementContext}`;
     if (options.pinnedNotes?.length) {
       sharedContext += `\n\nAudience and tone guidance:\n${options.pinnedNotes.join('\n\n')}`;
     }
@@ -636,11 +663,12 @@ Output:`;
     const now = new Date();
     const dateTimeContext = `CURRENT DATE AND TIME: ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}\n`;
 
-    // Add project title context if available and relevant
-    let projectContext = '';
-    if (options.projectTitle) {
-      projectContext = `DOCUMENT TITLE: "${options.projectTitle}"\n`;
-    }
+    // Get measurement unit context
+    const measurementContext = await this.getMeasurementUnitContext();
+
+    // Note: We don't include project title in the prompt because it causes the AI
+    // to add unwanted markdown headers like "## My First Project" to the output
+    const projectContext = '';
 
     if (options.context) {
       // Extract text before and after cursor for better context
@@ -658,10 +686,11 @@ Output:`;
               ? 'an article'
               : 'a document';
 
-      // Build context in priority order: date/time → project title → document context → pinned notes → user instruction
+      // Build context in priority order: date/time → measurement unit → project title → document context → pinned notes → user instruction
       fullPrompt = `CRITICAL RULE: NEVER USE SQUARE BRACKETS [] FOR PLACEHOLDERS. NO [Name], [Date], [Company], [Boss's Name], [Your Name], or ANY [] placeholders. If you don't know a specific name or date, just omit it - do NOT make up fake names.
 
-${dateTimeContext}${projectContext}
+${dateTimeContext}${measurementContext}
+${projectContext}
 You are a writing assistant. The user is writing ${docTypeDesc} and needs you to generate text at their cursor position.
 
 CONTEXT BEFORE CURSOR:
@@ -673,23 +702,28 @@ ${options.pinnedNotes?.length ? `\nAUDIENCE AND TONE GUIDANCE:\n${options.pinned
 USER'S INSTRUCTION: ${prompt}
 
 ${options.smartInstructions ? `SPECIFIC INSTRUCTIONS FOR THIS CONTEXT:\n- ${options.smartInstructions}\n\n` : ''}
-RULES:
-1. Generate ONLY new text that fits at the cursor position
-2. Do NOT repeat, quote, or paraphrase any of the context text shown above - add NEW information only
+INSTRUCTIONS:
+• Generate new sentences that continue naturally from the context
+• Do NOT repeat text from the context above
+• Start with fresh content that flows from what came before
+• Output ONLY the generated text - no explanations or meta-commentary
 3. If the user asks to "talk more about" or "expand on" something, provide NEW details, examples, or perspectives - do NOT restate what's already written
 4. Match the writing style, tone, and format of the surrounding text
 5. Ensure the generated text flows naturally with what comes before and after
 6. Output ONLY the new text itself - no explanations, no meta-commentary
 7. Do NOT say things like "Here's the text:" or "Based on the context..."
 8. Start directly with the actual content
+9. Do NOT add markdown headers (##, ###) unless they already exist in the context
+10. Do NOT add a title or heading at the start - just write the body content
 
 ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it completely.`;
     } else {
       // No context - standalone generation
-      // Build context in priority order: date/time → project title → pinned notes → user instruction
+      // Build context in priority order: date/time → measurement unit → project title → pinned notes → user instruction
       fullPrompt = `CRITICAL RULE: NEVER USE SQUARE BRACKETS [] FOR PLACEHOLDERS. NO [Name], [Date], [Company], or ANY [] placeholders. If you don't know a specific name or date, just omit it - do NOT make up fake names.
 
-${dateTimeContext}${projectContext}${options.pinnedNotes?.length ? `AUDIENCE AND TONE GUIDANCE:\n${options.pinnedNotes.join('\n')}\n\n` : ''}USER'S INSTRUCTION: ${prompt}
+${dateTimeContext}${measurementContext}
+${projectContext}${options.pinnedNotes?.length ? `AUDIENCE AND TONE GUIDANCE:\n${options.pinnedNotes.join('\n')}\n\n` : ''}USER'S INSTRUCTION: ${prompt}
 
 ${options.smartInstructions ? `SPECIFIC INSTRUCTIONS:\n- ${options.smartInstructions}\n\n` : ''}
 INSTRUCTIONS:
@@ -697,6 +731,8 @@ INSTRUCTIONS:
 - Do NOT include any meta-commentary, explanations, or acknowledgments
 - Do NOT say things like "Here's the text:" or "I will generate..."
 - Start directly with the requested content
+- Do NOT add markdown headers (##, ###) or a title at the start
+- Just write the body content in plain paragraphs
 
 ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it completely.`;
     }
@@ -769,8 +805,13 @@ ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it com
   }
 
   /**
-   * Generates text with enhanced context awareness using the lightweight context engine
-   * Provides better document understanding by including relevant sections from the entire document
+   * Generates text with enhanced context awareness using a two-stage process:
+   * Stage 1: Generate continuation from left context (Writer API)
+   * Stage 2: Rewrite to smooth transitions with both left and right context (Rewriter API)
+   * 
+   * This approach works around the limitation that generation models can't do true infilling,
+   * but rewrite models can use bidirectional context to smooth transitions.
+   * 
    * @param prompt - The generation prompt
    * @param fullDocument - Complete document text
    * @param cursorPos - Current cursor position
@@ -805,12 +846,18 @@ ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it com
 
     console.log('[AI] Enhanced context assembled:', {
       localChars: assembledContext.localContext.length,
+      cursorOffset: assembledContext.cursorOffset,
+      textBeforeCursor: assembledContext.localContext.slice(0, assembledContext.cursorOffset).slice(-50),
+      textAfterCursor: assembledContext.localContext.slice(assembledContext.cursorOffset).slice(0, 50),
       relatedSections: assembledContext.relatedSections.length,
       totalChars: assembledContext.totalChars,
     });
 
     // Format context for prompt
     const formattedContext = formatContextForPrompt(assembledContext, true);
+    
+    console.log('[AI] Formatted context for prompt:');
+    console.log(formattedContext.substring(0, 500));
 
     // Get nearest heading for additional context
     const nearestHeading = getNearestHeading(fullDocument, cursorPos);
@@ -818,6 +865,9 @@ ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it com
     // Build enhanced prompt
     const now = new Date();
     const dateTimeContext = `CURRENT DATE AND TIME: ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}\n`;
+
+    // Get measurement unit context
+    const measurementContext = await this.getMeasurementUnitContext();
 
     let projectContext = '';
     if (options.projectTitle) {
@@ -837,10 +887,11 @@ ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it com
             ? 'an article'
             : 'a document';
 
-    // Build context in priority order: date/time → project title → document context → pinned notes → user instruction
+    // Build context in priority order: date/time → measurement unit → project title → document context → pinned notes → user instruction
     const fullPrompt = `CRITICAL RULE: NEVER USE SQUARE BRACKETS [] FOR PLACEHOLDERS. NO [Name], [Date], [Company], or ANY [] placeholders. If you don't know a specific name or date, just omit it.
 
-${dateTimeContext}${projectContext}
+${dateTimeContext}${measurementContext}
+${projectContext}
 You are a writing assistant. The user is writing ${docTypeDesc} and needs you to generate text at their cursor position.
 
 ${formattedContext}
@@ -848,15 +899,11 @@ ${options.pinnedNotes?.length ? `\nAUDIENCE AND TONE GUIDANCE:\n${options.pinned
 USER'S INSTRUCTION: ${prompt}
 
 ${options.smartInstructions ? `SPECIFIC INSTRUCTIONS FOR THIS CONTEXT:\n- ${options.smartInstructions}\n\n` : ''}
-RULES:
-1. Generate ONLY new text that fits at the cursor position
-2. Do NOT repeat any of the context text shown above - add NEW information only
-3. If the user asks to "talk more about" or "expand on" something, provide NEW details, examples, or perspectives - do NOT restate what's already written
-4. Match the writing style, tone, and format of the surrounding text
-5. Use information from related sections to maintain consistency
-6. Ensure the generated text flows naturally with what comes before and after
-7. Output ONLY the new text itself - no explanations, no meta-commentary
-8. Start directly with the actual content
+INSTRUCTIONS:
+• Generate new sentences that continue naturally from the context
+• Do NOT repeat text from the context above
+• Start with fresh content that flows from what came before
+• Output ONLY the generated text - no explanations or meta-commentary
 
 ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it completely.`;
 
@@ -871,6 +918,9 @@ ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it com
     } else {
       finalPrompt += `\n- Generate a moderate response (around 50 words)`;
     }
+    
+    console.log('[AI] Final prompt being sent (first 1000 chars):');
+    console.log(finalPrompt.substring(0, 1000));
 
     // Merge pinned notes into context
     const sharedContext = options.pinnedNotes?.length
@@ -912,7 +962,6 @@ ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it com
 
     // Fallback to Prompt API
     const promptWithContext = sharedContext ? `${sharedContext}\n\n${finalPrompt}` : finalPrompt;
-
     return this.prompt(promptWithContext);
   }
 
@@ -951,8 +1000,11 @@ ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it com
     const now = new Date();
     const dateTimeContext = `Current date: ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
 
-    // Build context-aware prompt in priority order: date/time → document context → pinned notes
-    let contextPrompt = dateTimeContext;
+    // Get measurement unit context
+    const measurementContext = await this.getMeasurementUnitContext();
+
+    // Build context-aware prompt in priority order: date/time → measurement unit → document context → pinned notes
+    let contextPrompt = `${dateTimeContext}\n${measurementContext}`;
 
     if (beforeContext.trim() || afterContext.trim()) {
       contextPrompt += '\n\nSurrounding context for style matching:';
@@ -1017,31 +1069,48 @@ ABSOLUTELY NO SQUARE BRACKETS [] - If you don't know a name or date, omit it com
       try {
         console.log('[AI] RewriteWithContext - Using Writer API for custom prompt');
 
-        const writerPrompt = `You are a text editor. Your ONLY job is to make a small edit to existing text.
+        const writerPrompt = `Edit this text according to the instruction. Output ONLY the edited text with no explanations.
 
-ORIGINAL TEXT (do NOT change anything except what the instruction asks):
-${text}
+TEXT TO EDIT:
+"${text}"
 
-EDIT INSTRUCTION:
-${options.customPrompt}
+INSTRUCTION: ${options.customPrompt}
 
-CRITICAL: Output ONLY the edited version of the ORIGINAL TEXT above. Do NOT write a new email or letter. Do NOT add greetings, signatures, or extra sentences. Just make the requested edit to the original text.`;
+RULES:
+- Output ONLY the edited version of the text in quotes above
+- Do NOT add extra sentences, greetings, or signatures
+- Make ONLY the specific change requested
+- Keep everything else exactly the same
+
+Edited text:`;
 
         const writer = await (self as any).Writer.create({
           tone: 'neutral',
           format: 'plain-text',
-          length: 'medium', // Writer API doesn't support 'as-is'
+          length: 'short', // Use 'short' to discourage adding extra content
           sharedContext: contextPrompt,
           outputLanguage: 'en',
         });
 
-        const result = await Promise.race([
+        let result = await Promise.race([
           writer.write(writerPrompt),
           new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('Operation timed out')), 30000)
           ),
         ]);
 
+        // Clean up common AI artifacts
+        result = result.trim();
+        
+        // Remove quotes if AI wrapped the output
+        if ((result.startsWith('"') && result.endsWith('"')) || 
+            (result.startsWith("'") && result.endsWith("'"))) {
+          result = result.slice(1, -1);
+        }
+        
+        // Remove "Edited text:" prefix if present
+        result = result.replace(/^Edited text:\s*/i, '');
+        
         console.log('[AI] RewriteWithContext - Writer API returned:', result);
         return result;
       } catch (error) {
@@ -1080,18 +1149,24 @@ Output:`;
   /**
    * Generates a smart title for a document based on user prompt only
    * Called BEFORE content generation to create a contextual title
-   * Uses Summarizer API in 'headline' mode for ultra-concise titles
+   * Uses Summarizer API in 'headline' mode for creative, catchy titles
    * @param userPrompt - The original user prompt/instruction
-   * @returns Promise resolving to a concise title (max 50 chars)
+   * @returns Promise resolving to a creative title (max 50 chars)
    * @throws Error if API is unavailable or user activation is missing
    */
   static async generateTitle(userPrompt: string): Promise<string> {
-    this.ensureUserActivation();
+    console.log('[AI] generateTitle called with prompt:', userPrompt);
+    
+    // Note: We don't check user activation here because this is called
+    // during the streaming operation which may take several seconds.
+    // User activation was already validated when the generate button was clicked.
 
     const availability = await this.checkAvailability();
+    console.log('[AI] Title generation availability:', availability);
 
     // Use mock provider if all APIs unavailable
     if (availability.summarizerAPI === 'unavailable' && availability.promptAPI === 'unavailable') {
+      console.log('[AI] Both APIs unavailable, using mock');
       // Fallback to simple title from prompt
       const words = userPrompt.split(' ').slice(0, 6).join(' ');
       return words.slice(0, 50);
@@ -1102,22 +1177,29 @@ Output:`;
       const now = new Date();
       const dateTimeContext = `Current date: ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
 
-      // Try Summarizer API first with 'headline' type for ultra-brief titles
+      // Get measurement unit context
+      const measurementContext = await this.getMeasurementUnitContext();
+
+      // Try Summarizer API first with 'headline' type for creative titles
       if (availability.summarizerAPI === 'available') {
+        console.log('[AI] Using Summarizer API for title generation');
         const summarizer = await (self as any).Summarizer.create({
           type: 'headline', // Ultra-brief, perfect for titles
           format: 'plain-text',
           length: 'short',
-          sharedContext: `${dateTimeContext}\n\nCreate an extremely brief title using ONLY 4-5 words maximum. Be concise and descriptive.`,
+          sharedContext: `${dateTimeContext}\n${measurementContext}\n\nCreate a CREATIVE, CATCHY title that grabs attention! Use 2-5 words. Think like a magazine editor or advertising copywriter. Be bold, memorable, and intriguing. Avoid boring phrases like "Guide to" or "Explained". Make it pop!`,
           outputLanguage: 'en',
         });
 
+        console.log('[AI] Summarizer created, calling summarize...');
         const title = await Promise.race([
           summarizer.summarize(userPrompt),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Operation timed out')), 10000)
+            setTimeout(() => reject(new Error('Summarizer timed out after 10s')), 10000)
           ),
         ]);
+        
+        console.log('[AI] Summarizer returned title:', title);
 
         // Clean up and truncate
         const cleanTitle = title
@@ -1130,16 +1212,32 @@ Output:`;
         return cleanTitle.slice(0, 50) || 'Untitled';
       }
 
-      // Fallback to Prompt API
+      // Fallback to Prompt API with creative instructions
+      console.log('[AI] Using Prompt API for title generation');
       const prompt = `${dateTimeContext}
 
-Create a brief title using ONLY 4-5 words maximum for a document based on this request:
+You are a bold, creative copywriter who writes viral headlines. Create a punchy, memorable title for:
 
 "${userPrompt}"
 
-Output ONLY the title text. Use 4-5 words maximum. Be extremely concise.`;
+Rules:
+- Use 2-5 words maximum
+- Be clever, witty, or intriguing
+- Avoid boring words: "Guide", "Explained", "Introduction", "Overview", "Document"
+- Think like a bestselling book title or viral article headline
+- Use power words, metaphors, or unexpected angles
+- Make people WANT to read it
+
+Examples of good titles:
+- "The SEO Playbook"
+- "Ranking Secrets"
+- "Search Domination"
+- "Visibility Unlocked"
+
+Output ONLY the title, nothing else.`;
 
       const result = await this.prompt(prompt);
+      console.log('[AI] Prompt API returned title:', result);
 
       // Clean up the response
       let title = result
@@ -1156,10 +1254,10 @@ Output ONLY the title text. Use 4-5 words maximum. Be extremely concise.`;
 
       return title || 'Untitled';
     } catch (error) {
-      console.error('[AI] Title generation failed:', error);
-      // Fallback to simple title from prompt
-      const words = userPrompt.split(' ').slice(0, 6).join(' ');
-      return words.slice(0, 50) || 'Untitled';
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('[AI] Title generation failed:', errorMsg, error);
+      // Re-throw the error so the caller can handle it with generateSmartTitle fallback
+      throw error;
     }
   }
 

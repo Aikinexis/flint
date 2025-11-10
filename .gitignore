@@ -1,24 +1,33 @@
+# Build output
+dist/
+coverage/
 
-.DS_Store
+# Dependencies
+node_modules/
+
+# Environment files
 .env
 .env.local
+
+# Editor directories and files
 .idea/
 .vscode/
+
+# Logs
 *.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
 *.swo
 *.swp
 *~
-# Build output
-# Dependencies
-# Editor directories and files
-# Environment files
-# Logs
-# OS files
+diff.txt
+
 # Package manager
-dist/
-node_modules/
-npm-debug.log*
 package-lock.json
 pnpm-lock.yaml
-Thumbs.db
 yarn.lock

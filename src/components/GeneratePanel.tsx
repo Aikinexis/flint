@@ -1289,5 +1289,31 @@ style.textContent = `
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
     background: var(--surface-2) !important;
   }
+  
+  .flint-btn.ghost {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+  
+  .flint-btn.ghost:hover,
+  .flint-btn.ghost:focus-visible {
+    border: 1px solid var(--border) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    background: var(--surface-2) !important;
+  }
+  
+  .generate-clear-btn {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+  
+  .generate-clear-btn:hover,
+  .generate-clear-btn:focus-visible {
+    border: 1px solid var(--border) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    background: var(--surface-2) !important;
+  }
 `;
 document.head.appendChild(style);
